@@ -3,10 +3,10 @@ import numpy
 import warnings
 import time
 import matplotlib.pyplot
-import mirdef8
+import mirdef
 
 
-reload(mirdef8)
+reload(mirdef)
 
 # creates actuator lists for all APO mirrors
 # mir25_prim_actList -- direct
@@ -22,10 +22,10 @@ encList = mir25_prim_encList
 actListFix = mir25_prim_actListFixed
 
 
-orientTest = [0,0,0,100,0,0] 
+orientTest = [0,0,0,100,0,100] 
 
 print '-------------------------- no fixed link -------------------------'
-Mir = mirdef8.DirectMirror(actList)
+Mir = mirdef.DirectMirror(actList)
 mount1 = Mir.orient2Mount(orientTest)
 print 'mount1: ', mount1
 t1=time.time()
@@ -36,11 +36,11 @@ print 'orient1: ', orient1
 print ' '
 print '-------------------------- fixed link -------------------------'
 
-Mir = mirdef8.DirectMirror(actListFix)
+Mir = mirdef.DirectMirrorZFix(actListFix)
 mount2 = Mir.orient2Mount(orientTest)
 print 'mount2 : ', mount2
 t1=time.time()
-orient2 = Mir.mount2Orient(mount1)
+orient2 = Mir.mount2Orient(mount2)
 print 'time: ', time.time() - t1
 
 print 'orient2: ', orient2
