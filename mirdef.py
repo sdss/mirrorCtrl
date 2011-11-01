@@ -1,7 +1,3 @@
-# renamed variables and functions to be more intuitive.
-# made direct mirror able to handle encoders, if they are specified.
-
-
 import numpy
 import scipy.optimize  
 import math
