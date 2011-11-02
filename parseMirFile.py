@@ -1,7 +1,6 @@
 import numpy
 import math
-import mirdef7
-import copy
+import link
 ################ 2.5m Primary #######################
 
 PrimMinMount = numpy.array([-120000., -120000., -120000., -90000., -50000., -50000])
@@ -25,20 +24,20 @@ PrimActBaseXYZ = numpy.vstack((PrimActBaseX, PrimActBaseY, PrimActBaseZ))
 mir25_prim_actList = []
 for k in range(len(PrimMinMount)):
 #   basePos, mirPos, minMount, maxMount, scale
-    act = mirdef7.LinearActuator(PrimActBaseXYZ[:,k], PrimActMirXYZ[:,k], PrimMinMount[k], 
+    act = link.AdjLengthLink(PrimActBaseXYZ[:,k], PrimActMirXYZ[:,k], PrimMinMount[k], 
                                  PrimMaxMount[k], PrimMountScale[k], PrimMountOffset[k])
     mir25_prim_actList.append(act)
 
 # make a version using a fixed link for rotZ    
 mir25_prim_actListFixed = mir25_prim_actList[0:5]  # take first 5
-fixed = mirdef7.FixedLink(PrimActBaseXYZ[:,5], PrimActMirXYZ[:,5])
+fixed = link.FixedLengthLink(PrimActBaseXYZ[:,5], PrimActMirXYZ[:,5])
 mir25_prim_actListFixed.append(fixed)
 # make a fake encoder list, 
 # by dist (mm)
 dist = 75 #mm about 3in according to Nick
 
-PrimActMirXYZ_e = copy.copy(PrimActMirXYZ)
-PrimActBaseXYZ_e = copy.copy(PrimActBaseXYZ)
+PrimActMirXYZ_e = PrimActMirXYZ.copy()
+PrimActBaseXYZ_e = PrimActBaseXYZ.copy()
 
 # offset in [0:3] offset radially (away from center) for pistons
 for k in range(3):
@@ -63,7 +62,7 @@ PrimActBaseXYZ_e[2,3:5] = PrimActBaseXYZ_e[2,3:5] - dist
 mir25_prim_encList = []
 for k in range(len(PrimMinMount) - 1):  # we don't want last actuator
 #   basePos, mirPos, minMount, maxMount, scale
-    act = mirdef7.LinearActuator(PrimActBaseXYZ_e[:,k], PrimActMirXYZ_e[:,k], PrimMinMount[k], 
+    act = link.AdjLengthLink(PrimActBaseXYZ_e[:,k], PrimActMirXYZ_e[:,k], PrimMinMount[k], 
                                  PrimMaxMount[k], PrimMountScale[k], PrimMountOffset[k])
     mir25_prim_encList.append(act)
     
@@ -91,16 +90,16 @@ SecActBaseXYZ = numpy.vstack((SecActBaseX, SecActBaseY, SecActBaseZ))
 mir25_sec_actList = []
 for k in range(len(SecMinMount)):
 #   basePos, mirPos, minMount, maxMount, scale
-    act = mirdef7.LinearActuator(SecActBaseXYZ[:,k], SecActMirXYZ[:,k], SecMinMount[k], 
+    act = link.AdjLengthLink(SecActBaseXYZ[:,k], SecActMirXYZ[:,k], SecMinMount[k], 
                                  SecMaxMount[k], SecMountScale[k], SecMountOffset[k])
     mir25_sec_actList.append(act)
     
-# create a fake FixedLink to constrain z rotation, extending in x, length = 150 mm
+# create a fake FixedLengthLink to constrain z rotation, extending in x, length = 150 mm
 
 mmPerMeter = 1000
 mirPos = numpy.array([0., 2.5 * mmPerMeter, -193.])
 basePos = numpy.array([150., 2.5 * mmPerMeter, -193.])
-act = mirdef7.FixedLink(basePos, mirPos)
+act = link.FixedLengthLink(basePos, mirPos)
 mir25_sec_actList.append(act)
     
 ##################### 3.5m Secondary #####################
@@ -124,7 +123,7 @@ SecActBaseXYZ = numpy.vstack((SecActBaseX, SecActBaseY, SecActBaseZ))
 mir35_sec_actList = []
 for k in range(len(SecMinMount)):
 #   basePos, mirPos, minMount, maxMount, scale
-    act = mirdef7.LinearActuator(SecActBaseXYZ[:,k], SecActMirXYZ[:,k], SecMinMount[k], 
+    act = link.AdjLengthLink(SecActBaseXYZ[:,k], SecActMirXYZ[:,k], SecMinMount[k], 
                                  SecMaxMount[k], SecMountScale[k], SecMountOffset[k])
     mir35_sec_actList.append(act)
        
@@ -150,13 +149,13 @@ TertActBaseXYZ = numpy.vstack((TertActBaseX, TertActBaseY, TertActBaseZ))
 mir35_tert_actList = []
 for k in range(len(TertMinMount)):
 #   basePos, mirPos, minMount, maxMount, scale
-    act = mirdef7.LinearActuator(TertActBaseXYZ[:,k], TertActMirXYZ[:,k], TertMinMount[k], 
-                                 TertMaxMount[k], TertMountScale[k], TertMountOffset[k])
+    act = link.AdjLengthLink(TertActBaseXYZ[:,k], TertActMirXYZ[:,k], TertMinMount[k], 
+                             TertMaxMount[k], TertMountScale[k], TertMountOffset[k])
     mir35_tert_actList.append(act)
 
 #last 3 actuators are fixed links    
 for k in range(len(TertMinMount),len(TertActMirX)):
 #   basePos, mirPos
-    act = mirdef7.FixedLink(TertActBaseXYZ[:,k], TertActMirXYZ[:,k])
+    act = link.FixedLengthLink(TertActBaseXYZ[:,k], TertActMirXYZ[:,k])
     mir35_tert_actList.append(act)
 
