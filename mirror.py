@@ -1,238 +1,17 @@
+"""Mirror
+"""
+import itertools
 import numpy
 import scipy.optimize  
 import math
 # numpy.seterr(all='raise')
+import link
 
 MMPerMicron = 1 / 1000.0        # millimeters per micron
 RadPerDeg  = math.pi / 180.0    # radians per degree
 ArcSecPerDeg = 60.0 * 60.0      # arcseconds per degree
 RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
-
-class BaseActuator(object):
-    """
-    A base class for linear actuators and fixed links.
-    Links are controlled in mount coordinates = steps, but all positions are in mm.
-    """
-    def __init__(self, isAdjustable, basePos, mirPos):
-        """
-        Inputs:
-        - isAdjustable: Boolean. True for actuators, False for fixed links.
-        - basePos:      cartesian position of end of actuator fixed to the base (mm)
-        - mirPos:       cartesian position of end of actuator attached to the mirror (mm)
-                          when the mirror is at neutral orientation
-        """
-        self.isAdjustable = bool(isAdjustable)
-        self.basePos = numpy.asarray(basePos, dtype=float)
-        if self.basePos.shape != (3,):
-            raise RuntimeError("basePos=%s must be 3 elements" % (basePos,))
-        self.mirPos = numpy.asarray(mirPos, dtype=float)
-        if self.mirPos.shape != (3,):
-            raise RuntimeError("mirPos=%s must be 3 elements" % (mirPos,))
-        self.neutralLength = self.measureMir2Base(self.mirPos)
-
-    def measureMir2Base(self, mirPos):
-        """
-        Return the distance (um), between a cartesian mirror position (mm) and the 
-        cartesian base position (mm) of the actuator.
-        """        
-        vec = numpy.asarray(mirPos, dtype=float) - self.basePos
-        length = math.sqrt(numpy.sum(vec**2) ) * (1. / MMPerMicron )
-        return length
-  
-class LinearActuator(BaseActuator):
-    """
-    Linear actuator with two ball joints: one attached to a base, the
-    other attached to a mirror. The actuator controls the length of the
-    link between the two ball joints. This model is an estimation. True
-    geometry is taken into account with the ComplexActuator object.
-    """
-    def __init__(self, basePos, mirPos, minMount, maxMount, scale, offset):
-        """
-        Inputs:
-        - basePos:  cartesian position of end of actuator fixed to the base (mm)
-        - mirPos:   cartesian position of end of actuator attached to the mirror (mm)
-                      when the mirror is at neutral orientation
-        - minMount: minimum length (steps)
-        - maxMount: maximum length (steps)
-        - scale:    actuator scale (mm/step)
-        """
-        BaseActuator.__init__(self, isAdjustable=True, basePos=basePos, mirPos=mirPos)
-        self.minMount = float(minMount)
-        self.maxMount = float(maxMount)
-        self.scale = float(scale)
-        self.offset = float(offset)
-    
-    def mountFromLength(self, length):
-        """
-        Return the mount position (steps) given the actuator length from its neutral position.
         
-        Input: 
-        -length: length from neutral position (um)
-        
-        Output:
-        -mount: mount units (steps)
-        """
-       
-        return self.offset + (self.scale * length)
-        
-    def lengthFromMount(self, mount):
-        """
-        Return the physical length (um) from the actuator's neutral
-        position given the mount position (steps).
-        
-        Input: 
-        -mount: mount units (steps)
-
-        Output:
-        -length: length from neutral position (um)
-        """
-        return (mount - self.offset) / self.scale
-    
-    def mountInRange(self, mount):
-        """Return True if the mount position is in range
-        """
-        return self.minMount <= mount <= self.maxMount
-        
-class ComplexActuator(LinearActuator):
-    """
-    Actuator with two ball joints: one attached near the base, the other
-    attached to a mirror. The actuator adjusts the length below the base
-    ball joint while the length between ball joints remains constant.
-    This differs from the LinearActuator object where the actuator
-    adjusts length between the ball joints. There is a difference
-    between these models because the mount motor axis is not necessarily
-    aligned with the link axis between ball joints. The mount motor axis
-    is defined by the vector basePos --> mirPos when the mirror is in
-    the neutral position, and the link axis is defined by the vector
-    basePos --> mirPos at any other mirror orientation. Methods defined
-    in this object can convert the length (um) along the link axis, to a
-    'true length' (um) along the actuator's motor axis. The
-    ComplexActuator is a more accurate representation of an actuator
-    than the LinearActuator object. Right now there are three different
-    methods to determine conversions, we should test and pick one (or
-    none).
-    """
-    def __init__(self, basePos, mirPos, minMount, maxMount, scale, offset):
-        """
-        Inputs:
-        - basePos: cartesian position of end of actuator fixed to the base (mm)
-        - mirPos:  cartesian position of end of actuator attached to the mirror (mm)
-                     when the mirror is at neutral orientation.
-        - minMount: minimum length (steps)
-        - maxMount: maximum length (steps)
-        - scale:    actuator scale: mm/step
-        """
-        LinearActuator.__init__(self, basePos, mirPos, minMount, maxMount, scale, offset)
-
-    def doActTrigCCS(self, phys, mirPos):
-        """
-        This method makes the approximation that the projection of the
-		'true length' along the actuator motor axis to the link axis is
-		equal to phys. This should be ok for small angles, and the
-		solution requires no trig functions.
-        
-        Inputs:
-        - phys:   actuator length (um)
-        - mirPos: cartesian position of end of actuator attached to the mirror (mm).
-        
-        Output:
-        - truePhys: corrected actuator length (um)
-        """
-
-        # Calculate unit vector along actuator axis of motion.
-        # This coordinate system might be upside down, but it should not effect the dot product.
-        actVec = self.mirPos - self.basePos
-        actUnitVec = actVec / math.sqrt(numpy.dot(actVec, actVec))
-        
-        # Calculate unit vector from basePos to a given mirPos (link axis).
-        mirVec = mirPos - self.basePos
-        mirUnitVec = mirVec / math.sqrt(numpy.dot(mirVec, mirVec))
-        
-        # Use right triangle trig to solve for truePhys value.
-        # cos(theta) = adjacent / hypotenuse
-        # theta = acos(actUnitVec dot mirUnitVec)
-        # adjacent = phys
-        # hypotenuse = truePhys
-        truePhys = phys / numpy.dot(actUnitVec, mirUnitVec)
-        return truePhys
-               
-    def doActTrigRO1(self, phys, mirPos):
-        """ 
-        This method should be the exact solution, with no
-        approximations. The trig functions may slow it down.
-        
-        Inputs:
-        - phys:   actuator length (um), not used
-        - mirPos: cartesian position of end of actuator attached to the mirror (mm).
-        
-        Output:
-        - a: corrected actuator length (um)
-        """
-        
-        r_not = self.neutralLength
-        
-        # Calculate vector from basePos to a given mirPos, convert to um.
-        r = (mirPos - self.basePos) * (1 / MMPerMicron)
-
-        # Calculate unit vector in direction of motor mount axis.
-        actVec = self.mirPos - self.basePos
-        actUnitVec = actVec / math.sqrt(numpy.dot(actVec, actVec))
-        
-        # Get projection of mirVec (link axis) along axis of motor mount.
-        x = numpy.dot(r, actUnitVec)
-        
-        # Get projection of mirVec (link axis) along axis perpendicular to motor mount.
-        y = numpy.cross(r, actUnitVec)
-        
-        # Cross product is a vector, we want just the magnitude.
-        y = math.sqrt(numpy.dot(y, y))
-        
-        a = x - r_not * math.cos(math.asin(y / r_not))
-        
-        return a
-        
-    def doActTrigRO2(self, phys, mirPos):
-        """
-		This method uses a small angle approximation to eliminate trig functions used in
-        doActTrigR01.
-        
-        Inputs:
-        - phys: actuator length (um), not used
-        - mirPos: cartesian position of end of actuator attached to the mirror (mm).
-        
-        Output:
-        - a: corrected actuator length (um)
-        """
-        r_not = self.neutralLength
-        
-        # Calculate vector from basePos to a given mirPos, convert to um.
-        r = (mirPos - self.basePos) * (1 / MMPerMicron)
-
-        # Calculate unit vector in direction of motor mount axis.
-        actVec = self.mirPos - self.basePos
-        actUnitVec = actVec / math.sqrt(numpy.dot(actVec, actVec))
-        
-        # Get projection of mirVec (link axis) along axis of motor mount.
-        x = numpy.dot(r, actUnitVec)
-        
-        # Get projection of mirVec (link axis) along axis perpendicular to motor mount.
-        y = numpy.cross(r, actUnitVec)
-        
-        # Cross product is a vector, we want just the magnitude.
-        y = math.sqrt(numpy.dot(y, y))
-        
-        a = x + y**2 / (2 * r_not) - r_not
-        
-        return a        
-                                      
-class FixedLink(BaseActuator):
-    """A fixed-length link with two ball joints: one attached to a base, the other attached to a mirror
-    """
-    def __init__(self, basePos, mirPos):
-        BaseActuator.__init__(self, isAdjustable=False, basePos=basePos, mirPos=mirPos)
-        
-Encoder = LinearActuator
-
 class DirectMirror(object):
     """
     A Direct Mirror Object. All actuators connected directly to mirror. If an encoderList is not
@@ -242,31 +21,33 @@ class DirectMirror(object):
         """
         Inputs:
         - actuatorList: 6 item list of actuator or fixed link objects.
-							This list is used when determining mount units from a given
-							orientation (see orient2Mount method).
+						This list is used when determining mount units from a given
+						orientation (see orient2Mount method).
         - encoderList:  (optional) 6 item list of encoder objects, 1 for each actuator. If an 
-        			        actuator has no respective encoder, enter 'None'. In the case 
-        			        of 'None', the actuator is substituted for an encoder. This list is 
-        			        used when determining and orientation from a given set of mount
-        			       coordinates (see mount2Orient method).
-        rotZConst: 		Boolean. Set to True if Z rotation is constrained by a fixed link.
-        				    this could be later generalized to allow constraints on any axis.
+        			    actuator has no respective encoder, enter 'None'. In the case 
+        			    of 'None', the actuator is substituted for an encoder. This list is 
+        			    used when determining and orientation from a given set of mount
+        			    coordinates (see mount2Orient method).
+        - rotZConst: 	Boolean. Set to True if Z rotation is constrained by a fixed link.
+        				this could be later generalized to allow constraints on any axis.
         """
         if len(actuatorList) != 6:
-            raise RuntimeError("Need exactly 6 actuators; %s supplied" % (len(actuatorList,)))
-        self.actuatorList = actuatorList   # for orient2mount
-        if encoderList == None:
-            self.encoderList = actuatorList  # for mount2orient
+            raise RuntimeError("Need exactly 6 actuators; %s supplied" % (len(actuatorList),))
+        self.actuatorList = actuatorList
+        if not encoderList:
+            self.hasEncoders = False
+            self.encoderList = actuatorList
         else:
+            self.hasEncoders = True
             if len(encoderList) != 6:
                 raise RuntimeError("encoderList=%s must be 6 elements, insert 'None' in list if \n\
                                     there is a 'missing' encoder" % len(encoderList))
         
             # Populate encoderList with encoders, using actuators in place of 'None' encoder.
             self.encoderList = []
-            for ind, enc in enumerate(encoderList):
+            for enc, act in itertools.izip(encoderList, actuatorList):
                 if enc == None:
-                    self.encoderList.append(actuatorList[ind])
+                    self.encoderList.append(act)
                 else:
                     self.encoderList.append(enc)
         self.rotZConst = rotZConst
@@ -283,7 +64,7 @@ class DirectMirror(object):
         Output: 1 + sum(deltaPhysMult * deltaPhysErr ** 2)
         """       
         # called only from mount2Orient
-        deltaPhys = self._orient2DeltaPhys(orient, actuatorList)
+        deltaPhys = self._orient2Phys(orient, actuatorList)
         deltaPhysErr = (deltaPhys - g_deltaPhys) ** 2
         return 1 + sum(g_deltaPhysMult * deltaPhysErr)
         
@@ -295,12 +76,11 @@ class DirectMirror(object):
         orientation. 
         
         Input:
-        - orient[0:5]:  mirror orientation with 6 axes 6 item list:
-        - orient[0]:    piston (um)
-        - orient[1:3]:  x-y tilt (")
-        - orient[3:5]:  x-y translation (um)
-        - orient[5]:    z rotation (")     
-        - actuatorList: 6 element list of LinearActuator or Encoder objects.
+        - orient:  mirror orientation with 6 axes 6 item list:
+            - orient[0]:    piston (um)
+            - orient[1:3]:  x-y tilt (")
+            - orient[3:5]:  x-y translation (um)
+            - orient[5]:    z rotation (")     
 
         Outputs: 
         - rotMatXY: 3x3 rotation matrix defined from x-y tilts
@@ -334,7 +114,7 @@ class DirectMirror(object):
                                 [-sinY, 0, cosY] ])
 
         # Create single vector rotation matrix, rotate by X first, Y second
-        rotMatXY = numpy.dot(rotMatY, rotMatX) # this is right
+        rotMatXY = numpy.dot(rotMatY, rotMatX)
 
         sinZ = math.sin(rotZ)
         cosZ = math.cos(rotZ)
@@ -345,7 +125,7 @@ class DirectMirror(object):
         
         return rotMatXY, rotMatZ, offsets
         
-    def _orient2DeltaPhys(self, orient, actuatorList):
+    def _orient2Phys(self, orient, actuatorList):
         """
         Translated from: src/subr/mir/oneorient2mount.for
         src/subr/mir/oneOrient2Phys.for does most of work
@@ -356,11 +136,11 @@ class DirectMirror(object):
         - orient[1:3]:  x-y tilt (")
         - orient[3:5]:  x-y translation (um)
         - orient[5]:    z rotation (")     
-        - actuatorList: 6 element list of LinearActuator or Encoder objects.
+        - actuatorList: 6 element list of AdjLengthLink or Encoder objects.
 
         Output: 
         - deltaPhysList[0:5]: delta length for actuators (um) measured from the neutral position.
-        				        FixedLink actuators always return a deltaPhys of 0 because they
+        				        FixedLengthLink actuators always return a deltaPhys of 0 because they
         				        cannot change length.
         """
 
@@ -378,7 +158,6 @@ class DirectMirror(object):
             
             # Rotate 3-vector
             actMirPos = numpy.dot(rotMatXY, actUnrot)
-           
             
             # Rotate xy coordinate system about z axis
             actMirPos[0:2] = numpy.dot(rotMatZ, actMirPos[0:2]) 
@@ -388,12 +167,12 @@ class DirectMirror(object):
             actMirPos = actMirPos + offsets
             
             if act.isAdjustable:
-                deltaPhys = act.measureMir2Base(actMirPos) - act.neutralLength  
+                deltaPhys = act.lengthFromMirPos(actMirPos) - act.neutralLength  
                                
                 try:
-                    # compute new phys if act is a ComplexActuator. Choose your favorite 
+                    # compute new phys if act is a AdjBaseActuator. Choose your favorite 
                     # method.
-                    deltaPhys = act.doActTrigRO2(deltaPhys, actMirPos)
+                    deltaPhys = act.physFromMirPosRO(deltaPhys, actMirPos)
                 except AttributeError:
                     pass
             else:
@@ -434,7 +213,7 @@ class DirectMirror(object):
         # compute physical position at zero orientation, won't this always be zero?!?
         # why compute it?
         orient  = numpy.zeros((6,))
-        deltaPhysAtZero = self._orient2DeltaPhys(orient, actuatorList)
+        deltaPhysAtZero = self._orient2Phys(orient, actuatorList)
         
         # Compute delta physical length at perturbed orientations
         # Sum the square of errors
@@ -445,7 +224,7 @@ class DirectMirror(object):
         
         maxDeltaPhysErr = numpy.zeros(actNum)
         for pert in orient:
-            deltaPhys = self._orient2DeltaPhys(pert, actuatorList)
+            deltaPhys = self._orient2Phys(pert, actuatorList)
             # sum over perturbations
             maxDeltaPhysErr = maxDeltaPhysErr + (deltaPhys - deltaPhysAtZero) ** 2   
         
@@ -489,7 +268,7 @@ class DirectMirror(object):
         
         # We read from actuators to compute mount positions
         actuatorList = self.actuatorList
-        deltaPhysList = self._orient2DeltaPhys(orient, actuatorList)
+        deltaPhysList = self._orient2Phys(orient, actuatorList)
         mountList = []
         for ind, act in enumerate(actuatorList):
             if act.isAdjustable:
@@ -497,14 +276,14 @@ class DirectMirror(object):
                 if act.mountInRange(mount) != 1:
                     raise RuntimeError('mount=%f, out of range for actuator %i' % (mount,counter))
                 mountList.append(mount)
-            # should we return a mount value for a FixedLink?  I am not. If you want it uncomment:
+            # should we return a mount value for a FixedLengthLink?  I am not. If you want it uncomment:
             #else:
                  #mountList.append(0.) # fixed link, no mount change
         return numpy.asarray(mountList, dtype=float)
         
 class DirectMirrorZFix(DirectMirror):
     """
-    A class of mirror with a FixedLink constraining Z rotation. The only
+    A class of mirror with a FixedLengthLink constraining Z rotation. The only
     added feature of this object is that an extra optimization is used
     to incorporate the residual z rotation induced from the fixed link
     at a given mirror orientation.
@@ -525,7 +304,7 @@ class DirectMirrorZFix(DirectMirror):
         - Z:      z rotation angle in ArcSec. Parameter to be optimized.
         - orient: 6 axis orientation with Z rotation set to zero, this is 
         			the output of mount2Orient.         
-        - act: 	  The FixedLink, with a length that is conserved.
+        - act: 	  The FixedLengthLink, with a length that is conserved.
         
         Outputs: 1 + (measuredLinkLength - knownLinkLength)^2, thus the minimum
         		   value we seek is 1.
@@ -543,7 +322,7 @@ class DirectMirrorZFix(DirectMirror):
         # apply all translations to compute final positions of
         # the mirror end gimbals of the actuators
         actMirPos = actMirPos + offsets
-        deltaPhys = act.measureMir2Base(actMirPos) - act.neutralLength  
+        deltaPhys = act.lengthFromMirPos(actMirPos) - act.neutralLength  
         # in reality, deltaPhys = 0, because the measured distance between the fixed link's
         # mirPos and basePos should always equal the neutralLength. We are using this fact to
         # minimize the difference between measured length and expected length by varying Z
@@ -552,7 +331,7 @@ class DirectMirrorZFix(DirectMirror):
 
     def _computeZRot(self, orient):
         """
-        For a given oriention, find the correct Z rotation value taking into account the FixedLink
+        For a given oriention, find the correct Z rotation value taking into account the FixedLengthLink
         constraining the Z rotation.
         """
         # Take Z rotation fixed link into account when computing orientation.
@@ -580,7 +359,7 @@ class DirectMirrorZFix(DirectMirror):
     def mount2Orient(self, mount):
     	"""
     	Most of the work is done in _mount2Orient, which will return with a z rotation of 0.
-    	The actual z rotation induced by the FixedLink is then computed using _computeZRot.
+    	The actual z rotation induced by the FixedLengthLink is then computed using _computeZRot.
     	
         Input:
         - mount[0:n]: mount position for n actuators or encoders. 
@@ -643,25 +422,21 @@ class TipTransMirror(DirectMirror):
                                                          cosPol ]  ])  
         return rotMatEqPol
                                 
-    def _orient2DeltaPhys(self, orient, actuatorList):
-        """
-        translated from: src/subr/mir/oneorient2mount.for
-        src/subr/mir/oneOrient2Phys.for does most of work
+    def _orient2Phys(self, orient, actuatorList):
+        """Compute physical actuator or encoder length given orientation.
         
         Input:
-        - orient[0:5]:  mirror orientation with 6 axes 6 item list:
-        - orient[0]:    piston (um)
-        - orient[1:3]:  x-y tilt (")
-        - orient[3:5]:  x-y translation (um)
-        - orient[5]:    z rotation (")     
-        - actuatorList: 6 element list of LinearActuator or Encoder objects.
+        - orient:  mirror orientation with 6 axes 6 item list:
+        - actuatorList: 6 element list of AdjLengthLink or Encoder objects.
 
         Output: 
         - deltaPhysList[0:5]: delta length for actuators (um) measured from the neutral position.
-        				        FixedLink actuators always return a deltaPhys of 0 because they
+        				        FixedLengthLink actuators always return a deltaPhys of 0 because they
         				        cannot change length.
-        """
 
+        translated from: src/subr/mir/oneorient2mount.for
+        src/subr/mir/oneOrient2Phys.for does most of work
+        """
         # starting from line 152 in oneOrient2Phys.for (special case = tiptransmir)
         
         # Determine ctrMirPos, the final position of the central linear
@@ -728,13 +503,13 @@ class TipTransMirror(DirectMirror):
             actMirPos = actMirPos + ctrBasePos
             if act.isAdjustable:
                 try:
-                    # compute new phys if act is a ComplexActuator
-                    deltaPhys = act.doActTrigRO2(deltaPhys, actMirPos)
+                    # compute new phys if act is a AdjBaseActuator
+                    deltaPhys = act.physFromMirPosRO(deltaPhys, actMirPos)
                 except AttributeError:
                     pass                        
-                deltaPhys = act.measureMir2Base(actMirPos) - act.neutralLength    
+                deltaPhys = act.lengthFromMirPos(actMirPos) - act.neutralLength    
                 # phys units: um
             else:
-                deltaPhys = 0.  # no change in actuator length (FixedLink)
+                deltaPhys = 0.  # no change in actuator length (FixedLengthLink)
             deltaPhysList.append(deltaPhys)
         return numpy.asarray(deltaPhysList, dtype=float)
