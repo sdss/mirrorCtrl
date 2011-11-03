@@ -110,12 +110,49 @@ class MirrorBase(object):
         phys = [link.physFromMount(mt) for mt, link in itertools.izip(mount, linkList)]
         return self._orientFromPhys(phys, linkList)
     
-    def _orientFromPhyis(self, orient, linkList):
-        """Compute mount link length from orientation.
+    def _orientFromPhys(self, phys, linkList):
+        """Compute mirror orientation give the physical position of each actuator. Uses fitting.
         
-        Subclasses must override
+        Input:
+        - phys: physical position of each actuator or encoder; the position for fixed links will be ignored
+        - linkList: list of actuators or encoders (not fixed links!)
+       
+        Output:
+        - orient: mirror orientation (an Orientation)
         """
-        raise NotImplementedError()
+        numLinks = len(linkList)        
+
+        # Compute physical errors
+        maxOrientErr = Orientation(0.0001, 5e-8, 5e-8, 0.0001, 0.0001, 5e-7)
+        
+        # Compute delta physical length at perturbed orientations
+        # Sum the square of errors
+        # Orient is zeros except one axis on each iteration.
+        
+        # diagonal matrix for easily extracting orientations with a single non-zero element
+        orientSet = numpy.diag(maxOrientErr, 0)
+        
+        maxPhysErrSq = numpy.zeros(numLinks)
+        for pertOrient in orientSet:
+            pertOrient = Orientation(*pertOrient)
+            pertPhys = self._physFromOrient(pertOrient, linkList)
+            maxPhysErrSq += pertPhys**2   
+        physMult = 1.0 / maxPhysErrSq
+
+        # initial guess ("home")
+        initOrient = numpy.zeros(6)
+        fitTol = 1e-8
+        maxIter = 10000
+        phys = numpy.asarray(phys, dtype=float) # is this necessary?
+        orient = scipy.optimize.fmin_powell(
+            self._orientFromPhysErr,
+            initOrient, 
+            args = (phys, physMult, linkList), 
+            maxiter = maxIter,
+            ftol = fitTol,
+        )
+                                    
+        return Orientation(*orient)
 
     def _orient2RotTransMats(self, orient):
         """
