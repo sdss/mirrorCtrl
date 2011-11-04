@@ -14,7 +14,11 @@ Important attributes of adjustable links:
 - mount length: length of actuator/sensor in native units: microsteps or ticks;
     this differs from mount by an offset and a scale:
     mount = offset + (scale * phys)
+<<<<<<< HEAD
 - length: the distance from the base ball joint to the mirror ball joint
+=======
+- length: the distance from the base ball joint to the 
+>>>>>>> master
 
 There are three kinds of links supported in this file:
 - FixedLengthLink: length does not change
@@ -118,6 +122,7 @@ class AdjustableLink(BaseLink):
         self.offset = float(offset)
         # Unit vector defining the axis of mount motor
         self.pistonDir = (self.mirPos - self.basePos) / numpy.linalg.norm((self.mirPos - self.basePos))
+
     
     def mountFromPhys(self, phys):
         """Compute mount length (steps) of adjustable element given its physical length (mm)
