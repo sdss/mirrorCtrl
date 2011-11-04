@@ -60,13 +60,13 @@ PrimActMirXYZ_e[2,3:5] = PrimActMirXYZ_e[2,3:5] - dist  # - sign puts encoder be
 PrimActBaseXYZ_e[2,3:5] = PrimActBaseXYZ_e[2,3:5] - dist    
 
 mir25_prim_encList = []
-for k in range(len(PrimMinMount) - 1):  # we don't want last actuator
+for k in range(len(PrimMinMount)):  
 #   basePos, mirPos, minMount, maxMount, scale
     act = link.AdjLengthLink(PrimActBaseXYZ_e[:,k], PrimActMirXYZ_e[:,k], PrimMinMount[k], 
                                  PrimMaxMount[k], PrimMountScale[k], PrimMountOffset[k])
     mir25_prim_encList.append(act)
     
-mir25_prim_encList.append(None) # no encoder for rotZ
+
 
 
 ############### 2.5m Secondary #############################

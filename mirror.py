@@ -19,7 +19,7 @@ Orientation = collections.namedtuple("Orientation", ["piston", "tiltX", "tiltY",
 #     return 
 
 class MirrorBase(object):
-    def __init__(self, actuatorList, fixedLinkList, encoderList=None):
+    def __init__(self, actuatorList, fixedLinkList, encoderList):
         """Construct a MirrorBase
 
         Inputs:
@@ -115,7 +115,8 @@ class MirrorBase(object):
         """Compute mirror orientation give the physical position of each actuator. Uses fitting.
         
         Input:
-        - phys: physical position of each actuator or encoder; the position for fixed links will be ignored
+        - phys: physical position of each actuator or encoder; the position for fixed 
+                  links will be ignored
         - linkList: list of actuators or encoders (not fixed links!)
        
         Output:
@@ -200,7 +201,7 @@ class MirrorBase(object):
 class DirectMirror(MirrorBase):
     """A mirror supported by 6 actuators or fixed links connected directly to the mirror.
     """
-    def __init__(self, actuatorList, encoderList=None):
+    def __init__(self, actuatorList, fixedLinkList, encoderList = None):
         """
         Inputs:
         - actuatorList: List of the 6 actuators actuators and fixed links that support the mirror.
@@ -212,7 +213,7 @@ class DirectMirror(MirrorBase):
         - control piston, tip and tilt only (no translation or z rotation)
         - control piston, tip, tilt and translation (no z rotation)
         """
-        MirrorBase.__init__(self, actuatorList, encoderList)
+        MirrorBase.__init__(self, actuatorList, fixedLinkList, encoderList)
               
     def _orientFromPhysErr(self, orient, phys, physMult, linkList):
         """Function to minimize while computing _orientFromPhys
@@ -296,8 +297,7 @@ class DirectMirror(MirrorBase):
             maxiter = maxIter,
             ftol = fitTol,
         )
-          
-        print orient  
+
         return Orientation(*orient)
 
 class TipTransMirror(MirrorBase):
@@ -306,8 +306,8 @@ class TipTransMirror(MirrorBase):
     orient2phys method is different, other methods are same as
     DirectMirror obj.
     """
-    def __init__(self, ctrMirZ, ctrBaseZ, actuatorList, encoderList = None):
-        MirrorBase.__init__(self, actuatorList, encoderList)
+    def __init__(self, ctrMirZ, ctrBaseZ, actuatorList, fixedLinkList, encoderList = None):
+        MirrorBase.__init__(self, actuatorList, fixedLinkList, encoderList)
         self.ctrMirZ = ctrMirZ
         self.ctrBaseZ = ctrBaseZ
         
@@ -358,6 +358,8 @@ class TipTransMirror(MirrorBase):
         Output:
         - 1 + sum(physMult * physErrSq**2)
         """
+        # for this mirror type we are only minimizing 5 axes of orient.
+        # A sixth is tagged on so that _physFromOrient will always run with a z rot of zero.
         orient = numpy.hstack((orient, 0.))
         physFromOrient = self._physFromOrient(orient, linkList)
         physErrSq = (physFromOrient - phys)**2
