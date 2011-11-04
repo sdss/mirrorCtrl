@@ -63,7 +63,7 @@ print "act phys at neutral: ", dirMir._physFromOrient([0]*6, dirMir.actuatorList
 mount1 = dirMir.actuatorMountFromOrient(orientTest)
 print 'actuator mount1: ', numpy.array(mount1)
 t1=time.time()
-orient1 = dirMir.orientFromEncoderMount(mount1)
+orient1 = dirMir.orientFromActuatorMount(mount1)
 print 'time: ', time.time() - t1
 
 orientErr = numpy.array(orient1) - orientTest

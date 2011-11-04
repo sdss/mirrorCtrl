@@ -226,7 +226,14 @@ class DirectMirror(MirrorBase):
         
         Output:
         - 1 + sum(physMult * physErrSq**2)
-        """       
+        """
+        # z rotation may be ignored in the minimization
+        if len(orient) == 5:
+            # so we make it always 0
+            orient = numpy.hstack((orient, 0.))
+        if len(orient) != 6:
+            raise RuntimeError('Orient not fully defined in minimization, only\
+                                %i axes specified' % (len(orient)))
         physFromOrient = self._physFromOrient(orient, linkList)
         physErrSq = (physFromOrient - phys)**2
         return 1 + numpy.sum(physMult * physErrSq)
@@ -266,8 +273,7 @@ class DirectMirror(MirrorBase):
         Output:
         - orient: mirror orientation (an Orientation)
         """
-        numLinks = len(linkList)        
-
+        numLinks = len(linkList)
         # Compute physical errors
         maxOrientErr = Orientation(0.0001, 5e-8, 5e-8, 0.0001, 0.0001, 5e-7)
         
@@ -286,7 +292,12 @@ class DirectMirror(MirrorBase):
         physMult = 1.0 / maxPhysErrSq
 
         # initial guess ("home")
-        initOrient = numpy.zeros(6)
+        
+        # If only 5 links are specified in linkList, we assume a fixed length link is present
+        # constraining Z rotation. We don't want to allow Z rotation to vary when we are
+        # searching for a solution where Z rotation is actually constant (and equal to zero).
+        # Only do a minimization for links that can vary!
+        initOrient = numpy.zeros(numLinks)
         fitTol = 1e-8
         maxIter = 10000
         phys = numpy.asarray(phys, dtype=float) # is this necessary?
@@ -298,6 +309,11 @@ class DirectMirror(MirrorBase):
             ftol = fitTol,
         )
 
+        # z rotation may be have been ignored in the minimization
+        if len(orient) == 5:
+            # so we return it as 0
+            orient = numpy.hstack((orient, 0.))
+        
         return Orientation(*orient)
 
 class TipTransMirror(MirrorBase):
@@ -466,8 +482,7 @@ class TipTransMirror(MirrorBase):
         Output:
         - orient: mirror orientation (an Orientation)
         """
-        numLinks = len(linkList)        
-
+        numLinks = len(linkList)
         # Compute physical errors
         maxOrientErr = Orientation(0.0001, 5e-8, 5e-8, 0.0001, 0.0001, 5e-7)
         
