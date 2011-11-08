@@ -46,8 +46,8 @@ actList = parseMirFile.mir25_prim_actList
 encList = parseMirFile.mir25_prim_encList
 
 
-orientTest = mirror.Orientation(5, 0.02, 5e-4, 5, 5, 0)
-#orientTest = mirror.Orientation(0, 0.02, 0, 0, 0, 0)
+#orientTest = mirror.Orientation(5, 0.02, 5e-4, 5, 5, 0)
+orientTest = mirror.Orientation(0, 0, 0.02, 5, 0, 0)
 print
 print
 print '-------------------------- New Run -------------------------'
@@ -79,8 +79,7 @@ print '-------------------------- fixed link with encoder-----------------------
 printOrient('initial orient', orientTest)
 flActList = actList[0:-1]
 fixedLink = actList[-1]
-enc2=encList[0:4]
-enc2.extend([None])
+enc2=encList[0:5]
 fixedLinkList = [link.FixedLengthLink(basePos = fixedLink.basePos, mirPos = fixedLink.mirPos)]
 Mir = mirror.DirectMirror(flActList, fixedLinkList, enc2)
 mount2 = Mir.actuatorMountFromOrient(orientTest)
@@ -96,33 +95,35 @@ mount3 = Mir.actuatorMountFromOrient(orient2)
 mountError = numpy.array(mount3) - mount2
 print "actuator mount error: ", mountError
 
-print
-print '-------------------------- tip trans no fixed link -------------------------'
-printOrient('initial orient', orientTest)
-
-actList = parseMirFile.mir25_sec_actList
-flActList = actList[0:-1]
-fixedLink = actList[-1]
-
-SecCtrMirZ = -135.70
-SecCtrBaseZ = -178.40
-
-
-dirMir = mirror.TipTransMirror(SecCtrMirZ, SecCtrBaseZ, flActList, fixedLinkList)
-
-print "act phys at neutral: ", dirMir._physFromOrient([0]*6, dirMir.actuatorList)
-
-
-
-mount1 = dirMir.actuatorMountFromOrient(orientTest)
-print 'actuator mount1: ', numpy.array(mount1)
-t1=time.time()
-orient1 = dirMir.orientFromActuatorMount(mount1)
-print 'time: ', time.time() - t1
-
-orientErr = numpy.array(orient1) - orientTest
-printOrient("orient error", orientErr)
-
-mount2 = dirMir.actuatorMountFromOrient(orient1)
-mountError = numpy.array(mount2) - mount1
-print "actuator mount error: ", mountError
+# print
+# print '-------------------------- tip trans no fixed link with encoder-------------------------'
+# printOrient('initial orient', orientTest)
+# 
+# actList = parseMirFile.mir25_sec_actList
+# print len(actList)
+# flActList = actList[0:-1]
+# print len(flActList)
+# fixedLink = actList[-1]
+# 
+# SecCtrMirZ = -135.70
+# SecCtrBaseZ = -178.40
+# 
+# 
+# dirMir = mirror.TipTransMirror(SecCtrMirZ, SecCtrBaseZ, flActList, fixedLinkList, flActList)
+# 
+# print "act phys at neutral: ", dirMir._physFromOrient([0]*6, dirMir.actuatorList)
+# 
+# 
+# 
+# mount1 = dirMir.actuatorMountFromOrient(orientTest)
+# print 'actuator mount1: ', numpy.array(mount1)
+# t1=time.time()
+# orient1 = dirMir.orientFromActuatorMount(mount1)
+# print 'time: ', time.time() - t1
+# 
+# orientErr = numpy.array(orient1) - orientTest
+# printOrient("orient error", orientErr)
+# 
+# mount2 = dirMir.actuatorMountFromOrient(orient1)
+# mountError = numpy.array(mount2) - mount1
+# print "actuator mount error: ", mountError

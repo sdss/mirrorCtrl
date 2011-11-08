@@ -4,12 +4,15 @@ The units for orientation are mm and radians (not user-friendly units, but best 
 """
 import collections
 import itertools
+import copy
 import numpy
 import scipy.optimize  
 import math
 # numpy.seterr(all='raise')
 import link
 
+fitTol = 1e-8
+maxIter = 10000
 # Orientation of mirror; units are mm and radians
 Orientation = collections.namedtuple("Orientation", ["piston", "tiltX", "tiltY", "transX", "transY", "rotZ"])
 
@@ -110,20 +113,22 @@ class MirrorBase(object):
         phys = [link.physFromMount(mt) for mt, link in itertools.izip(mount, linkList)]
         return self._orientFromPhys(phys, linkList)
     
-
     def _orientFromPhys(self, phys, linkList):
         """Compute mirror orientation give the physical position of each actuator. Uses fitting.
         
         Input:
-        - phys: physical position of each actuator or encoder; the position for fixed 
-                  links will be ignored
+        - phys: physical position of each actuator or encoder; the position for fixed links will be ignored
         - linkList: list of actuators or encoders (not fixed links!)
        
         Output:
         - orient: mirror orientation (an Orientation)
         """
-        numLinks = len(linkList)        
-
+        # we want to compute orient using fixed link constraints
+        linkList = copy.copy(linkList) # don't wanna mess with the original linkList
+        linkList.extend(self.fixedLinkList)
+        # now add a phys of zero for fixed links.
+        phys.extend(numpy.zeros(len(self.fixedLinkList)))
+        numLinks = len(linkList)
         # Compute physical errors
         maxOrientErr = Orientation(0.0001, 5e-8, 5e-8, 0.0001, 0.0001, 5e-7)
         
@@ -137,25 +142,175 @@ class MirrorBase(object):
         maxPhysErrSq = numpy.zeros(numLinks)
         for pertOrient in orientSet:
             pertOrient = Orientation(*pertOrient)
-            pertPhys = self._physFromOrient(pertOrient, linkList)
+            rotMat, offsets = self._orient2RotTransMats(pertOrient)
+            
+            # list of acutator outputs in physical length (um), with neutral as the zero point.
+            pertPhys = []   
+            for act in linkList:
+                desMirPos = numpy.dot(rotMat, act.mirPos)
+                desMirPos = desMirPos + offsets
+                # compute phys in a way that works for fixed links, this may not make sense...
+                pertPhys.append(act.lengthFromMirPos(desMirPos) - act.neutralLength)
+            pertPhys = numpy.asarray(pertPhys, dtype=float)
+            #pertPhys = self._physFromOrient(pertOrient, linkList)
             maxPhysErrSq += pertPhys**2   
         physMult = 1.0 / maxPhysErrSq
 
         # initial guess ("home")
+        
+        # If only 5 links are specified in linkList, we assume a fixed length link is present
+        # constraining Z rotation. We don't want to allow Z rotation to vary when we are
+        # searching for a solution where Z rotation is actually constant (and equal to zero).
+        # Only do a minimization for links that can vary! Fixed link orientation values are
+        # determinied in _adjustOrient, so we don't want to find them here
+        
         initOrient = numpy.zeros(6)
         fitTol = 1e-8
         maxIter = 10000
-        phys = numpy.asarray(phys, dtype=float) # is this necessary?
+#        phys = numpy.asarray(phys, dtype=float) # is this necessary?
         orient = scipy.optimize.fmin_powell(
             self._orientFromPhysErr,
             initOrient, 
             args = (phys, physMult, linkList), 
             maxiter = maxIter,
             ftol = fitTol,
+            disp = True
         )
-                                    
+        
+        # z rotation may be have been ignored in the minimization
+#         if len(orient) == 5:
+#             # so we could just return it as 0
+#             # orient = numpy.hstack((orient, 0.))
+#             
+#             # or we could compute the optimum z rotation based on our pre-computed 5 axis orient
+#             initZ = 0.
+#             zLink = self.fixedLinkList[0]
+#             z = scipy.optimize.fmin_powell(self._zRotOpt, initZ, 
+#                                           # problem: assumes only 1 element in fixedLinkList
+#                                            args = (orient, zLink),
+#                                            maxiter = maxIter, 
+#                                            ftol = fitTol
+#                                            )
+#             # put the optimum z into orient and return itertools
+#             orient = numpy.hstack((orient, z))
+            
         return Orientation(*orient)
+        
+    def _orientFromPhysErr(self, orient, phys, physMult, linkList):
+        """Function to minimize while computing _orientFromPhys. This now takes fixed
+        links into account.
 
+        Inputs: 
+        - orient: an Orientation
+        - phys:  list of physical actuator lengths
+        - physMult: list of multipliers for computing errors
+        - linkList: list of adjustable actuators
+        
+        Output:
+        - 1 + sum(physMult * physErrSq**2)
+        """
+        # we want to minimize using fixed links constraints too
+        rotMat, offsets = self._orient2RotTransMats(orient)
+        
+        # list of acutator outputs in physical length (um), with neutral as the zero point.
+        physList = []   
+        for act in linkList:
+            desMirPos = numpy.dot(rotMat, act.mirPos)
+            desMirPos = desMirPos + offsets
+            # compute phys in a way that works for fixed links, this may not make sense...
+            physList.append(act.lengthFromMirPos(desMirPos) - act.neutralLength)
+        physList = numpy.asarray(physList, dtype=float)
+        
+        #print 'phys: ', phys
+        #physFromOrient = self._physFromOrient(orient, linkList)
+        physErrSq = (physList - phys)**2
+        return 1 + numpy.sum(physMult * physErrSq)
+
+    def _adjustOrient(self, orient, fixAxes):
+        """This method adjusts the 'commanded' orientation based on the presence of fixed length
+        links. 
+        
+        For example, a link constraining z rotation will induce a small amount of z rotation
+        upon movement of the mirror. We want to solve for this induced z rotation and plug it back
+        into the 'commanded' orientation.  This method is generalized for any fixed axis.
+        
+        Input:
+        - orient: desired 6 axis Orientation
+        - fixAxes: list of integers ranging from 0 to 5. Each element 
+                    corresponds to an axis in orient that is fixed.
+                    
+        Output:
+        - orientOut: adjusted 6 axis Orientation.
+        """
+
+        initOrient = numpy.zeros(len(fixAxes))
+        orientFix = scipy.optimize.fmin_powell(
+                        self._adjustOrientErr, initOrient,
+                        args = (orient, fixAxes), 
+                        maxiter = maxIter,
+                        ftol = fitTol,
+                        disp = False
+                        )
+        orient[fixAxes] = orientFix
+        return orient
+                
+    def _adjustOrientErr(self, orientFixed, desOrient, fixAxes):
+        """This function is minimized.  It finds orientation values for fixed axes that preserve
+        fixedLink lengths.
+        """
+        if len(orientFixed) != len(fixAxes):
+            raise RuntimeError("Fitting %s orientations to %s axes! \nthey must be equal!\
+                                 " % (len(orientFixed), len(fixAxes)))
+        
+        # fixedLinkList needs to be same order as fixed axes
+        fixedLinkList = self.fixedLinkList
+        
+        # combine the fixed axis values (recomputed each loop) with desOrient
+        desOrient = numpy.asarray(desOrient, dtype=float)
+        orientFixed = numpy.asarray(orientFixed, dtype=float)  # numpy needed for indexing
+        desOrient[fixAxes] = orientFixed
+        rotMat, offsets = self._orient2RotTransMats(desOrient)
+        lengthDiffSum = 1.   
+        for link in fixedLinkList:
+            desMirPos = numpy.dot(rotMat, link.mirPos)
+            desMirPos = desMirPos + offsets
+            lengthDiff = link.lengthFromMirPos(desMirPos) - link.neutralLength
+            lengthDiffSum += lengthDiff**2
+        
+        # This will equal 1 when the correct orientation is reached
+        return lengthDiffSum 
+        
+#     def _zRotOpt(self, z, fiveAxisOrient, zLink):
+#         """Function that is minimized to determine the induced z rotation. 
+#         
+#         When there is an anti-rotation fixed link constraining z rotation, a
+#         commanded 5 orientation will induce a little rotation, we are solving
+#         for this. The other 5 orientation axis are held constant during the
+#         minimization. These other 5 axes should be the output from the
+#         minimization of _orientFromPhysErr.
+# 
+#         Inputs: 
+#         - z:  z rotation, this is optimized
+#         - fiveAxisOrient: 5 element numpy array--[pist, tiltX, tiltY, transX, transY]
+#         - zLink: fixedLengthLink object that constrains the z rotation.
+#         
+#         Output:
+#         - 1 + (computedLength - zLink.neutralLength)**2
+#         
+#         """
+#         orient = numpy.hstack((fiveAxisOrient, z))
+#         if len(orient) != 6:
+#             raise RuntimeError('Orient not fully defined in minimization, only\
+#                                 %i axes specified' % (len(orient)))
+#         
+#         # Compute a mirPos and determine the length from the link's basePos.
+#         # We minimize the difference in this length from the link's actual length.
+#         rotMat, offsets = self._orient2RotTransMats(orient)
+#         desMirPos = numpy.dot(rotMat, zLink.mirPos)
+#         desMirPos = desMirPos + offsets
+#         computedLength = zLink.lengthFromMirPos(desMirPos)
+#         return 1 + (computedLength - zLink.neutralLength)**2
+        
     def _orient2RotTransMats(self, orient):
         """
         This function computes the rotation matrices and translation
@@ -214,41 +369,26 @@ class DirectMirror(MirrorBase):
         - control piston, tip, tilt and translation (no z rotation)
         """
         MirrorBase.__init__(self, actuatorList, fixedLinkList, encoderList)
-              
-    def _orientFromPhysErr(self, orient, phys, physMult, linkList):
-        """Function to minimize while computing _orientFromPhys
-
-        Inputs: 
-        - orient: an Orientation
-        - phys:  list of physical actuator lengths
-        - physMult: list of multipliers for computing errors
-        - linkList: list of adjustable actuators
-        
-        Output:
-        - 1 + sum(physMult * physErrSq**2)
-        """
-        # z rotation may be ignored in the minimization
-        if len(orient) == 5:
-            # so we make it always 0
-            orient = numpy.hstack((orient, 0.))
-        if len(orient) != 6:
-            raise RuntimeError('Orient not fully defined in minimization, only\
-                                %i axes specified' % (len(orient)))
-        physFromOrient = self._physFromOrient(orient, linkList)
-        physErrSq = (physFromOrient - phys)**2
-        return 1 + numpy.sum(physMult * physErrSq)
-        
-    def _physFromOrient(self, orient, linkList):
+                      
+    def _physFromOrient(self, orient, linkList, returnOrient=False):
         """Compute desired physical position of actuators or encoders given mirror orientation
         
         Input:
         - orient: mirror orientation (an Orientation)
         - linkList: list of actuators or encoders
+        - fixAxes: specify a list of axes that cannot be commanded to move (fixed links)
 
         Output: 
         - physList: physical length of each actuator (mm), measured from the neutral position.
                     FixedLengthLink links always return a phys of 0 because they cannot change length.
         """
+        # Get adjusted orient. Takes fixed axes into account and returns a
+        # (new) orient.
+        if len(self.fixedLinkList) > 0:
+            # assume only axis 5 (z rotation) is fixed for now to test
+            fixAxes = [5] # must be a list to work
+            orient = numpy.asarray(orient, dtype=float)
+            orient = self._adjustOrient(orient, fixAxes)
 
         # Get rotation matrices and offsets.
         rotMat, offsets = self._orient2RotTransMats(orient)
@@ -260,61 +400,12 @@ class DirectMirror(MirrorBase):
             desMirPos = desMirPos + offsets
             
             phys = act.physFromMirPos(desMirPos)
-            physList.append(phys)        
-        return numpy.asarray(physList, dtype=float)
+            physList.append(phys)
+        if returnOrient:
+            return numpy.asarray(physList, dtype=float), Orientation(*orient)
+        else:
+            return numpy.asarray(physList, dtype=float)
 
-    def _orientFromPhys(self, phys, linkList):
-        """Compute mirror orientation give the physical position of each actuator. Uses fitting.
-        
-        Input:
-        - phys: physical position of each actuator or encoder; the position for fixed links will be ignored
-        - linkList: list of actuators or encoders (not fixed links!)
-       
-        Output:
-        - orient: mirror orientation (an Orientation)
-        """
-        numLinks = len(linkList)
-        # Compute physical errors
-        maxOrientErr = Orientation(0.0001, 5e-8, 5e-8, 0.0001, 0.0001, 5e-7)
-        
-        # Compute delta physical length at perturbed orientations
-        # Sum the square of errors
-        # Orient is zeros except one axis on each iteration.
-        
-        # diagonal matrix for easily extracting orientations with a single non-zero element
-        orientSet = numpy.diag(maxOrientErr, 0)
-        
-        maxPhysErrSq = numpy.zeros(numLinks)
-        for pertOrient in orientSet:
-            pertOrient = Orientation(*pertOrient)
-            pertPhys = self._physFromOrient(pertOrient, linkList)
-            maxPhysErrSq += pertPhys**2   
-        physMult = 1.0 / maxPhysErrSq
-
-        # initial guess ("home")
-        
-        # If only 5 links are specified in linkList, we assume a fixed length link is present
-        # constraining Z rotation. We don't want to allow Z rotation to vary when we are
-        # searching for a solution where Z rotation is actually constant (and equal to zero).
-        # Only do a minimization for links that can vary!
-        initOrient = numpy.zeros(numLinks)
-        fitTol = 1e-8
-        maxIter = 10000
-        phys = numpy.asarray(phys, dtype=float) # is this necessary?
-        orient = scipy.optimize.fmin_powell(
-            self._orientFromPhysErr,
-            initOrient, 
-            args = (phys, physMult, linkList), 
-            maxiter = maxIter,
-            ftol = fitTol,
-        )
-
-        # z rotation may be have been ignored in the minimization
-        if len(orient) == 5:
-            # so we return it as 0
-            orient = numpy.hstack((orient, 0.))
-        
-        return Orientation(*orient)
 
 class TipTransMirror(MirrorBase):
     """
@@ -361,26 +452,7 @@ class TipTransMirror(MirrorBase):
                                                 -sinEq * sinPol,
                                                          cosPol ]  ])  
         return rotMatEqPol
-        
-    def _orientFromPhysErr(self, orient, phys, physMult, linkList):
-        """Function to minimize while computing _orientFromPhys
-
-        Inputs: 
-        - orient: an Orientation
-        - phys:  list of physical actuator lengths
-        - physMult: list of multipliers for computing errors
-        - linkList: list of adjustable actuators
-        
-        Output:
-        - 1 + sum(physMult * physErrSq**2)
-        """
-        # for this mirror type we are only minimizing 5 axes of orient.
-        # A sixth is tagged on so that _physFromOrient will always run with a z rot of zero.
-        orient = numpy.hstack((orient, 0.))
-        physFromOrient = self._physFromOrient(orient, linkList)
-        physErrSq = (physFromOrient - phys)**2
-        return 1 + numpy.sum(physMult * physErrSq)
-                                
+                                       
     def _physFromOrient(self, orient, linkList):
         """Compute physical actuator or encoder length given orientation.
         
@@ -472,49 +544,143 @@ class TipTransMirror(MirrorBase):
 
         return numpy.asarray(physList, dtype=float)      
         
-    def _orientFromPhys(self, phys, linkList):
-        """Compute mirror orientation give the physical position of each actuator. Uses fitting.
+class TipTransMirror(MirrorBase):
+    """
+    Tip-Trans Mirror. Translate by tipping a central linear bearing.
+    orient2phys method is different, other methods are same as
+    DirectMirror obj.
+    """
+    def __init__(self, ctrMirZ, ctrBaseZ, actuatorList, fixedLinkList, encoderList = None):
+        MirrorBase.__init__(self, actuatorList, fixedLinkList, encoderList)
+        self.ctrMirZ = ctrMirZ
+        self.ctrBaseZ = ctrBaseZ
+        
+    def _rotEqPolMat(self, eqAng, polAng):
+        """
+        This method was translated from src/subr/cnv/roteqpol.for.
+        Defines a matrix that rotates a 3-vector described by equatorial
+        and polar angles as follows: The plane of rotation contains the
+        z axis and a line in the x-y plane at angle eqAng from the x
+        axis towards y. The amount of rotation is angle polAng from the
+        z axis towards the line in the x-y plane.
+        
+        Inputs:
+        - eqAng:  Equatorial rotation angle (radians) of line in x-y plane (from x to y).
+                   This plane of rotation includes this line and z.
+        - polAng: Polar rotation angle (radians) from z axis to the line in the x-y plane.
+        
+        Output:
+        - rotMatEqPol: 3x3 rotation matrix
+        """ 
+        sinEq = math.sin(eqAng) 
+        cosEq = math.cos(eqAng)
+        sinPol = math.sin(polAng)
+        cosPol = math.cos(polAng)
+
+        rotMatEqPol = numpy.array([ [ sinEq**2 + (cosEq**2 * cosPol), 
+                                  -sinEq * cosEq * (1 - cosPol),
+                                                 cosEq * sinPol ],
+                                                
+                               [  -sinEq * cosEq * (1 - cosPol),
+                                 cosEq**2 + (sinEq**2 * cosPol),
+                                                 sinEq * sinPol ],
+                                                
+                               [                -cosEq * sinPol,
+                                                -sinEq * sinPol,
+                                                         cosPol ]  ])  
+        return rotMatEqPol
+                                       
+    def _physFromOrient(self, orient, linkList):
+        """Compute physical actuator or encoder length given orientation.
         
         Input:
-        - phys: physical position of each actuator or encoder; the position for fixed links will be ignored
-        - linkList: list of actuators or encoders (not fixed links!)
-       
-        Output:
-        - orient: mirror orientation (an Orientation)
+        - orient:  mirror orientation with 6 axes 6 item list:
+        - actuatorList: list of actuators or encoders
+
+        Output: 
+        - physList[0:5]: delta length for actuators (um) measured from the neutral position.
+        				        FixedLengthLink actuators always return a deltaPhys of 0 because they
+        				        cannot change length.
+
+        translated from: src/subr/mir/oneorient2mount.for
+        src/subr/mir/oneOrient2Phys.for does most of work
         """
-        numLinks = len(linkList)
-        # Compute physical errors
-        maxOrientErr = Orientation(0.0001, 5e-8, 5e-8, 0.0001, 0.0001, 5e-7)
+        # starting from line 152 in oneOrient2Phys.for (special case = tiptransmir)
         
-        # Compute delta physical length at perturbed orientations
-        # Sum the square of errors
-        # Orient is zeros except one axis on each iteration.
+        # Determine ctrMirPos, the final position of the central linear
+        # bearing mirror gimbal. This gimbal is fixed to the
+        # mirror (at ctrMirZ from the vertex) and slides along
+        # the central linear bearing.
+        # First rotate the gimbal position about the vertex
+        # (do this before translation so the vertex is at 0,0,0)
         
-        # diagonal matrix for easily extracting orientations with a single non-zero element
-        orientSet = numpy.diag(maxOrientErr, 0)
+        ctrMirZ = self.ctrMirZ
+        ctrBaseZ = self.ctrBaseZ
+        ctrUnrot = numpy.zeros(3)
+        ctrUnrot[2] = ctrMirZ
         
-        maxPhysErrSq = numpy.zeros(numLinks)
-        for pertOrient in orientSet:
-            pertOrient = Orientation(*pertOrient)
-            pertPhys = self._physFromOrient(pertOrient, linkList)
-            maxPhysErrSq += pertPhys**2   
-        physMult = 1.0 / maxPhysErrSq
+        rotMat, offsets = self._orient2RotTransMats(orient)
+        ctrMirPos = numpy.dot(rotMat, ctrUnrot)
+        
+        # Now apply translation to produce the final position.
+        ctrMirPos = ctrMirPos + offsets
+        # Determine ctrBasePos, the position of the central linear
+        # bearing base gimbal. This gimbal attaches the central linear
+        # bearing to the frame. Its position is fixed; it does not
+        # change as the mirror moves around.
+        ctrBasePos = numpy.zeros(3)
+        ctrBasePos[2] = ctrBaseZ
+        # Determine the vector from base gimbal to mirror gimbal.
+        ctrExtent = ctrMirPos - ctrBasePos
+        # Determine the new positions of the transverse actuators
+        # at the transverse gimbal end. This gimbal sets the tilt
+        # of the central linear bearing and is at a fixed length
+        # from the base gimbal. The home position of this end of the
+        # transverse actuators is actMirPos (despite the name).
+        #
+        # To do this, rotate the home position about the central linear
+        # bearing base pivot (ctrBasePos) by the amount the bearing tips.
+        # Note: rotation occurs in a plane defined by the motion
+        # of the central linear bearing, and is by the amount
+        # the bearing tips, so this is an "equatorial/polar" rotation
+        # (solved by nv_RotEqPol). I think. Close enough, anyway.
+        # First compute the equatorial and polar angle.
+        ctrLenXY = math.sqrt(numpy.sum(ctrExtent[0:2] ** 2))
+        if ctrExtent[2] > 0.:
+            eqAng = math.atan2(ctrExtent[1], ctrExtent[0])
+        else:
+            eqAng = math.atan2(-ctrExtent[1], -ctrExtent[0])
+        polAng = math.atan2(ctrLenXY, numpy.abs(ctrExtent[2]))
+        # compute home position of transverse actuators
+        # at transverse gimbal end, with respect to the base gimbal
+        
+        # make eq-pol rotation matrix
+        rotMatEq = self._rotEqPolMat(eqAng, polAng)
+       
+        physList = []
+        for ind, act in enumerate(linkList):
+            if ind == 3 or ind == 4:  
+                # these are special transverse actuators
+                actUnrot = numpy.asarray(act.mirPos, dtype=float) - ctrBasePos
+                # rotate this about the base pivot to compute the actual position
+                # of the transverse actuators at the transverse gimbal end,
+                # with respect to the base pivot
+                desMirPos = numpy.dot(rotMatEq, actUnrot)
+                # compute the position of the transverse actuators at the
+                # transverse gimbal end to the standard reference frame
+                # (which is with respect to home position of mirror vertex).
+                desMirPos = desMirPos + ctrBasePos
+                phys = act.physFromMirPos(desMirPos)
+                physList.append(phys)
+            else:
+                desMirPos = numpy.dot(rotMat, act.mirPos)
+                desMirPos = desMirPos + offsets
+                phys = act.physFromMirPos(desMirPos)
+                physList.append(phys)        
+        return numpy.asarray(physList, dtype=float)
 
-        # initial guess ("home")
-        initOrient = numpy.zeros(5)
-        fitTol = 1e-8
-        maxIter = 10000
-        phys = numpy.asarray(phys, dtype=float) # is this necessary?
-        orient = scipy.optimize.fmin_powell(
-            self._orientFromPhysErr,
-            initOrient,
-            args = (phys, physMult, linkList),
-            maxfun = maxIter,
-            xtol = fitTol)
-        
-        orient = numpy.hstack((orient, 0.))
-        return Orientation(*orient)
-
+        return numpy.asarray(physList, dtype=float)  
+         
 # class DirectMirrorZFix(DirectMirror):
 #     """
 #     A class of mirror with a FixedLengthLink constraining Z rotation. The only
