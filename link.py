@@ -14,7 +14,11 @@ Important attributes of adjustable links:
 - mount length: length of actuator/sensor in native units: microsteps or ticks;
     this differs from mount by an offset and a scale:
     mount = offset + (scale * phys)
+<<<<<<< HEAD
+- length: the distance from the base ball joint to the mirror ball joint
+=======
 - length: the distance from the base ball joint to the 
+>>>>>>> master
 
 There are three kinds of links supported in this file:
 - FixedLengthLink: length does not change
@@ -116,6 +120,9 @@ class AdjustableLink(BaseLink):
         self.maxMount = float(maxMount)
         self.scale = float(scale)
         self.offset = float(offset)
+        # Unit vector defining the axis of mount motor
+        self.pistonDir = (self.mirPos - self.basePos) / numpy.linalg.norm((self.mirPos - self.basePos))
+
     
     def mountFromPhys(self, phys):
         """Compute mount length (steps) of adjustable element given its physical length (mm)
@@ -170,32 +177,32 @@ class AdjBaseActuator(AdjLengthLink):
         
         return x - (r_not * math.cos(math.asin(y / r_not)))
 
-#     def physFromMirPosCCS(self, mirPos):
-#         """Compute physical length (mm) of adjustable element given the mirror position (mm)
-#         
-#         NOTE: THIS NEEDS TO BE REWRITTEN TO NOT TAKE phys AS AN ARGUMENT
-#         
-#         This method makes the approximation that the projection of the 'true length'
-#         along the actuator motor axis to the link axis is equal to phys.
-#         This should be ok for small angles, and the solution requires no trig functions.
-#         
-#         Inputs:
-#         - mirPos: cartesian position of end of actuator attached to the mirror (mm).
-#         
-#         Output:
-#         - phys: approximate actuator length (mm)
-#         """
-#         # Calculate unit vector from basePos to a given mirPos (link axis).
-#         mirVec = mirPos - self.basePos
-#         mirUnitVec = mirVec / numpy.linalg.norm(mirVec)
-#         
-#         # Use right triangle trig to solve for truePhys value.
-#         # cos(theta) = adjacent / hypotenuse
-#         # theta = acos(self.pistonDir dot mirUnitVec)
-#         # adjacent = phys
-#         # hypotenuse = truePhys
-#         truePhys = phys / numpy.dot(self.pistonDir, mirUnitVec)
-#         return truePhys
+    def physFromMirPosCCS(self, mirPos):
+        """Compute physical length (mm) of adjustable element given the mirror position (mm)
+
+        This method makes the approximation that the projection of the 'true
+        length' from the actuator motor axis to the link axis is equal to the
+        difference between length at zero orientation and the length at a given
+        mirror position. This should be ok for small angles, and the solution
+        requires no trig functions.
+        
+        Inputs:
+        - mirPos: cartesian position of end of actuator attached to the mirror (mm).
+        
+        Output:
+        - phys: approximate actuator length (mm)
+        """
+        # Calculate unit vector from basePos to a given mirPos (link axis).
+        mirVec = mirPos - self.basePos
+        mirUnitVec = mirVec / numpy.linalg.norm(mirVec)
+        phys = self.physFromMirPos(mirVec)
+        # Use right triangle trig to solve for truePhys value.
+        # cos(theta) = adjacent / hypotenuse
+        # theta = acos(self.pistonDir dot mirUnitVec)
+        # adjacent = phys
+        # hypotenuse = truePhys
+        truePhys = phys / numpy.dot(self.pistonDir, mirUnitVec)
+        return truePhys
                
     def physFromMirPosRO(self, mirPos):
         """Compute physical length (mm) of adjustable element given the mirror position (mm)

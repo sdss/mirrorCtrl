@@ -110,6 +110,7 @@ class MirrorBase(object):
         phys = [link.physFromMount(mt) for mt, link in itertools.izip(mount, linkList)]
         return self._orientFromPhys(phys, linkList)
     
+
     def _orientFromPhys(self, phys, linkList):
         """Compute mirror orientation give the physical position of each actuator. Uses fitting.
         
@@ -195,7 +196,6 @@ class MirrorBase(object):
         offsets = numpy.array([orient.transX, orient.transY, orient.piston])
         
         return rotMat, offsets
-
         
 class DirectMirror(MirrorBase):
     """A mirror supported by 6 actuators or fixed links connected directly to the mirror.
@@ -296,10 +296,208 @@ class DirectMirror(MirrorBase):
             maxiter = maxIter,
             ftol = fitTol,
         )
-                                    
+          
+        print orient  
         return Orientation(*orient)
 
+class TipTransMirror(MirrorBase):
+    """
+    Tip-Trans Mirror. Translate by tipping a central linear bearing.
+    orient2phys method is different, other methods are same as
+    DirectMirror obj.
+    """
+    def __init__(self, ctrMirZ, ctrBaseZ, actuatorList, encoderList = None):
+        MirrorBase.__init__(self, actuatorList, encoderList)
+        self.ctrMirZ = ctrMirZ
+        self.ctrBaseZ = ctrBaseZ
         
+    def _rotEqPolMat(self, eqAng, polAng):
+        """
+        This method was translated from src/subr/cnv/roteqpol.for.
+        Defines a matrix that rotates a 3-vector described by equatorial
+        and polar angles as follows: The plane of rotation contains the
+        z axis and a line in the x-y plane at angle eqAng from the x
+        axis towards y. The amount of rotation is angle polAng from the
+        z axis towards the line in the x-y plane.
+        
+        Inputs:
+        - eqAng:  Equatorial rotation angle (radians) of line in x-y plane (from x to y).
+                   This plane of rotation includes this line and z.
+        - polAng: Polar rotation angle (radians) from z axis to the line in the x-y plane.
+        
+        Output:
+        - rotMatEqPol: 3x3 rotation matrix
+        """ 
+        sinEq = math.sin(eqAng) 
+        cosEq = math.cos(eqAng)
+        sinPol = math.sin(polAng)
+        cosPol = math.cos(polAng)
+
+        rotMatEqPol = numpy.array([ [ sinEq**2 + (cosEq**2 * cosPol), 
+                                  -sinEq * cosEq * (1 - cosPol),
+                                                 cosEq * sinPol ],
+                                                
+                               [  -sinEq * cosEq * (1 - cosPol),
+                                 cosEq**2 + (sinEq**2 * cosPol),
+                                                 sinEq * sinPol ],
+                                                
+                               [                -cosEq * sinPol,
+                                                -sinEq * sinPol,
+                                                         cosPol ]  ])  
+        return rotMatEqPol
+        
+    def _orientFromPhysErr(self, orient, phys, physMult, linkList):
+        """Function to minimize while computing _orientFromPhys
+
+        Inputs: 
+        - orient: an Orientation
+        - phys:  list of physical actuator lengths
+        - physMult: list of multipliers for computing errors
+        - linkList: list of adjustable actuators
+        
+        Output:
+        - 1 + sum(physMult * physErrSq**2)
+        """
+        orient = numpy.hstack((orient, 0.))
+        physFromOrient = self._physFromOrient(orient, linkList)
+        physErrSq = (physFromOrient - phys)**2
+        return 1 + numpy.sum(physMult * physErrSq)
+                                
+    def _physFromOrient(self, orient, linkList):
+        """Compute physical actuator or encoder length given orientation.
+        
+        Input:
+        - orient:  mirror orientation with 6 axes 6 item list:
+        - actuatorList: list of actuators or encoders
+
+        Output: 
+        - physList[0:5]: delta length for actuators (um) measured from the neutral position.
+        				        FixedLengthLink actuators always return a deltaPhys of 0 because they
+        				        cannot change length.
+
+        translated from: src/subr/mir/oneorient2mount.for
+        src/subr/mir/oneOrient2Phys.for does most of work
+        """
+        # starting from line 152 in oneOrient2Phys.for (special case = tiptransmir)
+        
+        # Determine ctrMirPos, the final position of the central linear
+        # bearing mirror gimbal. This gimbal is fixed to the
+        # mirror (at ctrMirZ from the vertex) and slides along
+        # the central linear bearing.
+        # First rotate the gimbal position about the vertex
+        # (do this before translation so the vertex is at 0,0,0)
+        
+        ctrMirZ = self.ctrMirZ
+        ctrBaseZ = self.ctrBaseZ
+        ctrUnrot = numpy.zeros(3)
+        ctrUnrot[2] = ctrMirZ
+        
+        rotMat, offsets = self._orient2RotTransMats(orient)
+        ctrMirPos = numpy.dot(rotMat, ctrUnrot)
+        
+        # Now apply translation to produce the final position.
+        ctrMirPos = ctrMirPos + offsets
+        # Determine ctrBasePos, the position of the central linear
+        # bearing base gimbal. This gimbal attaches the central linear
+        # bearing to the frame. Its position is fixed; it does not
+        # change as the mirror moves around.
+        ctrBasePos = numpy.zeros(3)
+        ctrBasePos[2] = ctrBaseZ
+        # Determine the vector from base gimbal to mirror gimbal.
+        ctrExtent = ctrMirPos - ctrBasePos
+        # Determine the new positions of the transverse actuators
+        # at the transverse gimbal end. This gimbal sets the tilt
+        # of the central linear bearing and is at a fixed length
+        # from the base gimbal. The home position of this end of the
+        # transverse actuators is actMirPos (despite the name).
+        #
+        # To do this, rotate the home position about the central linear
+        # bearing base pivot (ctrBasePos) by the amount the bearing tips.
+        # Note: rotation occurs in a plane defined by the motion
+        # of the central linear bearing, and is by the amount
+        # the bearing tips, so this is an "equatorial/polar" rotation
+        # (solved by nv_RotEqPol). I think. Close enough, anyway.
+        # First compute the equatorial and polar angle.
+        ctrLenXY = math.sqrt(numpy.sum(ctrExtent[0:2] ** 2))
+        if ctrExtent[2] > 0.:
+            eqAng = math.atan2(ctrExtent[1], ctrExtent[0])
+        else:
+            eqAng = math.atan2(-ctrExtent[1], -ctrExtent[0])
+        polAng = math.atan2(ctrLenXY, numpy.abs(ctrExtent[2]))
+        # compute home position of transverse actuators
+        # at transverse gimbal end, with respect to the base gimbal
+        
+        # make eq-pol rotation matrix
+        rotMatEq = self._rotEqPolMat(eqAng, polAng)
+       
+        physList = []
+        for ind, act in enumerate(linkList):
+            if ind == 3 or ind == 4:  
+                # these are special transverse actuators
+                actUnrot = numpy.asarray(act.mirPos, dtype=float) - ctrBasePos
+                # rotate this about the base pivot to compute the actual position
+                # of the transverse actuators at the transverse gimbal end,
+                # with respect to the base pivot
+                desMirPos = numpy.dot(rotMatEq, actUnrot)
+                # compute the position of the transverse actuators at the
+                # transverse gimbal end to the standard reference frame
+                # (which is with respect to home position of mirror vertex).
+                desMirPos = desMirPos + ctrBasePos
+                phys = act.physFromMirPos(desMirPos)
+                physList.append(phys)
+            else:
+                desMirPos = numpy.dot(rotMat, act.mirPos)
+                desMirPos = desMirPos + offsets
+                phys = act.physFromMirPos(desMirPos)
+                physList.append(phys)        
+        return numpy.asarray(physList, dtype=float)
+
+        return numpy.asarray(physList, dtype=float)      
+        
+    def _orientFromPhys(self, phys, linkList):
+        """Compute mirror orientation give the physical position of each actuator. Uses fitting.
+        
+        Input:
+        - phys: physical position of each actuator or encoder; the position for fixed links will be ignored
+        - linkList: list of actuators or encoders (not fixed links!)
+       
+        Output:
+        - orient: mirror orientation (an Orientation)
+        """
+        numLinks = len(linkList)        
+
+        # Compute physical errors
+        maxOrientErr = Orientation(0.0001, 5e-8, 5e-8, 0.0001, 0.0001, 5e-7)
+        
+        # Compute delta physical length at perturbed orientations
+        # Sum the square of errors
+        # Orient is zeros except one axis on each iteration.
+        
+        # diagonal matrix for easily extracting orientations with a single non-zero element
+        orientSet = numpy.diag(maxOrientErr, 0)
+        
+        maxPhysErrSq = numpy.zeros(numLinks)
+        for pertOrient in orientSet:
+            pertOrient = Orientation(*pertOrient)
+            pertPhys = self._physFromOrient(pertOrient, linkList)
+            maxPhysErrSq += pertPhys**2   
+        physMult = 1.0 / maxPhysErrSq
+
+        # initial guess ("home")
+        initOrient = numpy.zeros(5)
+        fitTol = 1e-8
+        maxIter = 10000
+        phys = numpy.asarray(phys, dtype=float) # is this necessary?
+        orient = scipy.optimize.fmin_powell(
+            self._orientFromPhysErr,
+            initOrient,
+            args = (phys, physMult, linkList),
+            maxfun = maxIter,
+            xtol = fitTol)
+        
+        orient = numpy.hstack((orient, 0.))
+        return Orientation(*orient)
+
 # class DirectMirrorZFix(DirectMirror):
 #     """
 #     A class of mirror with a FixedLengthLink constraining Z rotation. The only
@@ -394,140 +592,4 @@ class DirectMirror(MirrorBase):
 #         orient = self._computeZRot(orient)
 #         return orient
 #         
-# class TipTransMirror(DirectMirror):
-#     """
-#     Tip-Trans Mirror. Translate by tipping a central linear bearing.
-#     orient2phys method is different, other methods are same as
-#     DirectMirror obj.
-#     """
-#     def __init__(self, ctrMirZ, ctrBaseZ, actuatorList, encoderList = None):
-#         DirectMirror.__init__(self, actuatorList, encoderList = encoderList)
-#         self.ctrMirZ = ctrMirZ
-#         self.ctrBaseZ = ctrBaseZ
-#         
-#     def _rotEqPolMat(self, eqAng, polAng):
-#         """
-#         This method was translated from src/subr/cnv/roteqpol.for.
-#         Defines a matrix that rotates a 3-vector described by equatorial
-#         and polar angles as follows: The plane of rotation contains the
-#         z axis and a line in the x-y plane at angle eqAng from the x
-#         axis towards y. The amount of rotation is angle polAng from the
-#         z axis towards the line in the x-y plane.
-#         
-#         Inputs:
-#         - eqAng:  Equatorial rotation angle (radians) of line in x-y plane (from x to y).
-#                    This plane of rotation includes this line and z.
-#         - polAng: Polar rotation angle (radians) from z axis to the line in the x-y plane.
-#         
-#         Output:
-#         - rotMatEqPol: 3x3 rotation matrix
-#         """ 
-#         sinEq = math.sin(eqAng) 
-#         cosEq = math.cos(eqAng)
-#         sinPol = math.sin(polAng)
-#         cosPol = math.cos(polAng)
-# 
-#         rotMatEqPol = numpy.array([ [ sinEq**2 + (cosEq**2 * cosPol), 
-#                                   -sinEq * cosEq * (1 - cosPol),
-#                                                  cosEq * sinPol ],
-#                                                 
-#                                [  -sinEq * cosEq * (1 - cosPol),
-#                                  cosEq**2 + (sinEq**2 * cosPol),
-#                                                  sinEq * sinPol ],
-#                                                 
-#                                [                -cosEq * sinPol,
-#                                                 -sinEq * sinPol,
-#                                                          cosPol ]  ])  
-#         return rotMatEqPol
-#                                 
-#     def _physFromOrient(self, orient, actuatorList):
-#         """Compute physical actuator or encoder length given orientation.
-#         
-#         Input:
-#         - orient:  mirror orientation with 6 axes 6 item list:
-#         - actuatorList: list of actuators or encoders
-# 
-#         Output: 
-#         - physList[0:5]: delta length for actuators (um) measured from the neutral position.
-#         				        FixedLengthLink actuators always return a deltaPhys of 0 because they
-#         				        cannot change length.
-# 
-#         translated from: src/subr/mir/oneorient2mount.for
-#         src/subr/mir/oneOrient2Phys.for does most of work
-#         """
-#         # starting from line 152 in oneOrient2Phys.for (special case = tiptransmir)
-#         
-#         # Determine ctrMirPos, the final position of the central linear
-#         # bearing mirror gimbal. This gimbal is fixed to the
-#         # mirror (at ctrMirZ from the vertex) and slides along
-#         # the central linear bearing.
-#         # First rotate the gimbal position about the vertex
-#         # (do this before translation so the vertex is at 0,0,0)
-#         
-#         ctrMirZ = self.ctrMirZ
-#         ctrBaseZ = self.ctrBaseZ
-#         ctrUnrot = numpy.zeros(3)
-#         ctrUnrot[2] = ctrMirZ
-#         
-# 
-#         rotMat, offsets = self._orient2RotTransMats(orient)
-#         ctrMirPos = numpy.dot(rotMat, ctrUnrot)
-#         
-#         # Now apply translation to produce the final position.
-#         ctrMirPos = ctrMirPos + offsets
-#         # Determine ctrBasePos, the position of the central linear
-#         # bearing base gimbal. This gimbal attaches the central linear
-#         # bearing to the frame. Its position is fixed; it does not
-#         # change as the mirror moves around.
-#         ctrBasePos = numpy.zeros(3)
-#         ctrBasePos[2] = ctrBaseZ
-#         # Determine the vector from base gimbal to mirror gimbal.
-#         ctrExtent = ctrMirPos - ctrBasePos
-#         # Determine the new positions of the transverse actuators
-#         # at the transverse gimbal end. This gimbal sets the tilt
-#         # of the central linear bearing and is at a fixed length
-#         # from the base gimbal. The home position of this end of the
-#         # transverse actuators is actMirPos (despite the name).
-#         #
-#         # To do this, rotate the home position about the central linear
-#         # bearing base pivot (ctrBasePos) by the amount the bearing tips.
-#         # Note: rotation occurs in a plane defined by the motion
-#         # of the central linear bearing, and is by the amount
-#         # the bearing tips, so this is an "equatorial/polar" rotation
-#         # (solved by nv_RotEqPol). I think. Close enough, anyway.
-#         # First compute the equatorial and polar angle.
-#         ctrLenXY = math.sqrt(numpy.sum(ctrExtent[0:2] ** 2))
-#         if ctrExtent[2] > 0.:
-#             eqAng = math.atan2(ctrExtent[1], ctrExtent[0])
-#         else:
-#             eqAng = math.atan2(-ctrExtent[1], -ctrExtent[0])
-#         polAng = math.atan2(ctrLenXY, numpy.abs(ctrExtent[2]))
-#         # compute home position of transverse actuators
-#         # at transverse gimbal end, with respect to the base gimbal
-#         
-#         # make eq-pol rotation matrix
-#         rotMatEq = self._rotEqPolMat(eqAng, polAng)
-#        
-#         physList = []
-#         for act in actuatorList:
-#             actUnrot = numpy.asarray(act.mirPos, dtype=float) - ctrBasePos
-#             # rotate this about the base pivot to compute the actual position
-#             # of the transverse actuators at the transverse gimbal end,
-#             # with respect to the base pivot
-#             actMirPos = numpy.dot(rotMatEq, actUnrot)
-#             # compute the position of the transverse actuators at the
-#             # transverse gimbal end to the standard reference frame
-#             # (which is with respect to home position of mirror vertex).
-#             actMirPos = actMirPos + ctrBasePos
-#             if act.isAdjustable:
-#                 try:
-#                     # compute new phys if act is a AdjBaseActuator
-#                     deltaPhys = act.physFromMirPosRO(deltaPhys, actMirPos)
-#                 except AttributeError:
-#                     pass                        
-#                 deltaPhys = act.lengthFromMirPos(actMirPos) - act.neutralLength    
-#                 # phys units: um
-#             else:
-#                 deltaPhys = 0.  # no change in actuator length (FixedLengthLink)
-#             physList.append(deltaPhys)
-#         return numpy.asarray(physList, dtype=float)
+
