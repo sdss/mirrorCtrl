@@ -47,7 +47,7 @@ encList = parseMirFile.mir25_prim_encList
 
 
 #orientTest = mirror.Orientation(5, 0.02, 5e-4, 5, 5, 0)
-orientTest = [5,0,0,0,0]
+orientTest = [0,0,0,5,0]
 print
 print '-------------------------- New Run -------------------------'
 

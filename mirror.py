@@ -140,8 +140,7 @@ class MirrorBase(object):
             orient = self._adjustOrient(orient, fixAxes)
         
         return orient
-        
-    
+            
     def _mountFromOrient(self, orient, linkList):
         """Compute link mount length from orientation
         """
@@ -220,7 +219,7 @@ class MirrorBase(object):
             ftol = fitTol,
             disp = True
         )
-        
+  
         return Orientation(*orient)        
 
     def _adjustOrient(self, orient, fixAxes):
@@ -277,7 +276,6 @@ class MirrorBase(object):
         Output:
         - 1 + sum(physMult * physErrSq**2)
         """
-        # if axes are being omitted.
         # I have omitted error checking for speed since this is iterated upon
         if len(minOrient) < 6:
             # combine the fixed axis values (recomputed each loop) with desOrient
