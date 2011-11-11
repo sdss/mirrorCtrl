@@ -217,7 +217,7 @@ class MirrorBase(object):
             args = (givPhys, physMult, linkListFull), 
             maxiter = maxIter,
             ftol = fitTol,
-            disp = True
+            disp = False
         )
   
         return Orientation(*orient)        
@@ -462,9 +462,8 @@ class TipTransMirror(MirrorBase):
         - actuatorList: list of actuators or encoders
 
         Output: 
-        - physList[0:5]: delta length for actuators (um) measured from the neutral position.
-        				        FixedLengthLink actuators always return a deltaPhys of 0 because they
-        				        cannot change length.
+        - physList[0:5]: delta length for link length (um) measured from the neutral position.
+        				        FixedLengthLink can return a non-zero length.
 
         notes: This can return an impossible length in the case of fixed length links. This feature
         is actually desired for the minimization routines.
