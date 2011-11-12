@@ -43,10 +43,11 @@ class mirTest(unittest.TestCase):
         print str
         
     def test(self):
+        str = 'Printing:  Orient Input(6)   Orient Diff(6)   Mount Diff(6)'
+        print
         print str
         for orientTest in orientRange:
             mount = self.mir.actuatorMountFromOrient(orientTest)
-            # from encoders this time
             orient1 = self.mir.orientFromEncoderMount(mount)
             mount1 = self.mir.actuatorMountFromOrient(orient1)
             self._printErr(orientTest, mount, orient1, mount1)
@@ -109,14 +110,14 @@ class sec25_adjLen(mirTest):
     def setUp(self):
         SecCtrMirZ = -135.70
         SecCtrBaseZ = -178.40
-        # new style encoders
+        # old style encoders
         actList = parseMirFile_adjLen.mir25_sec_actList
         self.mir = mirror.TipTransMirror(SecCtrMirZ, SecCtrBaseZ, actList[0:5], [actList[5]])
 
 class sec35_adjLen(mirTest):
     # holding one z rot link as a fixed link
     def setUp(self):
-        # new style encoders
+        # old style encoders
         actList = parseMirFile_adjLen.mir35_sec_actList
         self.mir = mirror.DirectMirror(actList[0:5], [actList[5]])
         
@@ -130,7 +131,7 @@ class sec35_adjBase(mirTest):
 class tert35_adjLen(mirTest):
     # holding one z rot link as a fixed link
     def setUp(self):
-        # new style encoders
+        # old style encoders
         actList = parseMirFile_adjBase.mir35_sec_actList
         self.mir = mirror.DirectMirror(actList[0:5], [actList[5]])
 
@@ -142,5 +143,6 @@ class tert35_adjBase(mirTest):
         self.mir = mirror.DirectMirror(actList[0:5], [actList[5]])
 
 if __name__ == '__main__':
-     suite = unittest.TestLoader().loadTestsFromTestCase(tert35_adjBase)
-     unittest.TextTestRunner(verbosity=2).run(suite)
+    # choose which mirror you want to test         
+    suite = unittest.TestLoader().loadTestsFromTestCase(prim25_adjBase)
+    unittest.TextTestRunner(verbosity=2).run(suite)
