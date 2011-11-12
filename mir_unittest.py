@@ -12,7 +12,7 @@ RadPerDeg  = math.pi / 180.0    # radians per degree
 ArcSecPerDeg = 60.0 * 60.0      # arcseconds per degree
 RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
 
-# construct range of orients to test (0-25mm, 0-.1 radians)
+# construct range of orients to test (0-25mm, 0-2 degrees)
 resolution = 10
 dist_range = numpy.linspace(0, 25, resolution)
 ang_range = numpy.linspace(0, 2 * RadPerDeg, resolution)
@@ -41,14 +41,6 @@ class mirTest(unittest.TestCase):
                 mountErr[0], mountErr[1], mountErr[2], 
                 mountErr[3], mountErr[4], mountErr[5])
         print str
-#         strO = 'orient err: %s \n\
-#                 orient test: %s' % (orientErr, orientTest)
-#         strM = 'mount err: %s \n orient err: %s \n\
-#                 orient test: %s' % (mountErr, orientErr, orientTest)
-#         for oE in orientErr:
-#             self.assertTrue(numpy.abs(oE - 0.) < 1e-3, msg=strO)
-#         for mE in mountErr:
-#             self.assertTrue(numpy.abs(mE - 0.) < 1e-3, msg=strM)
         
     def test(self):
         print str
@@ -103,30 +95,52 @@ class prim25_fix_adjBase(mirTest):
         encList = actList[0:5]
         self.mir = mirror.DirectMirror(actList[0:5], [actList[5]])
 
-
+class sec25_adjBase(mirTest):
+    # holding one z rot link as a fixed link
+    def setUp(self):
+        SecCtrMirZ = -135.70
+        SecCtrBaseZ = -178.40
+        # new style encoders
+        actList = parseMirFile_adjBase.mir25_sec_actList
+        self.mir = mirror.TipTransMirror(SecCtrMirZ, SecCtrBaseZ, actList[0:5], [actList[5]])
         
+class sec25_adjLen(mirTest):
+    # holding one z rot link as a fixed link
+    def setUp(self):
+        SecCtrMirZ = -135.70
+        SecCtrBaseZ = -178.40
+        # new style encoders
+        actList = parseMirFile_adjLen.mir25_sec_actList
+        self.mir = mirror.TipTransMirror(SecCtrMirZ, SecCtrBaseZ, actList[0:5], [actList[5]])
+
+class sec35_adjLen(mirTest):
+    # holding one z rot link as a fixed link
+    def setUp(self):
+        # new style encoders
+        actList = parseMirFile_adjLen.mir35_sec_actList
+        self.mir = mirror.DirectMirror(actList[0:5], [actList[5]])
+        
+class sec35_adjBase(mirTest):
+    # holding one z rot link as a fixed link
+    def setUp(self):
+        # new style encoders
+        actList = parseMirFile_adjBase.mir35_sec_actList
+        self.mir = mirror.DirectMirror(actList[0:5], [actList[5]])            
+
+class tert35_adjLen(mirTest):
+    # holding one z rot link as a fixed link
+    def setUp(self):
+        # new style encoders
+        actList = parseMirFile_adjBase.mir35_sec_actList
+        self.mir = mirror.DirectMirror(actList[0:5], [actList[5]])
+
+class tert35_adjBase(mirTest):
+    # holding one z rot link as a fixed link
+    def setUp(self):
+        # new style encoders
+        actList = parseMirFile_adjBase.mir35_sec_actList
+        self.mir = mirror.DirectMirror(actList[0:5], [actList[5]])
 
 if __name__ == '__main__':
-#     print 'prim25_adjLen'
-#     suite = unittest.TestLoader().loadTestsFromTestCase(prim25_adjLen)
-#     unittest.TextTestRunner(verbosity=2).run(suite)
-    
-#     print 'prim25_enc_adjLen'
-#     suite = unittest.TestLoader().loadTestsFromTestCase(prim25_enc_adjLen)
-#     unittest.TextTestRunner(verbosity=2).run(suite)
-#     
-    print 'prim25_fix_adjLen'
-    suite = unittest.TestLoader().loadTestsFromTestCase(prim25_fix_adjLen)
-    unittest.TextTestRunner(verbosity=2).run(suite)
-#     
-#     print 'prim25_adjBase'
-#     suite = unittest.TestLoader().loadTestsFromTestCase(prim25_adjBase)
-#     unittest.TextTestRunner(verbosity=2).run(suite)
-#     
-#     print 'prim25_enc_adjBase'
-#     suite = unittest.TestLoader().loadTestsFromTestCase(prim25_enc_adjBase)
-#     unittest.TextTestRunner(verbosity=2).run(suite)
-#     
-#     print 'prim25_fix_adjBase'
-#     suite = unittest.TestLoader().loadTestsFromTestCase(prim25_fix_adjBase)
-#     unittest.TextTestRunner(verbosity=2).run(suite)
+     suite = unittest.TestLoader().loadTestsFromTestCase(tert35_adjBase)
+     unittest.TextTestRunner(verbosity=2).run(suite)

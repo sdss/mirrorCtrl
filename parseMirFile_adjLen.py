@@ -97,8 +97,8 @@ for k in range(len(SecMinMount)):
 # create a fake FixedLengthLink to constrain z rotation, extending in x, length = 150 mm
 
 mmPerMeter = 1000
-mirPos = numpy.array([0., 2.5 * mmPerMeter, -193.])
-basePos = numpy.array([150., 2.5 * mmPerMeter, -193.])
+mirPos = numpy.array([0., 1 * mmPerMeter, -193.])
+basePos = numpy.array([150., 1 * mmPerMeter, -193.])
 act = link.FixedLengthLink(basePos, mirPos)
 mir25_sec_actList.append(act)
     
@@ -127,6 +127,11 @@ for k in range(len(SecMinMount)):
                                  SecMaxMount[k], SecMountScale[k], SecMountOffset[k])
     mir35_sec_actList.append(act)
        
+mmPerMeter = 1000
+mirPos = numpy.array([0., 1 * mmPerMeter, -152.806])
+basePos = numpy.array([150., 1 * mmPerMeter, -152.806])
+act = link.FixedLengthLink(basePos, mirPos)
+mir35_sec_actList.append(act)
 
 ###################### 3.5 Tertiary ##############################
 
