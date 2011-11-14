@@ -21,6 +21,8 @@ orientRange = numpy.zeros((resolution * 5, 5))
 for ind, rng in enumerate(ranges):
     orientRange[ind*resolution:ind*resolution+resolution, ind] = rng
 
+############################# TESTS #####################################
+
 class roundTrip(unittest.TestCase):
     def _printErr(self, orientTest, mount, orient1, mount1):
         # commanded orient is only 5 axes, add a zero for rotation for math to work
@@ -82,6 +84,12 @@ class mountDiff(unittest.TestCase):
             mount2 = self.mir2.actuatorMountFromOrient(orientTest)
             self._printErr(orientTest, mount1, mount2)        
                     
+                    
+################################################################################
+
+
+######################### roundTrip setUps #####################################
+
 class prim25_adjLen(roundTrip):
     def setUp(self):
         # old style encoders
@@ -172,6 +180,8 @@ class tert35_adjBase(roundTrip):
         actList = parseMirFile_adjBase.mir35_tert_actList
         self.mir = mirror.DirectMirror(actList[0:3], actList[3:])
         
+######################### mountDiff setUps #####################################
+        
         
 class prim25_mnt(mountDiff):
     def setUp(self):
@@ -195,5 +205,5 @@ class sec25_mnt(mountDiff):
         
 if __name__ == '__main__':
     # choose which mirror you want to test         
-    suite = unittest.TestLoader().loadTestsFromTestCase(sec25_mnt)
+    suite = unittest.TestLoader().loadTestsFromTestCase(sec25_adjLen)
     unittest.TextTestRunner(verbosity=2).run(suite)

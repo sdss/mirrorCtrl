@@ -161,23 +161,28 @@ class AdjBaseActuator(AdjLengthLink):
     Right now there are three different methods to determine conversions, we should test and pick one
     (or none and just use AdjLengthActuator).
     """
-    def physFromMirPos(self, mirPos):
-        """Compute physical length (mm) of adjustable element given the mirror position (mm)
-        
-        This computation is exact but requires trig and so will be slow
-        """
-        r_not = self.neutralLength
-        
-        # Calculate vector from basePos to a given mirPos
-        r = (mirPos - self.basePos)
-
-        # Get projection of mirVec (link axis) along axis of motor mount.
-        x = numpy.dot(r, self.pistonDir)
-        
-        # Get projection of mirVec (link axis) along axis perpendicular to motor mount.
-        y = numpy.linalg.norm(numpy.cross(r, self.pistonDir))
-        
-        return x - (r_not * math.cos(math.asin(y / r_not)))
+#     def physFromMirPos(self, mirPos):
+#         """Compute physical length (mm) of adjustable element given the mirror position (mm)
+#         
+#         This computation is exact but requires trig and so will be slow
+#         """
+#         # this method is producing math domain errors, I think it has to do 
+#         # with machine precision
+#         r_not = self.neutralLength
+#         
+#         # Calculate vector from basePos to a given mirPos
+#         # r = (mirPos - self.basePos)
+#         r = numpy.linalg.norm(mirPos - self.basePos)
+#         # Get projection of mirVec (link axis) along axis of motor mount.
+#         # x = numpy.dot(r, self.pistonDir)
+#         x = self.neutralLength
+#         # Get projection of mirVec (link axis) along axis perpendicular to motor mount.
+#         # y = numpy.linalg.norm(numpy.cross(r, self.pistonDir))
+#         print ' '
+#         print 'r_not, r: ', r_not, r
+#         y = math.sqrt(r**2 - r_not**2)
+#         print 'x=%s r_not=%s y=%s' % (x, r_not, y)
+#         return x - (r_not * math.cos(math.asin(y / r_not)))
 
     def physFromMirPosCCS(self, mirPos):
         """Compute physical length (mm) of adjustable element given the mirror position (mm)
@@ -206,7 +211,7 @@ class AdjBaseActuator(AdjLengthLink):
         truePhys = phys / numpy.dot(self.pistonDir, mirUnitVec)
         return truePhys
                
-    def physFromMirPosRO(self, mirPos):
+    def physFromMirPos(self, mirPos):
         """Compute physical length (mm) of adjustable element given the mirror position (mm)
         
         Inputs:
