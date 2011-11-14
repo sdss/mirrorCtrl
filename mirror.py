@@ -122,9 +122,10 @@ class MirrorBase(object):
             raise RuntimeError('Input orientation must be a list of numbers of \n\
                                 length 0, 1, 3, or 5. Actual length %s' % (len(userOrient)))
         orient = numpy.zeros(6)
+        # set all non-supplied orientations to 0.
         for axis, val in enumerate(userOrient):
             orient[axis] = val
-        
+        orient = numpy.asarray(orient, dtype=float)
         # Get adjusted orient. Takes fixed axes into account and returns a
         # (new) orient.
         
@@ -132,11 +133,15 @@ class MirrorBase(object):
             # assume only axis 5 (z rotation) is fixed for now to test
             if len(self.fixedLinkList) == 1:
                 # one fixed link means z anti-rotation link
-                fixAxes = [5] 
+                fixAxes = [5]
+                # commanded rot z will always be 0, by design
             if len(self.fixedLinkList) == 3:
                 # three fixed links means z rotation, transX, and transY are constrained
                 fixAxes = [3,4,5]
-            orient = numpy.asarray(orient, dtype=float)
+                # replace axes 3 and 4 with zeros, incase they were (incorrectly) commanded to move
+                # axis 5 is always zero by design
+                orient[[3,4]] = [0., 0.]
+            
             orient = self._adjustOrient(orient, fixAxes)
         
         return orient

@@ -68,12 +68,12 @@ class BaseLink(object):
             raise RuntimeError("mirPos=%s must be 3 elements" % (mirPos,))
         self.neutralLength = self.lengthFromMirPos(self.mirPos)
     
-    def physFromMirPos(self, mirPos):
-        """Compute physical length (mm) of adjustable element given the mirror position (mm)
-        
-        Subclasses must override.
-        """
-        raise NotImplementedError("Subclasses must define")
+#     def physFromMirPos(self, mirPos):
+#         """Compute physical length (mm) of adjustable element given the mirror position (mm)
+#         
+#         Subclasses must override.
+#         """
+#         raise NotImplementedError("Subclasses must define")
 
     def lengthFromMirPos(self, mirPos):
         """
@@ -91,10 +91,16 @@ class FixedLengthLink(BaseLink):
     def __init__(self, basePos, mirPos):
         BaseLink.__init__(self, isAdjustable=False, basePos=basePos, mirPos=mirPos)
     
+#     def physFromMirPos(self, mirPos):
+#         """Compute physical length (mm) of adjustable element given the mirror position (mm)
+#         """
+#         return 0.0
+
     def physFromMirPos(self, mirPos):
         """Compute physical length (mm) of adjustable element given the mirror position (mm)
         """
-        return 0.0
+        length = self.lengthFromMirPos(mirPos)
+        return length - self.neutralLength
 
 
 class AdjustableLink(BaseLink):
