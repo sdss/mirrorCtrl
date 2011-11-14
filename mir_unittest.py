@@ -63,13 +63,13 @@ class mountDiff(unittest.TestCase):
             mountErr = numpy.hstack((mountErr, zstack))
             
         str = '%9.2f %9.3f %9.3f %9.2f %9.2f %9.3f\
-               %9.2f %9.3f %9.3f %9.2f %9.2f %9.3f' %\
+               %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f' %\
                 (orientTest[0], orientTest[1]/RadPerArcSec, orientTest[2]/RadPerArcSec, 
                 orientTest[3], orientTest[4], orientTest[5]/RadPerArcSec,  
                 mountErr[0], mountErr[1], mountErr[2], 
                 mountErr[3], mountErr[4], mountErr[5])
                 
-        print mountErr
+        print str
        
        
     def test(self):
@@ -182,8 +182,18 @@ class prim25_mnt(mountDiff):
         actList = parseMirFile_adjBase.mir25_prim_actList
         self.mir2 = mirror.DirectMirror(actList, [])
         
+class sec25_mnt(mountDiff):
+    def setUp(self):
+        SecCtrMirZ = -135.70
+        SecCtrBaseZ = -178.40
+
+        # old style encoders
+        actList = parseMirFile_adjLen.mir25_sec_actList
+        self.mir1 = mirror.TipTransMirror(SecCtrMirZ, SecCtrBaseZ, actList[0:5], [actList[5]])
+        actList = parseMirFile_adjBase.mir25_sec_actList
+        self.mir2 = mirror.TipTransMirror(SecCtrMirZ, SecCtrBaseZ, actList[0:5], [actList[5]])
         
 if __name__ == '__main__':
     # choose which mirror you want to test         
-    suite = unittest.TestLoader().loadTestsFromTestCase(prim25_mnt)
+    suite = unittest.TestLoader().loadTestsFromTestCase(sec25_mnt)
     unittest.TextTestRunner(verbosity=2).run(suite)

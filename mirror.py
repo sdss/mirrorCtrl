@@ -379,7 +379,7 @@ class DirectMirror(MirrorBase):
             desMirPos = numpy.dot(rotMat, act.mirPos)
             desMirPos = desMirPos + offsets
             # compute phys in a way that works for fixed links
-            physList.append(act.lengthFromMirPos(desMirPos) - act.neutralLength)
+            physList.append(act.physFromMirPos(desMirPos))
         physList = numpy.asarray(physList, dtype=float)
         return physList
                       
@@ -541,12 +541,12 @@ class TipTransMirror(MirrorBase):
                 # transverse gimbal end to the standard reference frame
                 # (which is with respect to home position of mirror vertex).
                 desMirPos = desMirPos + ctrBasePos
-                phys = (act.lengthFromMirPos(desMirPos) - act.neutralLength)
+                phys = (act.physFromMirPos(desMirPos))
                 physList.append(phys)
             else:
                 desMirPos = numpy.dot(rotMat, act.mirPos)
                 desMirPos = desMirPos + offsets
-                phys = (act.lengthFromMirPos(desMirPos) - act.neutralLength)
+                phys = (act.physFromMirPos(desMirPos))
                 physList.append(phys)        
         return numpy.asarray(physList, dtype=float)
 

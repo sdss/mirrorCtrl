@@ -24,7 +24,7 @@ PrimActBaseXYZ = numpy.vstack((PrimActBaseX, PrimActBaseY, PrimActBaseZ))
 mir25_prim_actList = []
 for k in range(len(PrimMinMount)):
 #   basePos, mirPos, minMount, maxMount, scale
-    act = link.AdjLengthLink(PrimActBaseXYZ[:,k], PrimActMirXYZ[:,k], PrimMinMount[k], 
+    act = link.AdjBaseActuator(PrimActBaseXYZ[:,k], PrimActMirXYZ[:,k], PrimMinMount[k], 
                                  PrimMaxMount[k], PrimMountScale[k], PrimMountOffset[k])
     mir25_prim_actList.append(act)
 
@@ -62,7 +62,7 @@ PrimActBaseXYZ_e[2,3:5] = PrimActBaseXYZ_e[2,3:5] - dist
 mir25_prim_encList = []
 for k in range(len(PrimMinMount)):  
 #   basePos, mirPos, minMount, maxMount, scale
-    act = link.AdjLengthLink(PrimActBaseXYZ_e[:,k], PrimActMirXYZ_e[:,k], PrimMinMount[k], 
+    act = link.AdjBaseActuator(PrimActBaseXYZ_e[:,k], PrimActMirXYZ_e[:,k], PrimMinMount[k], 
                                  PrimMaxMount[k], PrimMountScale[k], PrimMountOffset[k])
     mir25_prim_encList.append(act)
     
@@ -90,7 +90,7 @@ SecActBaseXYZ = numpy.vstack((SecActBaseX, SecActBaseY, SecActBaseZ))
 mir25_sec_actList = []
 for k in range(len(SecMinMount)):
 #   basePos, mirPos, minMount, maxMount, scale
-    act = link.AdjLengthLink(SecActBaseXYZ[:,k], SecActMirXYZ[:,k], SecMinMount[k], 
+    act = link.AdjBaseActuator(SecActBaseXYZ[:,k], SecActMirXYZ[:,k], SecMinMount[k], 
                                  SecMaxMount[k], SecMountScale[k], SecMountOffset[k])
     mir25_sec_actList.append(act)
     
@@ -123,7 +123,7 @@ SecActBaseXYZ = numpy.vstack((SecActBaseX, SecActBaseY, SecActBaseZ))
 mir35_sec_actList = []
 for k in range(len(SecMinMount)):
 #   basePos, mirPos, minMount, maxMount, scale
-    act = link.AdjLengthLink(SecActBaseXYZ[:,k], SecActMirXYZ[:,k], SecMinMount[k], 
+    act = link.AdjBaseActuator(SecActBaseXYZ[:,k], SecActMirXYZ[:,k], SecMinMount[k], 
                                  SecMaxMount[k], SecMountScale[k], SecMountOffset[k])
     mir35_sec_actList.append(act)
 
@@ -156,7 +156,7 @@ TertActBaseXYZ = numpy.vstack((TertActBaseX, TertActBaseY, TertActBaseZ))
 mir35_tert_actList = []
 for k in range(len(TertMinMount)):
 #   basePos, mirPos, minMount, maxMount, scale
-    act = link.AdjLengthLink(TertActBaseXYZ[:,k], TertActMirXYZ[:,k], TertMinMount[k], 
+    act = link.AdjBaseActuator(TertActBaseXYZ[:,k], TertActMirXYZ[:,k], TertMinMount[k], 
                              TertMaxMount[k], TertMountScale[k], TertMountOffset[k])
     mir35_tert_actList.append(act)
 
