@@ -3,8 +3,7 @@ import unittest
 import numpy
 import math
 
-import parseMirFile_adjBase
-import parseMirFile_adjLen
+import genMirData
 import mirror
 
 MMPerMicron = 1 / 1000.0        # millimeters per micron
@@ -12,198 +11,144 @@ RadPerDeg  = math.pi / 180.0    # radians per degree
 ArcSecPerDeg = 60.0 * 60.0      # arcseconds per degree
 RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
 
+#Define maximum allowable orient error, reusing from mirror.py, not using z rot
+# maxOrientErr = numpy.array([0.0001, 5e-8, 5e-8, 0.0001, 0.0001])
+maxOrientErr = numpy.array([0.1, 5e-3, 5e-3, 0.1, 0.1])
+maxMountErr = 1e-3
+
 # construct range of orients to test (0-25mm, 0-2 degrees)
-resolution = 10
-dist_range = numpy.linspace(0, 25, resolution)
-ang_range = numpy.linspace(0, 2 * RadPerDeg, resolution)
+maxDist = 25 #mm
+maxTilt = 2 # degrees
+resolution = 5
+dist_range = numpy.linspace(0, maxDist, resolution)
+ang_range = numpy.linspace(0, maxTilt * RadPerDeg, resolution)
 ranges = [dist_range, ang_range, ang_range, dist_range, dist_range]
 orientRange = numpy.zeros((resolution * 5, 5))
 for ind, rng in enumerate(ranges):
     orientRange[ind*resolution:ind*resolution+resolution, ind] = rng
+    
+# construct a set of random orientations.
+num=5
+orientRand = numpy.zeros((num, 5))
+distRand = numpy.random.random_sample(num) * maxDist # pist, transXY
+tiltRand = numpy.random.random_sample(num) * maxTilt * RadPerDeg
+orientRand[:,[0, 3, 4]] = numpy.vstack((distRand, distRand, distRand)).T
+orientRand[:,[1, 2]] = numpy.vstack((tiltRand, tiltRand)).T
+
+
+# construct a list of all mirrors, with all actuator options.
+# from genMirData:
+# prim25List[8]: includes 2 faked fixed link versions and faked encoders
+# sec25List[4]: includes a faked fixed link and faked encoders
+# sec35List[4]: includes a faked fixed link and faked encoders
+# tert35List[2]: 
+
+
+prim25 = [mirror.DirectMirror(*input) for input in genMirData.prim25List]
+secCtrMirZ = -135.70
+secCtrBaseZ = -178.40
+sec25 = [mirror.TipTransMirror(secCtrMirZ, secCtrBaseZ, *input) for input in genMirData.sec25List]
+sec35 = [mirror.DirectMirror(*input) for input in genMirData.sec35List]
+tert35 = [mirror.DirectMirror(*input) for input in genMirData.tert35List]
+mirAll = prim25 + sec25 + sec35 + tert35
+mirAll = prim25
 
 ############################# TESTS #####################################
 
-class roundTrip(unittest.TestCase):
-    def _printErr(self, orientTest, mount, orient1, mount1):
-        # commanded orient is only 5 axes, add a zero for rotation for math to work
-        orientTest = numpy.hstack((numpy.array(orientTest),0.))
-        orientErr = numpy.abs(orientTest - orient1)
-        mountErr = numpy.abs(numpy.asarray(mount, dtype=float) - numpy.asarray(mount1, dtype=float))
-        if len(mountErr) < 6:
-            # for printing to work
-            zstack = numpy.zeros(6-len(mountErr))
-            mountErr = numpy.hstack((mountErr, zstack))
-        str = '%9.2f %9.3f %9.3f %9.2f %9.2f %9.3f\
-               %9.2f %9.3f %9.3f %9.2f %9.2f %9.3f\
-               %9.2f %9.3f %9.3f %9.2f %9.2f %9.3f' %\
-                (orientTest[0], orientTest[1]/RadPerArcSec, orientTest[2]/RadPerArcSec, 
-                orientTest[3], orientTest[4], orientTest[5]/RadPerArcSec, 
-                orientErr[0], orientErr[1]/RadPerArcSec, orientErr[2]/RadPerArcSec, 
-                orientErr[3], orientErr[4], orientErr[5]/RadPerArcSec, 
-                mountErr[0], mountErr[1], mountErr[2], 
-                mountErr[3], mountErr[4], mountErr[5])
-        print str
+class MirTests(unittest.TestCase):
+    """Tests for mirrors
+    """
+    
+    def _checkOrient(self, orientIn, orientOut, mirIter):
+        """This checks if the value abs(orientIn - orientOut) is within the limit defined
+        by maxOrientErr.  If it isn't the test fails, and the orientIn and Errors are printed
+        """
+        orientIn = numpy.asarray(orientIn[0:5], dtype=float) # only 5 axes (no rotZ)
+        orientOut = numpy.asarray(orientOut[0:5], dtype=float) # only 5 axes (no rotZ)
+        orientErr = numpy.abs(orientIn - orientOut)
+        failStr = 'Mir Iter Num: %s \n orientIn(5):  %9.4f %9.4f %9.4f %9.4f %9.4f \n orientErr(5): %9.4f %9.4f %9.4f %9.4f %9.4f' %\
+               (mirIter, orientIn[0], orientIn[1]/RadPerArcSec, orientIn[2]/RadPerArcSec,
+               orientIn[3], orientIn[4], orientErr[0],
+               orientErr[1]/RadPerArcSec, orientErr[2]/RadPerArcSec,
+               orientErr[3], orientErr[4])
+        return orientErr
         
-    def test(self):
-        str = 'Printing:  Orient Input(6)   Orient Diff(6)   Mount Diff(6)'
-        print
-        print str
-        for orientTest in orientRange:
-            mount = self.mir.actuatorMountFromOrient(orientTest)
-            orient1 = self.mir.orientFromEncoderMount(mount)
-            mount1 = self.mir.actuatorMountFromOrient(orient1)
-            self._printErr(orientTest, mount, orient1, mount1)
-            
-class mountDiff(unittest.TestCase):
-    def _printErr(self, orientTest, mount1, mount2):
-        # commanded orient is only 5 axes, add a zero for rotation for math to work
-        orientTest = numpy.hstack((numpy.array(orientTest),0.))
-        mountErr = numpy.abs(numpy.asarray(mount1, dtype=float) - numpy.asarray(mount2, dtype=float))
-        if len(mountErr) < 6:
-            # for printing to work
-            zstack = numpy.zeros(6-len(mountErr))
-            mountErr = numpy.hstack((mountErr, zstack))
-            
-        str = '%9.2f %9.3f %9.3f %9.2f %9.2f %9.3f\
-               %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f' %\
-                (orientTest[0], orientTest[1]/RadPerArcSec, orientTest[2]/RadPerArcSec, 
-                orientTest[3], orientTest[4], orientTest[5]/RadPerArcSec,  
-                mountErr[0], mountErr[1], mountErr[2], 
-                mountErr[3], mountErr[4], mountErr[5])
+    def _roundTripAct(self, orientList):
+        for mirIter, mir in enumerate(mirAll):
+            for orientIn in orientList:
+                try:
+                    mnt = mir.actuatorMountFromOrient(orientIn)
+                    orient = mir.orientFromActuatorMount(mnt)
+                except RuntimeError as er:
+                    print str(er) + '  orientIn: %10.4f %10.4f %10.4f %10.4f %10.4f  mirIter: %s' %\
+                               (orientIn[0], orientIn[1]/RadPerArcSec, orientIn[2]/RadPerArcSec,
+                                orientIn[3], orientIn[4], mirIter)
+                    continue
+                self._checkOrient(orientIn, orient, mirIter)
                 
-        print str
-       
-       
-    def test(self):
-        str = 'Printing:  Orient Input(6)   Mount Diff(6)'
-        print
-        print str
+    def _roundTripEnc(self, orientList):
+        for mirIter, mir in enumerate(mirAll):
+            for orientIn in orientList:
+                try:
+                    mnt = mir.actuatorMountFromOrient(orientIn)
+                    orient = mir.orientFromActuatorMount(mnt)
+                except RuntimeError as er:
+                    print str(er) + '  orientIn: %10.4f %10.4f %10.4f %10.4f %10.4f  mirIter: %s' %\
+                               (orientIn[0], orientIn[1]/RadPerArcSec, orientIn[2]/RadPerArcSec,
+                                orientIn[3], orientIn[4], mirIter)
+                    continue
+                self._checkOrient(orientIn, orient, mirIter)
+                
+    def testRoundTripActRange(self):
+        orientList = orientRange
+        self._roundTripAct(orientList)
+        
+    def testRoundTripActRand(self):
+        orientList = orientRange
+        self._roundTripAct(orientList)
 
-        for orientTest in orientRange:
-            mount1 = self.mir1.actuatorMountFromOrient(orientTest)
-            mount2 = self.mir2.actuatorMountFromOrient(orientTest)
-            self._printErr(orientTest, mount1, mount2)        
-                    
+    def testRoundTripEncRange(self):
+        orientList = orientRange
+        self._roundTripEnc(orientList)
+        
+    def testRoundTripEncRand(self):
+        orientList = orientRange
+        self._roundTripEnc(orientList)
+                
+                
+if __name__ == '__main__':
+    unittest.main()
+       
                     
 ################################################################################
 
 
-######################### roundTrip setUps #####################################
+#         
+# if __name__ == '__main__':
+#     # choose which mirror you want to test         
+#     suite = unittest.TestLoader().loadTestsFromTestCase(sec25_adjLen)
+#     unittest.TextTestRunner(verbosity=2).run(suite)
 
-class prim25_adjLen(roundTrip):
-    def setUp(self):
-        # old style encoders
-        actList = parseMirFile_adjLen.mir25_prim_actList
-        self.mir = mirror.DirectMirror(actList, [])
 
-class prim25_enc_adjLen(roundTrip):
-    # contrived encoder locations
-    def setUp(self):
-        # old style encoders
-        actList = parseMirFile_adjLen.mir25_prim_actList
-        encList = parseMirFile_adjLen.mir25_prim_encList
-        self.mir = mirror.DirectMirror(actList, [], encList)
 
-class prim25_fix_adjLen(roundTrip):
-    # holding one z rot link as a fixed link
-    def setUp(self):
-        # old style encoders
-        actList = parseMirFile_adjLen.mir25_prim_actListFixed
-        encList = actList[0:5]
-        self.mir = mirror.DirectMirror(actList[0:5], [actList[5]])
-
-class prim25_adjBase(roundTrip):
-    def setUp(self):
-        # new style encoders
-        actList = parseMirFile_adjBase.mir25_prim_actList
-        self.mir = mirror.DirectMirror(actList, [])
-
-class prim25_enc_adjBase(roundTrip):
-    # contrived encoder locations
-    def setUp(self):
-        # new style encoders
-        actList = parseMirFile_adjBase.mir25_prim_actList
-        encList = parseMirFile_adjBase.mir25_prim_encList
-        self.mir = mirror.DirectMirror(actList, [], encList)
-
-class prim25_fix_adjBase(roundTrip):
-    # holding one z rot link as a fixed link
-    def setUp(self):
-        # new style encoders
-        actList = parseMirFile_adjBase.mir25_prim_actListFixed
-        encList = actList[0:5]
-        self.mir = mirror.DirectMirror(actList[0:5], [actList[5]])
-
-class sec25_adjBase(roundTrip):
-    # holding one z rot link as a fixed link
-    def setUp(self):
-        SecCtrMirZ = -135.70
-        SecCtrBaseZ = -178.40
-        # new style encoders
-        actList = parseMirFile_adjBase.mir25_sec_actList
-        self.mir = mirror.TipTransMirror(SecCtrMirZ, SecCtrBaseZ, actList[0:5], [actList[5]])
+# old tests    
+#     def _printErr(self, orientTest, mount, orient1, mount1):
+#         # commanded orient is only 5 axes, add a zero for rotation for math to work
+#         orientTest = numpy.hstack((numpy.array(orientTest),0.))
+#         orientErr = numpy.abs(orientTest - orient1)
+#         mountErr = numpy.abs(numpy.asarray(mount, dtype=float) - numpy.asarray(mount1, dtype=float))
+#         if len(mountErr) < 6:
+#             # for printing to work
+#             zstack = numpy.zeros(6-len(mountErr))
+#             mountErr = numpy.hstack((mountErr, zstack))
+#         str = '%9.2f %9.3f %9.3f %9.2f %9.2f %9.3f\
+#                %9.2f %9.3f %9.3f %9.2f %9.2f %9.3f\
+#                %9.2f %9.3f %9.3f %9.2f %9.2f %9.3f' %\
+#                 (orientTest[0], orientTest[1]/RadPerArcSec, orientTest[2]/RadPerArcSec, 
+#                 orientTest[3], orientTest[4], orientTest[5]/RadPerArcSec, 
+#                 orientErr[0], orientErr[1]/RadPerArcSec, orientErr[2]/RadPerArcSec, 
+#                 orientErr[3], orientErr[4], orientErr[5]/RadPerArcSec, 
+#                 mountErr[0], mountErr[1], mountErr[2], 
+#                 mountErr[3], mountErr[4], mountErr[5])
+#         print str
         
-class sec25_adjLen(roundTrip):
-    # holding one z rot link as a fixed link
-    def setUp(self):
-        SecCtrMirZ = -135.70
-        SecCtrBaseZ = -178.40
-        # old style encoders
-        actList = parseMirFile_adjLen.mir25_sec_actList
-        self.mir = mirror.TipTransMirror(SecCtrMirZ, SecCtrBaseZ, actList[0:5], [actList[5]])
-
-class sec35_adjLen(roundTrip):
-    # holding one z rot link as a fixed link
-    def setUp(self):
-        # old style encoders
-        actList = parseMirFile_adjLen.mir35_sec_actList
-        self.mir = mirror.DirectMirror(actList[0:5], [actList[5]])
-        
-class sec35_adjBase(roundTrip):
-    # holding one z rot link as a fixed link
-    def setUp(self):
-        # new style encoders
-        actList = parseMirFile_adjBase.mir35_sec_actList
-        self.mir = mirror.DirectMirror(actList[0:5], [actList[5]])            
-
-class tert35_adjLen(roundTrip):
-    # holding one z rot link as a fixed link
-    def setUp(self):
-        # old style encoders
-        actList = parseMirFile_adjBase.mir35_tert_actList
-        self.mir = mirror.DirectMirror(actList[0:3], actList[3:])
-
-class tert35_adjBase(roundTrip):
-    # holding one z rot link as a fixed link
-    def setUp(self):
-        # new style encoders
-        actList = parseMirFile_adjBase.mir35_tert_actList
-        self.mir = mirror.DirectMirror(actList[0:3], actList[3:])
-        
-######################### mountDiff setUps #####################################
-        
-        
-class prim25_mnt(mountDiff):
-    def setUp(self):
-        # old style encoders
-        actList = parseMirFile_adjLen.mir25_prim_actList
-        self.mir1 = mirror.DirectMirror(actList, [])
-        # new style encoders
-        actList = parseMirFile_adjBase.mir25_prim_actList
-        self.mir2 = mirror.DirectMirror(actList, [])
-        
-class sec25_mnt(mountDiff):
-    def setUp(self):
-        SecCtrMirZ = -135.70
-        SecCtrBaseZ = -178.40
-
-        # old style encoders
-        actList = parseMirFile_adjLen.mir25_sec_actList
-        self.mir1 = mirror.TipTransMirror(SecCtrMirZ, SecCtrBaseZ, actList[0:5], [actList[5]])
-        actList = parseMirFile_adjBase.mir25_sec_actList
-        self.mir2 = mirror.TipTransMirror(SecCtrMirZ, SecCtrBaseZ, actList[0:5], [actList[5]])
-        
-if __name__ == '__main__':
-    # choose which mirror you want to test         
-    suite = unittest.TestLoader().loadTestsFromTestCase(sec25_adjLen)
-    unittest.TextTestRunner(verbosity=2).run(suite)
