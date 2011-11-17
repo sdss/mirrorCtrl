@@ -144,5 +144,5 @@ class tert35_adjBase(mirTest):
 
 if __name__ == '__main__':
     # choose which mirror you want to test         
-    suite = unittest.TestLoader().loadTestsFromTestCase(prim25_adjBase)
+    suite = unittest.TestLoader().loadTestsFromTestCase(sec25_adjBase)
     unittest.TextTestRunner(verbosity=2).run(suite)
