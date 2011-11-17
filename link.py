@@ -68,12 +68,12 @@ class BaseLink(object):
             raise RuntimeError("mirPos=%s must be 3 elements" % (mirPos,))
         self.neutralLength = self.lengthFromMirPos(self.mirPos)
     
-    def physFromMirPos(self, mirPos):
-        """Compute physical length (mm) of adjustable element given the mirror position (mm)
-        
-        Subclasses must override.
-        """
-        raise NotImplementedError("Subclasses must define")
+#     def physFromMirPos(self, mirPos):
+#         """Compute physical length (mm) of adjustable element given the mirror position (mm)
+#         
+#         Subclasses must override.
+#         """
+#         raise NotImplementedError("Subclasses must define")
 
     def lengthFromMirPos(self, mirPos):
         """
@@ -91,10 +91,16 @@ class FixedLengthLink(BaseLink):
     def __init__(self, basePos, mirPos):
         BaseLink.__init__(self, isAdjustable=False, basePos=basePos, mirPos=mirPos)
     
+#     def physFromMirPos(self, mirPos):
+#         """Compute physical length (mm) of adjustable element given the mirror position (mm)
+#         """
+#         return 0.0
+
     def physFromMirPos(self, mirPos):
         """Compute physical length (mm) of adjustable element given the mirror position (mm)
         """
-        return 0.0
+        length = self.lengthFromMirPos(mirPos)
+        return length - self.neutralLength
 
 
 class AdjustableLink(BaseLink):
@@ -160,18 +166,20 @@ class AdjBaseActuator(AdjLengthLink):
         
         This computation is exact but requires trig and so will be slow
         """
-        r_not = self.neutralLength
+        # this method is producing math domain errors, I think it has to do 
+        # with machine precision
+        r_naught = self.neutralLength
         
         # Calculate vector from basePos to a given mirPos
         r = (mirPos - self.basePos)
-
         # Get projection of mirVec (link axis) along axis of motor mount.
         x = numpy.dot(r, self.pistonDir)
         
-        # Get projection of mirVec (link axis) along axis perpendicular to motor mount.
         y = numpy.linalg.norm(numpy.cross(r, self.pistonDir))
-        
-        return x - (r_not * math.cos(math.asin(y / r_not)))
+        try: 
+            return x - (r_naught * math.cos(math.asin(y / r_naught)))
+        except ValueError:
+            raise RuntimeError( 'Err: lim of y = r_naught, but y=%5.3f r_n=%5.3f' % (y, r_naught))
 
     def physFromMirPosCCS(self, mirPos):
         """Compute physical length (mm) of adjustable element given the mirror position (mm)
