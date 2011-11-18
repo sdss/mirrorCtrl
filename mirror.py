@@ -216,7 +216,7 @@ class MirrorBase(object):
         
         
         initOrient = numpy.zeros(6)
-        orient = scipy.optimize.fmin(
+        orient = scipy.optimize.fmin_powell(
             self._minOrientErr,
             initOrient, 
             args = (givPhys, physMult, linkListFull), 

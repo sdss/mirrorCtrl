@@ -14,7 +14,7 @@ RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
 #Define maximum allowable orient error, reusing from mirror.py, not using z rot
 # maxOrientErr = numpy.array([0.0001, 5e-8, 5e-8, 0.0001, 0.0001])
 maxOrientErr = numpy.array([0.1, 5e-3, 5e-3, 0.1, 0.1])
-maxMountErr = 1e-3
+maxMountErr = 0.1
 
 # construct range of orients to test (0-25mm, 0-2 degrees)
 maxDist = 25 #mm
@@ -35,6 +35,9 @@ tiltRand = numpy.random.random_sample(num) * maxTilt * RadPerDeg
 orientRand[:,[0, 3, 4]] = numpy.vstack((distRand, distRand, distRand)).T
 orientRand[:,[1, 2]] = numpy.vstack((tiltRand, tiltRand)).T
 
+# choose what type of orientation set you want to use in tests, right now there are:
+# orientRange and orientRand
+orientList = orientRange  
 
 # construct a list of all mirrors, with all actuator options.
 # from genMirData:
@@ -50,74 +53,119 @@ secCtrBaseZ = -178.40
 sec25 = [mirror.TipTransMirror(secCtrMirZ, secCtrBaseZ, *input) for input in genMirData.sec25List]
 sec35 = [mirror.DirectMirror(*input) for input in genMirData.sec35List]
 tert35 = [mirror.DirectMirror(*input) for input in genMirData.tert35List]
-mirAll = prim25 + sec25 + sec35 + tert35
-mirAll = prim25
+# choose which mirrors you want to include in the tests
+mirList = prim25 + sec25 + sec35 + tert35
 
 ############################# TESTS #####################################
 
 class MirTests(unittest.TestCase):
     """Tests for mirrors
     """
-    
-    def _checkOrient(self, orientIn, orientOut, mirIter):
-        """This checks if the value abs(orientIn - orientOut) is within the limit defined
-        by maxOrientErr.  If it isn't the test fails, and the orientIn and Errors are printed
-        """
+
+    def _roundTrip(self, linkType):
+        for mir in mirList:
+            for orientIn in orientList:
+                try:
+                    mnt = mir.actuatorMountFromOrient(orientIn)
+                    orient = mir.orientFromActuatorMount(mnt)
+                    mnt2 = mir.actuatorMountFromOrient(orient)
+                except RuntimeError as er:
+                    print str(er) + '  orientIn: %10.4f %10.4f %10.4f %10.4f %10.4f  mirIter: %s' %\
+                               (orientIn[0], orientIn[1]/RadPerArcSec, orientIn[2]/RadPerArcSec,
+                                orientIn[3], orientIn[4], mirIter)
+                    continue
+                orientErr, failStr = self._checkOrient(orientIn, orient)
+                if True in (orientErr > maxOrientErr):
+                    print failStr
+                    break 
+                mountErr, failStr = self._checkMount(orientIn, mnt, mnt2)
+                if True in (mountErr > maxMountErr):
+                    print failStr
+                    break 
+
+    def testRoundTripAct(self):
+        for orientIn in orientList:
+            try:
+                mnt = mir.actuatorMountFromOrient(orientIn)
+                orient = mir.orientFromActuatorMount(mnt)
+                mnt2 = mir.actuatorMountFromOrient(orient)
+            except RuntimeError as er:
+                print str(er) + '  orientIn: %10.4f %10.4f %10.4f %10.4f %10.4f  mirIter: %s' %\
+                           (orientIn[0], orientIn[1]/RadPerArcSec, orientIn[2]/RadPerArcSec,
+                            orientIn[3], orientIn[4], mirIter)
+                continue
+            orientErr, failStr = self._checkOrient(orientIn, orient)
+            if True in (orientErr > maxOrientErr):
+                print failStr
+                break 
+            mountErr, failStr = self._checkMount(orientIn, mnt, mnt2)
+            if True in (mountErr > maxMountErr):
+                print failStr
+                break          
+
+    def testRoundTripEnc(self):
+        for orientIn in orientList:
+            try:
+                mnt = mir.encoderMountFromOrient(orientIn)
+                orient = mir.orientFromEncoderMount(mnt)
+                mnt2 = mir.encoderMountFromOrient(mnt)
+            except RuntimeError as er:
+                print str(er) + '  orientIn: %10.4f %10.4f %10.4f %10.4f %10.4f  mirIter: %s' %\
+                           (orientIn[0], orientIn[1]/RadPerArcSec, orientIn[2]/RadPerArcSec,
+                            orientIn[3], orientIn[4], mirIter)
+                continue
+            orientErr, failStr = self._checkOrient(orientIn, orient)
+            if True in (orientErr > maxOrientErr):
+                print failStr
+                break 
+            mountErr, failStr = self._checkMount(orientIn, mnt, mnt2)
+            if True in (mountErr > maxMountErr):
+                print failStr
+                break     
+                
+    def _checkOrient(self, orientIn, orientOut):
+        """This checks if the value abs(orientIn - orientOut) is within
+        the limit defined by maxOrientErr.  If it isn't the test fails,
+        and the orientIn and Errors are printed """
         orientIn = numpy.asarray(orientIn[0:5], dtype=float) # only 5 axes (no rotZ)
         orientOut = numpy.asarray(orientOut[0:5], dtype=float) # only 5 axes (no rotZ)
         orientErr = numpy.abs(orientIn - orientOut)
-        failStr = 'Mir Iter Num: %s \n orientIn(5):  %9.4f %9.4f %9.4f %9.4f %9.4f \n orientErr(5): %9.4f %9.4f %9.4f %9.4f %9.4f' %\
-               (mirIter, orientIn[0], orientIn[1]/RadPerArcSec, orientIn[2]/RadPerArcSec,
+        failStr = 'orientIn(5):  %9.4f %9.4f %9.4f %9.4f %9.4f \n orientErr(5): %9.4f %9.4f %9.4f %9.4f %9.4f' %\
+               (orientIn[0], orientIn[1]/RadPerArcSec, orientIn[2]/RadPerArcSec,
                orientIn[3], orientIn[4], orientErr[0],
                orientErr[1]/RadPerArcSec, orientErr[2]/RadPerArcSec,
                orientErr[3], orientErr[4])
-        return orientErr
-        
-    def _roundTripAct(self, orientList):
-        for mirIter, mir in enumerate(mirAll):
-            for orientIn in orientList:
-                try:
-                    mnt = mir.actuatorMountFromOrient(orientIn)
-                    orient = mir.orientFromActuatorMount(mnt)
-                except RuntimeError as er:
-                    print str(er) + '  orientIn: %10.4f %10.4f %10.4f %10.4f %10.4f  mirIter: %s' %\
-                               (orientIn[0], orientIn[1]/RadPerArcSec, orientIn[2]/RadPerArcSec,
-                                orientIn[3], orientIn[4], mirIter)
-                    continue
-                self._checkOrient(orientIn, orient, mirIter)
-                
-    def _roundTripEnc(self, orientList):
-        for mirIter, mir in enumerate(mirAll):
-            for orientIn in orientList:
-                try:
-                    mnt = mir.actuatorMountFromOrient(orientIn)
-                    orient = mir.orientFromActuatorMount(mnt)
-                except RuntimeError as er:
-                    print str(er) + '  orientIn: %10.4f %10.4f %10.4f %10.4f %10.4f  mirIter: %s' %\
-                               (orientIn[0], orientIn[1]/RadPerArcSec, orientIn[2]/RadPerArcSec,
-                                orientIn[3], orientIn[4], mirIter)
-                    continue
-                self._checkOrient(orientIn, orient, mirIter)
-                
-    def testRoundTripActRange(self):
-        orientList = orientRange
-        self._roundTripAct(orientList)
-        
-    def testRoundTripActRand(self):
-        orientList = orientRange
-        self._roundTripAct(orientList)
+        return orientErr, failStr
+        #self.assertFalse(True in (orientErr > maxOrientErr), failStr)
 
-    def testRoundTripEncRange(self):
-        orientList = orientRange
-        self._roundTripEnc(orientList)
-        
-    def testRoundTripEncRand(self):
-        orientList = orientRange
-        self._roundTripEnc(orientList)
+    
+    def _checkMount(self, orientIn, mountIn, mountOut):
+        """This compares the differnce between the mount computed from
+        initial orient and mount computed from recovered orient.  This
+        will check that the fitting process produced the desired
+        orientation, and not an alternate one """
+        orientIn = numpy.asarray(orientIn[0:5], dtype=float) # only 5 axes (no rotZ)
+        mountIn = numpy.asarray(mountIn, dtype=float)
+        mountOut = numpy.asarray(mountOut, dtype=float)
+        mountErr = numpy.abs(mountIn - mountOut)
+        # append zero error to make len(mountErr) == 6
+        if len(mountErr) < 6:
+            mountErr = numpy.hstack((mountErr, numpy.zeros(6-len(mountErr))))
+        failStr = 'orientIn(5):  %9.4f %9.4f %9.4f %9.4f %9.4f \n mountErr(6): %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f' %\
+               (orientIn[0], orientIn[1]/RadPerArcSec, orientIn[2]/RadPerArcSec,
+               orientIn[3], orientIn[4], mountErr[0],
+               mountErr[1], mountErr[2],
+               mountErr[3], mountErr[4], mountErr[5])
+        return mountErr, failStr
+        #self.assertFalse(True in (mountErr > maxMountErr), failStr)
+   
+
                 
                 
 if __name__ == '__main__':
-    unittest.main()
+    for ind, mir in enumerate(mirList):
+        print 'Testing Mirror # ', ind    
+        unittest.main()
        
                     
 ################################################################################
