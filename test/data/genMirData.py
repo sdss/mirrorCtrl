@@ -34,7 +34,7 @@ mmPerMeter = 1000
 
 MirSetUp = collections.namedtuple("mirSetUp", "actList fixedList encList")
 
-def fakeEncoders(pistonMirPos, pistonBasePos, transMirPos, transBasePos, dist=75):
+def fakeEncoders(pistonMirPos, pistonBasePos, transMirPos, transBasePos, dist=0):
     """Generate new mirror and base positions to simulate an offset encoder.
     Input
     -pistonMirPos: mirPos positions for pistons - [[x,y,z], n] where n is number of actuators, 

@@ -64,7 +64,7 @@ class MirrorBase(object):
                     self.encoderList.append(enc)
                     self.hasEncoders = True
 
-    def orientFromEncoderMount(self, mount):
+    def orientFromEncoderMount(self, mount, initOrient = numpy.zeros(6)):
         """Compute mirror orientation from encoder mount lengths
         
         Inputs:
@@ -72,9 +72,11 @@ class MirrorBase(object):
         """
         if len(mount) != len(self.encoderList):
             raise RuntimeError("Need %s values; got %s" % (len(self.encoderList), len(mount)))
-        return self._orientFromMount(mount, self.encoderList)
+        if len(initOrient) != 6:
+            raise RuntimeError("orientation guess must be length 6; got %s" % (len(initOrient)))    
+        return self._orientFromMount(mount, self.encoderList, initOrient)
     
-    def orientFromActuatorMount(self, mount):
+    def orientFromActuatorMount(self, mount, initOrient = numpy.zeros(6)):
         """Compute mirror orientation from actuator mount lengths
         
         Inputs:
@@ -82,7 +84,9 @@ class MirrorBase(object):
         """
         if len(mount) != len(self.actuatorList):
             raise RuntimeError("Need %s values; got %s" % (len(self.actuatorList), len(mount)))
-        return self._orientFromMount(mount, self.actuatorList)
+        if len(initOrient) != 6:
+            raise RuntimeError("orientation guess must be length 6; got %s" % (len(initOrient)))
+        return self._orientFromMount(mount, self.actuatorList, initOrient)
     
     def actuatorMountFromOrient(self, userOrient):
         """Compute actuator mount lengths from orientation
@@ -90,9 +94,13 @@ class MirrorBase(object):
         Inputs:
         - userOrient: an Orientation or collection of 6 items or fewer in the same order. Keywords
         are also accepted, undefined fields will be silently replaced as zeros.
+        
+        Output:
+        -mountList: list of mount coords for actuator/encoders
+        -adjOrient: adjusted orient based on mirror fixed links
         """
-        orient = self._fullOrient(userOrient)
-        return self._mountFromOrient(Orientation(*orient), self.actuatorList)
+        adjOrient = self._fullOrient(userOrient)
+        return self._mountFromOrient(Orientation(*adjOrient), self.actuatorList), adjOrient
     
     def encoderMountFromOrient(self, userOrient):
         """Compute actuator mount lengths from orientation
@@ -101,9 +109,13 @@ class MirrorBase(object):
         - userOrient: an Orientation or collection of 6 items or fewer in the
         same order. Keywords are also accepted, undefined fields will be
         silently replaced as zeros.
+        
+        Output:
+        -mountList: list of mount coords for actuator/encoders
+        -adjOrient: adjusted orient based on mirror fixed links
         """
-        orient = self._fullOrient(userOrient)
-        return self._mountFromOrient(Orientation(*orient), self.encoderList)
+        adjOrient = self._fullOrient(userOrient)
+        return self._mountFromOrient(Orientation(*adjOrient), self.encoderList), adjOrient
         
     def _fullOrient(self, userOrient):
         """Takes user supplied orientation values and constructs a fully defined
@@ -141,7 +153,6 @@ class MirrorBase(object):
                 # replace axes 3 and 4 with zeros, incase they were (incorrectly) commanded to move
                 # axis 5 is always zero by design
                 orient[[3,4]] = [0., 0.]
-            
             orient = self._adjustOrient(orient, fixAxes)
         
         return orient
@@ -159,11 +170,11 @@ class MirrorBase(object):
         """
         raise NotImplementedError()
     
-    def _orientFromMount(self, mount, linkList):
+    def _orientFromMount(self, mount, linkList, initOrient):
         """Compute orientation from link mount length
         """
         phys = [link.physFromMount(mt) for mt, link in itertools.izip(mount, linkList)]
-        return self._orientFromPhys(phys, linkList)    
+        return self._orientFromPhys(phys, linkList, initOrient)    
 
     def _physMult(self, linkList):
         """Determine multipliers to be used in minimization of orientation errors, so we
@@ -193,7 +204,7 @@ class MirrorBase(object):
         
         return physMult
     
-    def _orientFromPhys(self, phys, linkList):
+    def _orientFromPhys(self, phys, linkList, initOrient):
         """Compute mirror orientation give the physical position of each actuator. Uses fitting.
         
         Input:
@@ -212,19 +223,18 @@ class MirrorBase(object):
         # Compute physical errors
         physMult = self._physMult(linkListFull)
 
-        # initial guess ("home")
-        
-        
-        initOrient = numpy.zeros(6)
-        orient = scipy.optimize.fmin_powell(
+        orient, f, direc, iter, funcalls, warnflag = scipy.optimize.fmin_powell(
             self._minOrientErr,
             initOrient, 
             args = (givPhys, physMult, linkListFull), 
             maxiter = _MaxIter,
             ftol = _FitTol,
-            disp = False
+            disp = False,
+            full_output = True
         )
-  
+        if warnflag == 1:
+            raise RuntimeError('Maximum num of iterations reached, computing mount-->orient')
+            
         return Orientation(*orient)        
 
     def _adjustOrient(self, orient, fixAxes):
@@ -249,13 +259,17 @@ class MirrorBase(object):
         givPhys = numpy.zeros(len(fixAxes))
         # only searching for solutions for the fixed axes
         initOrient = numpy.zeros(len(fixAxes))
-        orientFix = scipy.optimize.fmin_powell(
+        orientFix, f, direc, iter, funcalls, warnflag = scipy.optimize.fmin_powell(
                         self._minOrientErr, initOrient,
                         args = (givPhys, physMult, linkList, fixAxes, orient), 
                         maxiter = _MaxIter,
                         ftol = _FitTol,
-                        disp = False
+                        disp = False,
+                        full_output = True
                         )
+        if warnflag == 1:
+            raise RuntimeError('Maximum num of iterations reached, \n\
+                               computing userOrient-->fullOrient')
         orient[fixAxes] = orientFix
         return orient
         

@@ -38,7 +38,7 @@ orientRand[:,[1, 2]] = numpy.vstack((tiltRand, tiltRand)).T
 
 # choose what type of orientation set you want to use in tests, right now there are:
 # orientRange and orientRand
-orientList = orientRange  
+orientList = orientRange 
 
 # construct a list of all mirrors, with all actuator options.
 # from genMirData:
@@ -55,8 +55,7 @@ sec25 = [mirror.TipTransMirror(secCtrMirZ, secCtrBaseZ, *input) for input in gen
 sec35 = [mirror.DirectMirror(*input) for input in genMirData.sec35List]
 tert35 = [mirror.DirectMirror(*input) for input in genMirData.tert35List]
 # choose which mirrors you want to include in the tests
-mirList = tert35
-
+mirList = prim25 + sec25 + sec35 + tert35
 ############################# TESTS #####################################
 
 class MirTests(unittest.TestCase):
@@ -66,14 +65,16 @@ class MirTests(unittest.TestCase):
     def testRoundTripAct(self):
         linkType = 'Act'
         errLog = self._roundTrip(linkType)
-        self._errLogPrint(errLog, linkType)
+        if len(errLog) > 0:
+            self._errLogPrint(errLog, linkType)
         self.assertEqual(len(errLog), 0, 'Errors Found and Printed To File')
 
         
     def testRoundTripEnc(self):
         linkType = 'Enc'
         errLog = self._roundTrip(linkType)
-        self._errLogPrint(errLog, linkType)
+        if len(errLog) > 0:
+            self._errLogPrint(errLog, linkType)
         self.assertEqual(len(errLog), 0, 'Errors Found and Printed To File')
         
     def _roundTrip(self, linkType):
@@ -89,9 +90,11 @@ class MirTests(unittest.TestCase):
                 
             for orientIn in orientList:
                 try:
-                    mnt = mountFromOrient(orientIn)
-                    orient = orientFromMount(mnt)
-                    mnt2 = mountFromOrient(orient)
+                    mnt, adjOrient = mountFromOrient(orientIn)
+                    # remove adjOrient from arguments to default to an initial guess of zeros
+                    # for the minimization
+                    orient = orientFromMount(mnt, adjOrient)  
+                    mnt2, adjOrient2 = mountFromOrient(orient)
                 except RuntimeError as er:
                     errLog.append(self._fmtRunTimeErr(er, orientIn, mirIter))
                     continue
@@ -107,18 +110,17 @@ class MirTests(unittest.TestCase):
     def _fmtRunTimeErr(self, error, orientIn, mirIter):
         """For catching and printing a RuntimeError
         """
-        str ='Mirror number: %2.0f orientIn: %10.4f %10.4f %10.4f %10.4f %10.4f' %\
+        errstr =' Mirror number: %2.0f orientIn: %10.4f %10.4f %10.4f %10.4f %10.4f' %\
                                (mirIter, orientIn[0], orientIn[1]/RadPerArcSec, orientIn[2]/RadPerArcSec,
-                                orientIn[3], orientIn[4], mirIter) + str(er) + '\n'
-        return str
+                                orientIn[3], orientIn[4]) + str(error) + '\n'
+        return errstr
         
     def _errLogPrint(self, errLog, linkType):
         """Print the error log to a file
         """
         fileDate = time.localtime()
-        fileName = 'Errors' + linkType + '_' + str(fileDate[0]) + str(fileDate[1])\
-                     + str(fileDate[2]) + str(fileDate[3]) +\
-                    str(fileDate[4]) + str(fileDate[5]) +'.txt'
+        # minutes and seconds appended to filename
+        fileName = 'Errors' + linkType + '_' + str(fileDate[4]) + str(fileDate[5]) +'.txt'
         with open(fileName, 'w') as f:
             for line in errLog:
                 f.write(line)
