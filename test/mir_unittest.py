@@ -17,28 +17,30 @@ RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
 maxOrientErr = numpy.array([0.1, 5e-3, 5e-3, 0.1, 0.1])
 maxMountErr = 0.1
 
-# construct range of orients to test (0-25mm, 0-2 degrees)
-maxDist = 25 #mm
-maxTilt = 2 # degrees
-resolution = 10
-dist_range = numpy.linspace(0, maxDist, resolution)
-ang_range = numpy.linspace(0, maxTilt * RadPerDeg, resolution)
+# construct range of orients to test +/- (0-25mm, 0-2 degrees)
+maxDist = 25. #mm
+maxTilt = 2. * RadPerDeg # 2 degrees
+resolution = 20
+dist_range = numpy.linspace(-maxDist, maxDist, resolution)
+ang_range = numpy.linspace(-maxTilt, maxTilt, resolution)
 ranges = [dist_range, ang_range, ang_range, dist_range, dist_range]
 orientRange = numpy.zeros((resolution * 5, 5))
 for ind, rng in enumerate(ranges):
     orientRange[ind*resolution:ind*resolution+resolution, ind] = rng
-    
+
+# for 35m tert, don't command translations
+tertOrientRange = orientRange[0:resolution*1,:]
 # construct a set of random orientations.
 num=5
 orientRand = numpy.zeros((num, 5))
 distRand = numpy.random.random_sample(num) * maxDist # pist, transXY
-tiltRand = numpy.random.random_sample(num) * maxTilt * RadPerDeg
+tiltRand = numpy.random.random_sample(num) * maxTilt
 orientRand[:,[0, 3, 4]] = numpy.vstack((distRand, distRand, distRand)).T
 orientRand[:,[1, 2]] = numpy.vstack((tiltRand, tiltRand)).T
 
 # choose what type of orientation set you want to use in tests, right now there are:
 # orientRange and orientRand
-orientList = orientRange 
+orientList = orientRange
 
 # construct a list of all mirrors, with all actuator options.
 # from genMirData:
@@ -55,7 +57,7 @@ sec25 = [mirror.TipTransMirror(secCtrMirZ, secCtrBaseZ, *input) for input in gen
 sec35 = [mirror.DirectMirror(*input) for input in genMirData.sec35List]
 tert35 = [mirror.DirectMirror(*input) for input in genMirData.tert35List]
 # choose which mirrors you want to include in the tests
-mirList = prim25 + sec25 + sec35 + tert35
+mirList = tert35
 ############################# TESTS #####################################
 
 class MirTests(unittest.TestCase):
@@ -90,11 +92,18 @@ class MirTests(unittest.TestCase):
                 
             for orientIn in orientList:
                 try:
-                    mnt, adjOrient = mountFromOrient(orientIn)
+                    mnt, adjOrient = mountFromOrient(orientIn, return_adjOrient=True)
                     # remove adjOrient from arguments to default to an initial guess of zeros
                     # for the minimization
-                    orient = orientFromMount(mnt, adjOrient)  
-                    mnt2, adjOrient2 = mountFromOrient(orient)
+                    # add some noise then use noisyOrient as initial guess for round trip
+                    adjOrient = numpy.asarray(adjOrient, dtype=float)
+                    noiseAmp = numpy.asarray([maxDist, maxTilt, maxTilt, 
+                                                maxDist, maxDist, maxTilt], dtype=float) / 10.
+                    # noise is: (flat distribution between -1 and 1) * noiseAmp + adjOrient                            
+                    noisyOrient = (2 * numpy.random.random_sample(6,) - 1) * noiseAmp + adjOrient 
+                    
+                    orient = orientFromMount(mnt, noisyOrient)  
+                    mnt2 = mountFromOrient(orient)
                 except RuntimeError as er:
                     errLog.append(self._fmtRunTimeErr(er, orientIn, mirIter))
                     continue

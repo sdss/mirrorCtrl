@@ -1,6 +1,8 @@
 """Mirror
 
 The units for orientation are mm and radians (not user-friendly units, but best for computation).
+
+notes: so far self.hasEncoders isn't used...
 """
 import collections
 import itertools
@@ -88,7 +90,7 @@ class MirrorBase(object):
             raise RuntimeError("orientation guess must be length 6; got %s" % (len(initOrient)))
         return self._orientFromMount(mount, self.actuatorList, initOrient)
     
-    def actuatorMountFromOrient(self, userOrient):
+    def actuatorMountFromOrient(self, userOrient, return_adjOrient = False):
         """Compute actuator mount lengths from orientation
         
         Inputs:
@@ -99,10 +101,14 @@ class MirrorBase(object):
         -mountList: list of mount coords for actuator/encoders
         -adjOrient: adjusted orient based on mirror fixed links
         """
-        adjOrient = self._fullOrient(userOrient)
-        return self._mountFromOrient(Orientation(*adjOrient), self.actuatorList), adjOrient
-    
-    def encoderMountFromOrient(self, userOrient):
+        adjOrient = Orientation(*self._fullOrient(userOrient))
+        mountList = self._mountFromOrient(adjOrient, self.actuatorList)
+        if return_adjOrient == True:
+            return mountList, adjOrient
+        else:
+            return mountList
+        
+    def encoderMountFromOrient(self, userOrient, return_adjOrient = False):
         """Compute actuator mount lengths from orientation
         
         Inputs:
@@ -114,8 +120,12 @@ class MirrorBase(object):
         -mountList: list of mount coords for actuator/encoders
         -adjOrient: adjusted orient based on mirror fixed links
         """
-        adjOrient = self._fullOrient(userOrient)
-        return self._mountFromOrient(Orientation(*adjOrient), self.encoderList), adjOrient
+        adjOrient = Orientation(*self._fullOrient(userOrient))
+        mountList = self._mountFromOrient(adjOrient, self.encoderList)
+        if return_adjOrient == True:
+            return mountList, adjOrient
+        else:
+            return mountList
         
     def _fullOrient(self, userOrient):
         """Takes user supplied orientation values and constructs a fully defined
@@ -214,7 +224,7 @@ class MirrorBase(object):
         Output:
         - orient: mirror orientation (an Orientation)
         """
-        givPhys = phys
+        givPhys = phys[:]
         # we want to compute orient using fixed link constraints
         linkListFull = linkList + self.fixedLinkList 
         # now add a phys of zero for fixed links.
@@ -223,7 +233,7 @@ class MirrorBase(object):
         # Compute physical errors
         physMult = self._physMult(linkListFull)
 
-        orient, f, direc, iter, funcalls, warnflag = scipy.optimize.fmin_powell(
+        minOut = scipy.optimize.fmin_powell(
             self._minOrientErr,
             initOrient, 
             args = (givPhys, physMult, linkListFull), 
@@ -232,8 +242,23 @@ class MirrorBase(object):
             disp = False,
             full_output = True
         )
-        if warnflag == 1:
+        # if (re)using dhill simplex uncomment below       
+#         minOut = scipy.optimize.fmin(
+#             self._minOrientErr,
+#             minOut[0], 
+#             args = (givPhys, physMult, linkListFull), 
+#             maxiter = _MaxIter,
+#             ftol = _FitTol,
+#             disp = False,
+#             full_output = True
+#         )
+        
+        orient = minOut[0]
+        warnflag = minOut[-1]
+        if warnflag == 2:
             raise RuntimeError('Maximum num of iterations reached, computing mount-->orient')
+        if warnflag == 1:
+            raise RuntimeError('Maximum num of func calls reached, computing mount-->orient')
             
         return Orientation(*orient)        
 
@@ -259,7 +284,7 @@ class MirrorBase(object):
         givPhys = numpy.zeros(len(fixAxes))
         # only searching for solutions for the fixed axes
         initOrient = numpy.zeros(len(fixAxes))
-        orientFix, f, direc, iter, funcalls, warnflag = scipy.optimize.fmin_powell(
+        minOut = scipy.optimize.fmin_powell(
                         self._minOrientErr, initOrient,
                         args = (givPhys, physMult, linkList, fixAxes, orient), 
                         maxiter = _MaxIter,
@@ -267,8 +292,23 @@ class MirrorBase(object):
                         disp = False,
                         full_output = True
                         )
-        if warnflag == 1:
+        # if (re)using fmin (dhill simplex) uncomment below                        
+#         minOut = scipy.optimize.fmin(
+#                         self._minOrientErr, minOut[0],
+#                         args = (givPhys, physMult, linkList, fixAxes, orient), 
+#                         maxiter = _MaxIter,
+#                         ftol = _FitTol,
+#                         disp = False,
+#                         full_output = True
+#                         )
+                        
+        orientFix = minOut[0]
+        warnflag = minOut[-1]
+        if warnflag == 2:
             raise RuntimeError('Maximum num of iterations reached, \n\
+                               computing userOrient-->fullOrient')
+        if warnflag == 1:
+            raise RuntimeError('Maximum num of func calls reached, \n\
                                computing userOrient-->fullOrient')
         orient[fixAxes] = orientFix
         return orient
@@ -300,11 +340,10 @@ class MirrorBase(object):
             # combine the fixed axis values (recomputed each loop) with desOrient
             desOrient = numpy.asarray(fullOrient, dtype=float)
             minOrient = numpy.asarray(minOrient, dtype=float)  # numpy needed for indexing
-            # this way only the fitAxes are being varied by the fitter 
+            # this way only the fitAxes are being varied by the fitter
             desOrient[fitAxes] = minOrient
         else:
-            desOrient = minOrient
-            
+            desOrient = minOrient        
         physList = self._physFromOrient(desOrient, linkList)
 
         # note givPhys should always = 0 for fixed length links
