@@ -355,7 +355,7 @@ mir35_tert_adjBase = [mirror.AdjBaseActuator(base, mir, min, max, scale, off)
                                            
 tert35List.append(MirSetUp(mir35_tert_adjBase, fixed, []))
 
-# following computations inspired by russell's 3.5 M3 Actuator Positions 2008-04-18.py
+#### following computations copied/adjusted from russell's 3.5 M3 Actuator Positions 2008-04-18.py
 
 #rad =   11.714 * MMPerInch
 # changing rad to get offset encoders
@@ -393,9 +393,9 @@ mirIP[3] = (-203.2, 0., 0.)
 mirIP[4] = (203.2, 0., 0.)
 mirIP[5] = (0., 0., 0.)
 baseIP[3] = mirIP[3].copy()
-baseIP[3, 1] = (-281.47)
+baseIP[3, 1] = (281.47)
 baseIP[4] = mirIP[4].copy()
-baseIP[4, 1] = (-281.47)
+baseIP[4, 1] = (281.47) # positive y, base pivot is close to instrument port
 baseIP[5] = (281.47, 0., 0.)
 
 # rotate to final coordinate system which is:
