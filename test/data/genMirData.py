@@ -31,10 +31,13 @@ import mirror
 
 
 mmPerMeter = 1000
+MMPerInch = 25.4
+RadPerDeg = math.pi / 180.0
+
 
 MirSetUp = collections.namedtuple("mirSetUp", "actList fixedList encList")
 
-def fakeEncoders(pistonMirPos, pistonBasePos, transMirPos, transBasePos, dist=0):
+def fakeEncoders(pistonMirPos, pistonBasePos, transMirPos, transBasePos, dist=75):
     """Generate new mirror and base positions to simulate an offset encoder.
     Input
     -pistonMirPos: mirPos positions for pistons - [[x,y,z], n] where n is number of actuators, 
@@ -82,7 +85,9 @@ def fakeEncoders(pistonMirPos, pistonBasePos, transMirPos, transBasePos, dist=0)
     newXY = numpy.asarray(newXY, dtype=float).T
     pistMirAdj = numpy.vstack((newXY, pistonMirPos[2,:])) # z wasn't changed
     pistBaseAdj = numpy.vstack((newXY, pistonBasePos[2,:])) # z wasn't changed
-    # translation encoders + Z offset    
+    # translation encoders + Z offset 
+    if transMirPos==None and transBasePos==None: # for 3.5m tert (no translation)
+        return pistMirAdj, pistBaseAdj
     nAct = len(transMirPos.T)
     addZ = numpy.zeros((3,nAct))
     addZ[2,:] = dist
@@ -313,6 +318,8 @@ tert35List=[]
 """tert35List has the following mirSetUp's:  All contain 3 fixed length links.
 0: act - adj len
 1: act - adj base
+2: enc - adj len, true fixed link list
+3: enc - adj base, true fixed link list
 
 """
 minMnt = numpy.array([-7250000., -7250000., -7250000])
@@ -333,7 +340,6 @@ baseXYZ = numpy.vstack((baseX, baseY, baseZ))
 
 # last 3 are fixed links
 fixed = [mirror.FixedLengthLink(base, mir) for base, mir in itertools.izip(baseXYZ[:,3:].T, mirXYZ[:,3:].T)]
-
 # transpose is to iterate over columns, not rows, only loop over first 3 actuators (others are fix).
 mir35_tert_adjLen = [mirror.AdjLengthLink(base, mir, min, max, scale, off) 
                         for base, mir, min, max, scale, off 
@@ -349,25 +355,81 @@ mir35_tert_adjBase = [mirror.AdjBaseActuator(base, mir, min, max, scale, off)
                                            
 tert35List.append(MirSetUp(mir35_tert_adjBase, fixed, []))
 
-# make a fake encoder list. transX are included so function will run, but they are notabilities
-# used below because the tertiary is constrained in rotaion and translation.
-# need to adjust fakeEncoders function for it to work with the tert mirror.
-# pistMirAdj, pistBaseAdj, transMirAdj, transBaseAdj = fakeEncoders(mirXYZ[:,0:3], baseXYZ[:,0:3], 
-#                                                                    mirXYZ[:,3:], baseXYZ[:,3:])
-#                                      
-# mirXYZ  = pistMirAdj # use computed coords
-# baseXYZ = pistBaseAdj, transBaseAdj
-# 
-# mir35_tert_adjLen_enc = [mirror.AdjLengthLink(base, mir, min, max, scale, off) 
-#                         for base, mir, min, max, scale, off 
-#                         in itertools.izip(baseXYZ.T, mirXYZ.T, minMnt, maxMnt,
-#                                           mntScale, mntOffset)]
-# 
-# tert35List.append(MirSetUp(mir35_tert_adjLen, [fixed], mir35_tert_adjLen_enc))
-# 
-# mir35_tert_adjBase_enc = [mirror.AdjBaseActuator(base, mir, min, max, scale, off) 
-#                         for base, mir, min, max, scale, off 
-#                         in itertools.izip(baseXYZ.T, mirXYZ.T, minMnt, maxMnt,
-#                                           mntScale, mntOffset)]
-#                                           
-# tert35List.append(MirSetUp(mir35_tert_adjBase, [fixed], mir35_tert_adjBase_enc))
+# following computations inspired by russell's 3.5 M3 Actuator Positions 2008-04-18.py
+
+#rad =   11.714 * MMPerInch
+# changing rad to get offset encoders
+rad =   (11.714 + 5.)* MMPerInch
+zMir =  -0.875 * MMPerInch
+zBase = -3.375 * MMPerInch
+angDegList = numpy.arange(-90.0, 359.0, 360.0 / 3.0)
+angRadList = angDegList * RadPerDeg
+
+# compute in-plane positions
+# with convention:
+# z points from back of glass to front of glass
+# y points sort of towards the instrument
+# x is as required for right-handed coordinate system
+# Actuator index:
+#   0-2 = axial actuators A-C
+#   3-5 = constraints
+mirIP = numpy.zeros([6,3])
+baseIP = mirIP.copy()
+# first handle actuators A, B and C
+for actInd, angRad in enumerate(angRadList):
+    mirIP[actInd, :] = numpy.array((
+        math.cos(angRad) * rad,
+        math.sin(angRad) * rad,
+        zMir
+    ))
+    baseIP[actInd, 0:2] = mirIP[actInd, 0:2]
+    baseIP[actInd, 2] = zBase
+    
+
+# now add constraints (from Nick Mac model):
+# 3,4 are parallel
+# 5 is perp to 3,4
+mirIP[3] = (-203.2, 0., 0.)
+mirIP[4] = (203.2, 0., 0.)
+mirIP[5] = (0., 0., 0.)
+baseIP[3] = mirIP[3].copy()
+baseIP[3, 1] = (-281.47)
+baseIP[4] = mirIP[4].copy()
+baseIP[4, 1] = (-281.47)
+baseIP[5] = (281.47, 0., 0.)
+
+# rotate to final coordinate system which is:
+# z points towards secondary
+# y points towards the instrument port
+# x is unchanged
+# in other words, rotate 45 degrees about x
+rotAng = -45.0 * math.pi / 180.0
+rotMat = numpy.zeros([3,3])
+rotMat[0,0] = 1
+rotMat[1,1] = math.cos(rotAng)
+rotMat[1,2] = math.sin(rotAng)
+rotMat[2,2] = rotMat[1,1]
+rotMat[2,1] = -rotMat[1,2]
+
+mirXYZ = numpy.dot(mirIP, rotMat).T
+baseXYZ = numpy.dot(baseIP, rotMat).T
+
+# generate new fixed links (not infinite)
+fixed = [mirror.FixedLengthLink(base, mir) for base, mir in itertools.izip(baseXYZ[:,3:].T, mirXYZ[:,3:].T)]
+
+# generate encoder list
+mir25_sec_adjLen_enc = [mirror.AdjLengthLink(base, mir, min, max, scale, off) 
+                        for base, mir, min, max, scale, off 
+                        in itertools.izip(baseXYZ[0:3].T, mirXYZ[0:3].T, minMnt, maxMnt,
+                                          mntScale, mntOffset)]
+
+tert35List.append(MirSetUp(mir35_tert_adjLen, fixed, mir25_sec_adjLen_enc))
+
+
+mir25_sec_adjBase_enc = [mirror.AdjBaseActuator(base, mir, min, max, scale, off) 
+                        for base, mir, min, max, scale, off 
+                        in itertools.izip(baseXYZ[0:3].T, mirXYZ[0:3].T, minMnt, maxMnt,
+                                          mntScale, mntOffset)]
+                                          
+tert35List.append(MirSetUp(mir35_tert_adjBase, fixed, mir25_sec_adjBase_enc))
+
