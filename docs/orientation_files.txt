@@ -1,0 +1,79 @@
+From 3.5m tinst:default.dat
+! mirror collimation coefficients
+! - piston and translation coefficients are in um
+! - tilt coefficients are in arc-seconds
+! - value = Coef1 + Coef2 sin(alt) + Coef3 cos(alt)
+! piston Coef2 = -410 um is based on:
+!   secondary apparatus supported by eight 89" long 1/2" diameter steel rods
+!   rods are separated 39" at secondary, 2" at other end
+!   secondary apparatus weighs roughly 370 lbs
+!   modulus of elasticity of steel = 30E6 psi
+
+!SecPistCoef   143.4 -380.0 -27.0    ! RM 2005-07-15
+
+SecPistCoef   -350.0  -150.0   -30.0    ! RM 2010-10-25
+SecXTiltCoef  -560.0    0.0     0.0     ! RM 2011-10-13
+SecYTiltCoef   410.0    0.0     0.0     ! RM 2011-10-13
+SecXTransCoef    0.0    0.0    0.0      ! RM 2010-10-23
+SecYTransCoef  -214.0   180.0   380.0   ! RM 2011-07-20
+! SecYTrans set to be 0 at alt 85 where autocollimator was used
+
+! secondary piston (focus) temperature coefficients (in um/C)
+! offset = coef1 * secondary truss temp
+!          + coef2 * primary front temp   + coef3 * primary back-front delta-t
+!          + coef4 * secondary front temp + coef5 * secondary back-front delta-t
+! Coef1 = 54.9 um/C is based on:
+!   primary to secondary distance = 6.17 m
+!   CTE = 11.7 um/m-C (steel) - 2.8 um/m-C (E-6 glass)
+!                  Truss   Prim F  Prim B-F   Sec F   Sec B-F
+SecPistTempCoef     51.0     0.0      0.0      0.0      0.0  ! RM 2011-05-26
+!SecPistTempCoef    43.0     0.0      0.0      0.0      0.0  ! before September 2006
+
+From 3.5m tinst:ip_na2.dat
+! mirror collimation coefficients
+! - piston and translation coefficients are in um
+! - tilt coefficients are in arc-seconds
+! - value = Coef1 + Coef2 sin(alt) + Coef3 cos(alt)
+!
+! 2007-09-11 NM&LC, measured in the dome at 90deg.
+! Sag coefficients zeroed 2008-09-15 RM
+! Tilt coefficients changed 2011-07-20 RM
+! Piston coefficients changed 2009-07-12 GS
+
+TertPistCoef    -2000.0   0.0  0.0
+TertXTiltCoef     150.0   0.0  0.0
+TertYTiltCoef     860.0   0.0  0.0
+TertXTransCoef     0.0   0.0  0.0
+TertYTransCoef  -2000.0   0.0  0.0
+
+
+2.5m tinst:default.dat
+PrimPistCoef       0.0       0.0       0.0
+! The tilt coefficients should be zero so that scale changes never tilt the mirror
+! and mess up pointing. If you measure a new tilt for collimation then run
+! [TCC.RELEASE.SRC.SUBR.MIR.TEST]dooneorient2mount
+! to determine the corresponding mount position for M1 actuators A, B, C.
+! Then round those values to the nearest multiple of 50
+! and use the rounded values to replace the first three values of PrimMountOffset tdat:mir.dat.
+! Zeroed 2011-10-04 by Russell Owen (along with modifying tdat:mir.dat).
+! Before that the values were:
+! PrimXTiltCoef      -24.31       0.0       0.0
+! PrimYTiltCoef      11.3       0.0       0.0
+PrimXTiltCoef      0.0       0.0       0.0
+PrimYTiltCoef      0.0       0.0       0.0
+PrimXTransCoef     612.35       0.0       0.0
+PrimYTransCoef     1325.9       0.0       0.0
+
+SecPistCoef        0.0    -286.0       0.0
+SecXTiltCoef      13.0       0.0       0.0
+SecYTiltCoef       8.0       0.0       0.0
+SecXTransCoef    -60.0       0.0       0.0
+SecYTransCoef   -235.0       0.0     473.0
+
+
+! secondary piston (focus) temperature coefficients (in um/C)
+! offset = Coef1 * secondary truss temp
+!          + Coef2 * primary front temp   + Coef3 * primary back-front delta-t
+!          + Coef4 * secondary front temp + Coef5 * secondary back-front delta-t
+!                  Truss   PrimB  PrimF  SecB   SecF
+SecPistTempCoef     0.0    0.0    0.0    0.0    0.0
