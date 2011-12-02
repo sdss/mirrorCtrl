@@ -119,11 +119,16 @@ mntOffset = numpy.array([11300.,  -650.,  5500., -1650., -6900., -6900])
 mntScale  = numpy.array([15.696, 15.696, 15.696, 15.696,  33.22, 32.53])
 
 mirX  = numpy.array([    0., -749.03,  749.03,     0.,     0.,    0.])
-mirY  = numpy.array([864.90, -432.45, -432.45, -1305., -1277., 1277.])
+#mirY  = numpy.array([864.90, -432.45, -432.45, -1305., -1277., 1277.]) # given
+mirY  = numpy.array([864.90, -432.45, -432.45,      0., -1277., 1277.]) # modified: attach trans y act to vertex
 mirZ  = numpy.array([  251.,    251.,    251.,   238.,   262.,  262.])
+# baseX = numpy.array([    0., -749.03,  749.03,     0.,  -698., -698.])
+# baseY = numpy.array([864.90, -432.45, -432.45,   -9e9, -1277., 1277.])
+# baseZ = numpy.array([   9e9,     9e9,     9e9,   238.,   262.,  262.])
+# non inf version
 baseX = numpy.array([    0., -749.03,  749.03,     0.,  -698., -698.])
-baseY = numpy.array([864.90, -432.45, -432.45,   -9e9, -1277., 1277.])
-baseZ = numpy.array([   9e9,     9e9,     9e9,   238.,   262.,  262.])
+baseY = numpy.array([864.90, -432.45, -432.45,   -9e4, -1277., 1277.])
+baseZ = numpy.array([   9e4,     9e4,     9e4,   238.,   262.,  262.])
 
 mirXYZ  = numpy.vstack((mirX, mirY, mirZ))
 baseXYZ = numpy.vstack((baseX, baseY, baseZ))
@@ -331,9 +336,14 @@ mntScale  = numpy.array([1259.843, 1259.843, 1259.843])
 mirX  = numpy.array([      0.,  257.673, -257.673,        0.,        0.,       298.])
 mirY  = numpy.array([-226.105,   89.479,   89.479,        0.,        0.,         0.])
 mirZ  = numpy.array([ 194.674, -120.910, -120.910,        0.,        0.,         0.]) 
-baseX = numpy.array([      0.,  257.673, -257.673,     1e+09,    -1e+09,       298.])
-baseY = numpy.array([-271.006,   44.578,   44.578,  7.07e+08,  7.07e+08,   7.07e+08])
-baseZ = numpy.array([ 149.773, -165.811, -165.811, -7.07e+08,  -7.07e+08, -7.07e+08])
+# baseX = numpy.array([      0.,  257.673, -257.673,     1e+09,    -1e+09,       298.])
+# baseY = numpy.array([-271.006,   44.578,   44.578,  7.07e+08,  7.07e+08,   7.07e+08])
+# baseZ = numpy.array([ 149.773, -165.811, -165.811, -7.07e+08,  -7.07e+08, -7.07e+08])
+
+# less-infinite version for rounding error avoidence
+baseX = numpy.array([      0.,  257.673, -257.673,     9e4,    -9e4,       298.])
+baseY = numpy.array([-271.006,   44.578,   44.578,  63639.610306,  63639.610306,   63639.610306])
+baseZ = numpy.array([ 149.773, -165.811, -165.811, -63639.610306,  -63639.610306, -63639.610306])
 
 mirXYZ  = numpy.vstack((mirX,   mirY,  mirZ))
 baseXYZ = numpy.vstack((baseX, baseY, baseZ))
@@ -360,6 +370,7 @@ tert35List.append(MirSetUp(mir35_tert_adjBase, fixed, []))
 #rad =   11.714 * MMPerInch
 # changing rad to get offset encoders
 rad =   (11.714 + 5.)* MMPerInch
+radOrig = 11.714 * MMPerInch
 zMir =  -0.875 * MMPerInch
 zBase = -3.375 * MMPerInch
 angDegList = numpy.arange(-90.0, 359.0, 360.0 / 3.0)

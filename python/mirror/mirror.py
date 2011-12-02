@@ -10,6 +10,8 @@ import copy
 import numpy
 import scipy.optimize  
 import math
+import decimal
+
 numpy.seterr(all='raise')
 import link
 
@@ -171,7 +173,17 @@ class MirrorBase(object):
         """Compute link mount length from orientation
         """
         phys = self._physFromOrient(orient, linkList)
-        return [link.mountFromPhys(p) for p, link in itertools.izip(phys, linkList)]
+        mountList = []
+        for p, link in itertools.izip(phys, linkList):
+            mount = link.mountFromPhys(p)
+            if link.minMount <= mount <= link.maxMount:
+                mountList.append(mount)
+            else:
+                raise RuntimeError('Mount out of range!')
+        
+        return mountList
+        
+        #return [link.mountFromPhys(p) for p, link in itertools.izip(phys, linkList)]
     
     def _physFromOrient(self, orient, linkList):
         """Compute physical link length from orientation.
@@ -198,6 +210,7 @@ class MirrorBase(object):
         """
         
         maxOrientErr = Orientation(0.0001, 5e-8, 5e-8, 0.0001, 0.0001, 5e-7)
+
         
         # Compute delta physical length at perturbed orientations
         # Sum the square of errors
@@ -239,8 +252,8 @@ class MirrorBase(object):
             args = (givPhys, physMult, linkListFull), 
             maxiter = _MaxIter,
             ftol = _FitTol,
-            disp = False,
-            full_output = True
+            disp = 0,
+            full_output = 1
         )
         # if (re)using dhill simplex uncomment below       
 #         minOut = scipy.optimize.fmin(
@@ -249,18 +262,19 @@ class MirrorBase(object):
 #             args = (givPhys, physMult, linkListFull), 
 #             maxiter = _MaxIter,
 #             ftol = _FitTol,
-#             disp = False,
-#             full_output = True
+#             disp = 0,
+#             full_output = 1
 #         )
-        
         orient = minOut[0]
         warnflag = minOut[-1]
+        # print function value
+        # print 'f val: ', minOut[1]
         if warnflag == 2:
             raise RuntimeError('Maximum num of iterations reached, computing mount-->orient')
-        if warnflag == 1:
+        elif warnflag == 1:
             raise RuntimeError('Maximum num of func calls reached, computing mount-->orient')
-            
-        return Orientation(*orient)        
+        else:
+            return Orientation(*orient)        
 
     def _adjustOrient(self, orient, fixAxes):
         """This method adjusts the 'commanded' orientation based on the presence of fixed length
@@ -284,7 +298,7 @@ class MirrorBase(object):
         givPhys = numpy.zeros(len(fixAxes))
         # only searching for solutions for the fixed axes
         initOrient = numpy.zeros(len(fixAxes))
-        minOut = scipy.optimize.fmin_powell(
+        minOut = scipy.optimize.fmin(
                         self._minOrientErr, initOrient,
                         args = (givPhys, physMult, linkList, fixAxes, orient), 
                         maxiter = _MaxIter,
@@ -333,7 +347,7 @@ class MirrorBase(object):
                         the constant axes untouched by the fitter.
         
         Output:
-        - 1 + sum(physMult * physErrSq**2)
+        - sum(physMult * physErrSq**2)
         """
         # I have omitted error checking for speed since this is iterated upon
         if len(minOrient) < 6:
@@ -345,11 +359,11 @@ class MirrorBase(object):
         else:
             desOrient = minOrient        
         physList = self._physFromOrient(desOrient, linkList)
-
         # note givPhys should always = 0 for fixed length links
         physErrSq = (physList - givPhys)**2
-        return 1 + numpy.sum(physMult * physErrSq)
-                        
+        return numpy.sum(physMult * physErrSq) # for chi squared physMult is 1 / variance
+        
+
     def _orient2RotTransMats(self, orient):
         """
         This function computes the rotation matrices and translation
@@ -369,6 +383,13 @@ class MirrorBase(object):
         sinX = math.sin(orient.tiltX)
         cosY = math.cos(orient.tiltY)
         sinY = math.sin(orient.tiltY)
+        # small angle versions        
+#         cosX = 1 - (orient.tiltX)**2. / 2.
+#         sinX = orient.tiltX
+#         cosY = 1 - (orient.tiltY)**2. / 2.
+#         sinY = orient.tiltY
+        
+        
         rotMatX = numpy.array([ [1,    0,     0],
                                 [0, cosX, -sinX],
                                 [0, sinX,  cosX] ])
@@ -381,7 +402,11 @@ class MirrorBase(object):
         rotMat = numpy.dot(rotMatY, rotMatX)
 
         sinZ = math.sin(orient.rotZ)
-        cosZ = math.cos(orient.rotZ)
+        cosZ = math.cos(orient.rotZ)        
+        # small angle versions
+#        sinZ = orient.rotZ #small ang approx
+#        cosZ = 1 - (orient.rotZ)**2. / 2.  #small ang approx
+        
         rotMatZ = numpy.array([ [cosZ, -sinZ, 0],
                                 [sinZ,  cosZ, 0],
                                 [   0,     0, 1] ])
@@ -428,7 +453,7 @@ class DirectMirror(MirrorBase):
         """
         rotMat, offsets = self._orient2RotTransMats(orient)
         physList = []   
-        for act in linkList:
+        for ind, act in enumerate(linkList):
             desMirPos = numpy.dot(rotMat, act.mirPos)
             desMirPos = desMirPos + offsets
             # compute phys in a way that works for fixed links

@@ -14,13 +14,13 @@ RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
 
 #Define maximum allowable orient error, reusing from mirror.py, not using z rot
 # maxOrientErr = numpy.array([0.0001, 5e-8, 5e-8, 0.0001, 0.0001])
-maxOrientErr = numpy.array([0.1, 5e-3, 5e-3, 0.1, 0.1])
-maxMountErr = 0.1
+maxOrientErr = numpy.array([.1 * MMPerMicron, .01 * RadPerArcSec, .01 * RadPerArcSec, .1 * MMPerMicron, .1 * MMPerMicron, 1*RadPerDeg])
+maxMountErr = 0.001
 
 # construct range of orients to test +/- (0-25mm, 0-2 degrees)
 maxDist = 25. #mm
 maxTilt = 2. * RadPerDeg # 2 degrees
-resolution = 20
+resolution = 21
 dist_range = numpy.linspace(-maxDist, maxDist, resolution)
 ang_range = numpy.linspace(-maxTilt, maxTilt, resolution)
 ranges = [dist_range, ang_range, ang_range, dist_range, dist_range]
@@ -57,7 +57,8 @@ sec25 = [mirror.TipTransMirror(secCtrMirZ, secCtrBaseZ, *input) for input in gen
 sec35 = [mirror.DirectMirror(*input) for input in genMirData.sec35List]
 tert35 = [mirror.DirectMirror(*input) for input in genMirData.tert35List]
 # choose which mirrors you want to include in the tests
-mirList = tert35
+mirList = prim25 + sec25 + sec35 + tert35
+print 'mirList len: ', len(mirList)
 ############################# TESTS #####################################
 
 class MirTests(unittest.TestCase):
@@ -98,21 +99,18 @@ class MirTests(unittest.TestCase):
                     # add some noise then use noisyOrient as initial guess for round trip
                     adjOrient = numpy.asarray(adjOrient, dtype=float)
                     noiseAmp = numpy.asarray([maxDist, maxTilt, maxTilt, 
-                                                maxDist, maxDist, maxTilt], dtype=float) / 10.
+                                                maxDist, maxDist, 0.], dtype=float) / 10.
                     # noise is: (flat distribution between -1 and 1) * noiseAmp + adjOrient                            
                     noisyOrient = (2 * numpy.random.random_sample(6,) - 1) * noiseAmp + adjOrient 
                     
-                    orient = orientFromMount(mnt, noisyOrient)  
+                    orient = orientFromMount(mnt, noisyOrient) 
+                    #orient = orientFromMount(mnt, adjOrient) # no noise
                     mnt2 = mountFromOrient(orient)
                 except RuntimeError as er:
                     errLog.append(self._fmtRunTimeErr(er, orientIn, mirIter))
                     continue
-                orientErr, failStr = self._checkOrient(orientIn, orient, mirIter)
-                if True in (orientErr > maxOrientErr):
-                    errLog.append(failStr)
-                    continue 
-                mountErr, failStr = self._checkMount(orientIn, mnt, mnt2, mirIter)
-                if True in (mountErr > maxMountErr):
+                orientErr, mountErr, failStr = self._checkOutput(adjOrient, orient, mnt, mnt2, mirIter)
+                if (True in (orientErr > maxOrientErr)) or (True in (mountErr > maxMountErr)):
                     errLog.append(failStr)
         return errLog            
 
@@ -133,45 +131,30 @@ class MirTests(unittest.TestCase):
         with open(fileName, 'w') as f:
             for line in errLog:
                 f.write(line)
-                            
-    def _checkOrient(self, orientIn, orientOut, mirIter):
+
+    def _checkOutput(self, orientIn, orientOut, mountIn, mountOut, mirIter):
         """This checks if the value abs(orientIn - orientOut) is within
         the limit defined by maxOrientErr.  If it isn't the test fails,
         and the orientIn and Errors are printed """
-        orientIn = numpy.asarray(orientIn[0:5], dtype=float) # only 5 axes (no rotZ)
-        orientOut = numpy.asarray(orientOut[0:5], dtype=float) # only 5 axes (no rotZ)
-        orientErr = numpy.abs(orientIn - orientOut)
-        failStr = 'Mirror number: %s orientIn(5):  %9.4f %9.4f %9.4f %9.4f %9.4f orientErr(5): %9.4f %9.4f %9.4f %9.4f %9.4f\n' %\
-               (mirIter, orientIn[0], orientIn[1]/RadPerArcSec, orientIn[2]/RadPerArcSec,
-               orientIn[3], orientIn[4], orientErr[0],
-               orientErr[1]/RadPerArcSec, orientErr[2]/RadPerArcSec,
-               orientErr[3], orientErr[4])
-        return orientErr, failStr
-        #self.assertFalse(True in (orientErr > maxOrientErr), failStr)
-
-    
-    def _checkMount(self, orientIn, mountIn, mountOut, mirIter):
-        """This compares the differnce between the mount computed from
-        initial orient and mount computed from recovered orient.  This
-        will check that the fitting process produced the desired
-        orientation, and not an alternate one """
-        orientIn = numpy.asarray(orientIn[0:5], dtype=float) # only 5 axes (no rotZ)
+        # orientIn = numpy.asarray(orientIn[0:5], dtype=float) # only 5 axes (no rotZ)
+        # orientOut = numpy.asarray(orientOut[0:5], dtype=float) # only 5 axes (no rotZ)
+        orientErr = numpy.abs(orientIn - orientOut) # 6 axes
         mountIn = numpy.asarray(mountIn, dtype=float)
         mountOut = numpy.asarray(mountOut, dtype=float)
         mountErr = numpy.abs(mountIn - mountOut)
         # append zero error to make len(mountErr) == 6
         if len(mountErr) < 6:
-            mountErr = numpy.hstack((mountErr, numpy.zeros(6-len(mountErr))))
-        failStr = 'Mirror number: %s orientIn(5):  %9.4f %9.4f %9.4f %9.4f %9.4f mountErr(6): %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f\n' %\
+            mountErr = numpy.hstack((mountErr, numpy.zeros(6-len(mountErr)))) # for printing zero pad
+        failStr = 'Mirror number: %s orientAdj(5):  %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f\
+        orientErr(5): %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f  mountErr(6): %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f\n' %\
                (mirIter, orientIn[0], orientIn[1]/RadPerArcSec, orientIn[2]/RadPerArcSec,
-               orientIn[3], orientIn[4], mountErr[0],
+               orientIn[3], orientIn[4], orientIn[5]/RadPerArcSec, orientErr[0],
+               orientErr[1]/RadPerArcSec, orientErr[2]/RadPerArcSec,
+               orientErr[3], orientErr[4], orientErr[5]/RadPerArcSec, mountErr[0],
                mountErr[1], mountErr[2],
                mountErr[3], mountErr[4], mountErr[5])
-        return mountErr, failStr
-        #self.assertFalse(True in (mountErr > maxMountErr), failStr)
-   
-
-                
+        return orientErr, mountErr, failStr
+                            
                 
 if __name__ == '__main__':
     unittest.main()
