@@ -68,12 +68,14 @@ class BaseLink(object):
             raise RuntimeError("mirPos=%s must be 3 elements" % (mirPos,))
         self.neutralLength = self.lengthFromMirPos(self.mirPos)
     
-#     def physFromMirPos(self, mirPos):
-#         """Compute physical length (mm) of adjustable element given the mirror position (mm)
-#         
-#         Subclasses must override.
-#         """
-#         raise NotImplementedError("Subclasses must define")
+    def physFromMirPos(self, mirPos):
+        """Compute desired physical length (mm) of adjustable element given the mirror position (mm)
+
+        The link may not be capable of achieving this length.
+        
+        Subclasses must override.
+        """
+        raise NotImplementedError("Subclasses must define")
 
     def lengthFromMirPos(self, mirPos):
         """
@@ -91,11 +93,6 @@ class FixedLengthLink(BaseLink):
     def __init__(self, basePos, mirPos):
         BaseLink.__init__(self, isAdjustable=False, basePos=basePos, mirPos=mirPos)
     
-#     def physFromMirPos(self, mirPos):
-#         """Compute physical length (mm) of adjustable element given the mirror position (mm)
-#         """
-#         return 0.0
-
     def physFromMirPos(self, mirPos):
         """Compute physical length (mm) of adjustable element given the mirror position (mm)
         """
@@ -122,10 +119,7 @@ class AdjustableLink(BaseLink):
         self.maxMount = float(maxMount)
         self.scale = float(scale)
         self.offset = float(offset)
-        # Unit vector defining the axis of mount motor
-        self.pistonDir = (self.mirPos - self.basePos) / numpy.linalg.norm((self.mirPos - self.basePos))
 
-    
     def mountFromPhys(self, phys):
         """Compute mount length (steps) of adjustable element given its physical length (mm)
         """
@@ -161,6 +155,11 @@ class AdjBaseActuator(AdjLengthLink):
     Right now there are three different methods to determine conversions, we should test and pick one
     (or none and just use AdjLengthActuator).
     """
+    def __init__(self, *args, **kwargs):
+        AdjLengthLink.__init__(self, *args, **kwargs)
+        # Unit vector along the axis of motion of the actuator base
+        self.pistonDir = (self.mirPos - self.basePos) / numpy.linalg.norm((self.mirPos - self.basePos))
+        
 #     def physFromMirPos(self, mirPos):
 #         """Compute physical length (mm) of adjustable element given the mirror position (mm)
 #         
@@ -180,33 +179,6 @@ class AdjBaseActuator(AdjLengthLink):
 #             return x - (r_naught * math.cos(math.asin(y / r_naught)))
 #         except ValueError:
 #             raise RuntimeError( 'Err: lim of y = r_naught, but y=%5.3f r_n=%5.3f' % (y, r_naught))
-
-    def physFromMirPosCCS(self, mirPos):
-        """Compute physical length (mm) of adjustable element given the mirror position (mm)
-
-        This method makes the approximation that the projection of the 'true
-        length' from the actuator motor axis to the link axis is equal to the
-        difference between length at zero orientation and the length at a given
-        mirror position. This should be ok for small angles, and the solution
-        requires no trig functions.
-        
-        Inputs:
-        - mirPos: cartesian position of end of actuator attached to the mirror (mm).
-        
-        Output:
-        - phys: approximate actuator length (mm)
-        """
-        # Calculate unit vector from basePos to a given mirPos (link axis).
-        mirVec = mirPos - self.basePos
-        mirUnitVec = mirVec / numpy.linalg.norm(mirVec)
-        phys = self.physFromMirPos(mirVec)
-        # Use right triangle trig to solve for truePhys value.
-        # cos(theta) = adjacent / hypotenuse
-        # theta = acos(self.pistonDir dot mirUnitVec)
-        # adjacent = phys
-        # hypotenuse = truePhys
-        truePhys = phys / numpy.dot(self.pistonDir, mirUnitVec)
-        return truePhys
                
     def physFromMirPos(self, mirPos):
         """Compute physical length (mm) of adjustable element given the mirror position (mm)

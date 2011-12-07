@@ -1,24 +1,23 @@
 """Mirror
 
 The units for orientation are mm and radians (not user-friendly units, but best for computation).
-
-notes: so far self.hasEncoders isn't used...
 """
 import collections
 import itertools
-import copy
+import math
+
 import numpy
 import scipy.optimize  
-import math
-import decimal
+
+import link
 
 numpy.seterr(all='raise')
-import link
 
 _FitTol = 1e-8
 _MaxIter = 10000
 # Orientation of mirror; units are mm and radians
 Orientation = collections.namedtuple("Orientation", ["piston", "tiltX", "tiltY", "transX", "transY", "rotZ"])
+ZeroOrientation = Orientation(0, 0, 0, 0, 0, 0)
 
 # def userOrient(orient):
 #     """Return orientation in user-friendly units
@@ -47,10 +46,20 @@ class MirrorBase(object):
                  (len(actuatorList), len(fixedLinkList)))
         self.actuatorList = actuatorList
         
-        if len(fixedLinkList) in [0, 1, 3] == False:
+        # be sure to use a list for self._fixedAxes so it can be used to index numpy arrays
+        if len(fixedLinkList) == 0:
+            self._fixedAxes = []
+        elif len(fixedLinkList) == 1:
+            # one antirotation link: z rotation is constrained
+            self._fixedAxes = [5]
+        elif len(fixedLinkList) == 3:
+            # x,y translation and z rotation are constrained
+            self._fixedAxes = [3, 4, 5]
+        else:            
             raise RuntimeError("Any mirror may only have 0, 1, or 3 fixed links. %s were supplied"\
                                  % (len(fixedLinkList)))
         self.fixedLinkList = fixedLinkList    
+
         self.hasEncoders = False
         if not encoderList:
             self.encoderList = actuatorList
@@ -68,42 +77,40 @@ class MirrorBase(object):
                     self.encoderList.append(enc)
                     self.hasEncoders = True
 
-    def orientFromEncoderMount(self, mount, initOrient = numpy.zeros(6)):
+    def orientFromEncoderMount(self, mount, initOrient=ZeroOrientation):
         """Compute mirror orientation from encoder mount lengths
         
         Inputs:
         - mount: encoder mount positions; one per encoder or actuator if the actuator has no associated encoder
+        - initOrient: initial guess as to orientation; may be incomplete
         """
         if len(mount) != len(self.encoderList):
             raise RuntimeError("Need %s values; got %s" % (len(self.encoderList), len(mount)))
-        if len(initOrient) != 6:
-            raise RuntimeError("orientation guess must be length 6; got %s" % (len(initOrient)))    
         return self._orientFromMount(mount, self.encoderList, initOrient)
     
-    def orientFromActuatorMount(self, mount, initOrient = numpy.zeros(6)):
+    def orientFromActuatorMount(self, mount, initOrient = ZeroOrientation):
         """Compute mirror orientation from actuator mount lengths
         
         Inputs:
         - mount: encoder mount positions; one per encoder
+        - initOrient: initial guess as to orientation; may be incomplete
         """
         if len(mount) != len(self.actuatorList):
             raise RuntimeError("Need %s values; got %s" % (len(self.actuatorList), len(mount)))
-        if len(initOrient) != 6:
-            raise RuntimeError("orientation guess must be length 6; got %s" % (len(initOrient)))
         return self._orientFromMount(mount, self.actuatorList, initOrient)
     
     def actuatorMountFromOrient(self, userOrient, return_adjOrient = False):
         """Compute actuator mount lengths from orientation
         
         Inputs:
-        - userOrient: an Orientation or collection of 6 items or fewer in the same order. Keywords
-        are also accepted, undefined fields will be silently replaced as zeros.
+        - userOrient: an Orientation or collection of 6 items or fewer in the same order.
+            Missing items are treated as 0 or (for uncontrollable axes) properly constrained values.
         
         Output:
-        -mountList: list of mount coords for actuator/encoders
-        -adjOrient: adjusted orient based on mirror fixed links
+        - mountList: list of mount coords for actuator/encoders
+        - adjOrient: adjusted orient based on mirror fixed links
         """
-        adjOrient = Orientation(*self._fullOrient(userOrient))
+        adjOrient = self._fullOrient(userOrient)
         mountList = self._mountFromOrient(adjOrient, self.actuatorList)
         if return_adjOrient == True:
             return mountList, adjOrient
@@ -119,10 +126,10 @@ class MirrorBase(object):
         silently replaced as zeros.
         
         Output:
-        -mountList: list of mount coords for actuator/encoders
-        -adjOrient: adjusted orient based on mirror fixed links
+        - mountList: list of mount coords for actuator/encoders
+        - adjOrient: adjusted orient based on mirror fixed links
         """
-        adjOrient = Orientation(*self._fullOrient(userOrient))
+        adjOrient = self._fullOrient(userOrient)
         mountList = self._mountFromOrient(adjOrient, self.encoderList)
         if return_adjOrient == True:
             return mountList, adjOrient
@@ -130,45 +137,59 @@ class MirrorBase(object):
             return mountList
         
     def _fullOrient(self, userOrient):
-        """Takes user supplied orientation values and constructs a fully defined
-        Orientation to be used throughout. This routine will also optimize
-        orientations in the case of fixedLinkList length links.
-
+        """Compute fully specified orientation from a partially specified orientation.
+        
         Input:
-        - userOrient: list of orientation values, or keword/value pairs.
-        Keywords correspond to those defined in the Orientation object.
-        Non-specified orientation axes are replaced as zeros. 
-        
+        - userOrient: list of orientation values: 0, 1, 3, 5 or 6 values. Missing values are treated as 0.
+
         Output:
-        - orient: a fully defined (and sometimes adjusted) orientation
+        - orient: the full 6-axis orientation as an Orientation. Axes that cannot be controlled
+            are set to their constrained value (which should be nearly 0 for a typical mirror).
         """
-        if len(userOrient) in [0, 1, 3, 5] == False:
+        if len(userOrient) not in set((0, 1, 3, 5, 6)):
             raise RuntimeError('Input orientation must be a list of numbers of \n\
-                                length 0, 1, 3, or 5. Actual length %s' % (len(userOrient)))
-        orient = numpy.zeros(6)
+                                length 0, 1, 3, or 5, 6. Actual length %s' % (len(userOrient)))
+
         # set all non-supplied orientations to 0.
-        for axis, val in enumerate(userOrient):
-            orient[axis] = val
-        orient = numpy.asarray(orient, dtype=float)
-        # Get adjusted orient. Takes fixed axes into account and returns a
-        # (new) orient.
-        
-        if len(self.fixedLinkList) > 0:
-            # assume only axis 5 (z rotation) is fixed for now to test
-            if len(self.fixedLinkList) == 1:
-                # one fixed link means z anti-rotation link
-                fixAxes = [5]
-                # commanded rot z will always be 0, by design
-            if len(self.fixedLinkList) == 3:
-                # three fixed links means z rotation, transX, and transY are constrained
-                fixAxes = [3,4,5]
-                # replace axes 3 and 4 with zeros, incase they were (incorrectly) commanded to move
-                # axis 5 is always zero by design
-                orient[[3,4]] = [0., 0.]
-            orient = self._adjustOrient(orient, fixAxes)
-        
-        return orient
-            
+        orient = numpy.zeros(6, dtype=float)
+        orient[0:len(userOrient)] = userOrient
+
+        # compute constrained axes of orientation
+        if self._fixedAxes:
+            linkList = self.fixedLinkList
+            physMult = self._physMult(linkList)
+            # phys lengths should be zero, since we're dealing with fixed length links
+            givPhys = numpy.zeros(len(self._fixedAxes))
+            # only searching for solutions for the fixed axes
+            initOrient = numpy.zeros(len(self._fixedAxes))
+            minOut = scipy.optimize.fmin(
+                            self._minOrientErr, initOrient,
+                            args = (givPhys, physMult, linkList, self._fixedAxes, orient), 
+                            maxiter = _MaxIter,
+                            ftol = _FitTol,
+                            disp = False,
+                            full_output = True
+                            )
+            # if (re)using fmin (dhill simplex) uncomment below                        
+#             minOut = scipy.optimize.fmin(
+#                             self._minOrientErr, minOut[0],
+#                             args = (givPhys, physMult, linkList, self._fixedAxes, orient), 
+#                             maxiter = _MaxIter,
+#                             ftol = _FitTol,
+#                             disp = False,
+#                             full_output = True
+#                             )
+                            
+            fitOrient = minOut[0]
+            warnflag = minOut[-1]
+            if warnflag == 2:
+                raise RuntimeError('Too many iterations')
+            if warnflag == 1:
+                raise RuntimeError('Too many function calls')
+            orient[self._fixedAxes] = fitOrient
+
+        return Orientation(*orient)
+
     def _mountFromOrient(self, orient, linkList):
         """Compute link mount length from orientation
         """
@@ -192,21 +213,31 @@ class MirrorBase(object):
         """
         raise NotImplementedError()
     
-    def _orientFromMount(self, mount, linkList, initOrient):
+    def _orientFromMount(self, mount, linkList, initOrient=ZeroOrientation):
         """Compute orientation from link mount length
+
+        Inputs:
+        - mount: link mount length
+        - linkList: list of Links
+        - initOrient: initial guess as to orientation (may be incomplete)
         """
+        if len(mount) != len(linkList):
+            raise RuntimeError("len(mount)=%s != %s=len(linkList)" % (len(mount), len(linkList)))
         phys = [link.physFromMount(mt) for mt, link in itertools.izip(mount, linkList)]
         return self._orientFromPhys(phys, linkList, initOrient)    
 
     def _physMult(self, linkList):
-        """Determine multipliers to be used in minimization of orientation errors, so we
-        minimize a dimensionless quantity.
+        """Determine multiplier for each actuator to be used in minimization
+        
+        Computes the effect of a perturbing each axis of orientation by a given amount
+        on each link actuator length. This is used to scale the weighting of physical
+        length errors when fitting orientation from physical length.
         
         Input:
-        - linkList
+        - linkList: list of links
         
         Output:
-        - physMult: error multiplyer for each axis.
+        - physMult: error multiplier for each axis.
         """
         
         maxOrientErr = Orientation(0.0001, 5e-8, 5e-8, 0.0001, 0.0001, 5e-7)
@@ -227,12 +258,13 @@ class MirrorBase(object):
         
         return physMult
     
-    def _orientFromPhys(self, phys, linkList, initOrient):
+    def _orientFromPhys(self, phys, linkList, initOrient=ZeroOrientation):
         """Compute mirror orientation give the physical position of each actuator. Uses fitting.
         
         Input:
         - phys: physical position of each actuator or encoder; the position for fixed links will be ignored
         - linkList: list of actuators or encoders (not fixed links!)
+        - initOrient: initial guess as to orientation; may be incomplete
        
         Output:
         - orient: mirror orientation (an Orientation)
@@ -245,10 +277,12 @@ class MirrorBase(object):
         numLinks = len(linkListFull)
         # Compute physical errors
         physMult = self._physMult(linkListFull)
+        
+        fullInitOrient = self._fullOrient(initOrient)
 
         minOut = scipy.optimize.fmin_powell(
             self._minOrientErr,
-            initOrient, 
+            fullInitOrient, 
             args = (givPhys, physMult, linkListFull), 
             maxiter = _MaxIter,
             ftol = _FitTol,
@@ -275,72 +309,22 @@ class MirrorBase(object):
             raise RuntimeError('Maximum num of func calls reached, computing mount-->orient')
         else:
             return Orientation(*orient)        
-
-    def _adjustOrient(self, orient, fixAxes):
-        """This method adjusts the 'commanded' orientation based on the presence of fixed length
-        links. 
-        
-        For example, a link constraining z rotation will induce a small amount of z rotation
-        upon movement of the mirror. We want to solve for this induced z rotation and plug it back
-        into the 'commanded' orientation.  This method is generalized for any fixed axis.
-        
-        Input:
-        - orient: desired 6 axis Orientation
-        - fixAxes: list of integers ranging from 0 to 5. Each element 
-                    corresponds to an axis in orient that is fixed.
-                    
-        Output:
-        - orientOut: adjusted 6 axis Orientation.
-        """
-        linkList = self.fixedLinkList
-        physMult = self._physMult(linkList)
-        # phys lengths should be zero, since we're dealing with fixed length links
-        givPhys = numpy.zeros(len(fixAxes))
-        # only searching for solutions for the fixed axes
-        initOrient = numpy.zeros(len(fixAxes))
-        minOut = scipy.optimize.fmin(
-                        self._minOrientErr, initOrient,
-                        args = (givPhys, physMult, linkList, fixAxes, orient), 
-                        maxiter = _MaxIter,
-                        ftol = _FitTol,
-                        disp = False,
-                        full_output = True
-                        )
-        # if (re)using fmin (dhill simplex) uncomment below                        
-#         minOut = scipy.optimize.fmin(
-#                         self._minOrientErr, minOut[0],
-#                         args = (givPhys, physMult, linkList, fixAxes, orient), 
-#                         maxiter = _MaxIter,
-#                         ftol = _FitTol,
-#                         disp = False,
-#                         full_output = True
-#                         )
-                        
-        orientFix = minOut[0]
-        warnflag = minOut[-1]
-        if warnflag == 2:
-            raise RuntimeError('Maximum num of iterations reached, \n\
-                               computing userOrient-->fullOrient')
-        if warnflag == 1:
-            raise RuntimeError('Maximum num of func calls reached, \n\
-                               computing userOrient-->fullOrient')
-        orient[fixAxes] = orientFix
-        return orient
         
     def _minOrientErr(self, minOrient, givPhys, physMult, linkList, fitAxes=None, fullOrient=None):
-        """This function minimizes the error between a computed phys (from an orientation) and the
-        given phys (givPhys).  If fixAxes is defined, only orientations for those axes are found. 
+        """Compute physical error given desired orientation and actual physical.
+        
+        If fixAxes is defined, only orientations for those axes are found. 
         In this case a fullOrient(6) is needed to define the orientation values that are held 
         constant (the fitter won't touch these).
         
         Inputs: 
         - minOrient: an orientation to be solved for. If it is less than 6 elements, then fitAxes
-                        needs to be defined.
+                        must to be specified and must be the same length as minOrient.
         - givPhys:  list of physical link lengths, must be same length as linkList
         - physMult: list of multipliers for computing errors
         - linkList: list of links
-        - fitAxes:  axes to solve for if minOrient is less than 6 elements. Must be same size
-                    as minOrient.
+        - fitAxes:  a Python list of axes to solve for.
+                        Ignored if minOrient has 6 elements, else must be the same size as minOrient.
         - fullOrient: 6 item collection. This is a 'constant' orientation, minOrient is inserted
                         into specific axes of fullOrient defined by fitAxes. This way we can define
                         a minimization for an arbitrary amount of orientation axes while leaving 
@@ -348,13 +332,14 @@ class MirrorBase(object):
         
         Output:
         - sum(physMult * physErrSq**2)
+        
+        @raise IndexError if fitAxes is not a Python list
         """
         # I have omitted error checking for speed since this is iterated upon
         if len(minOrient) < 6:
             # combine the fixed axis values (recomputed each loop) with desOrient
-            desOrient = numpy.asarray(fullOrient, dtype=float)
-            minOrient = numpy.asarray(minOrient, dtype=float)  # numpy needed for indexing
             # this way only the fitAxes are being varied by the fitter
+            desOrient = numpy.array(fullOrient, dtype=float)
             desOrient[fitAxes] = minOrient
         else:
             desOrient = minOrient        
@@ -365,11 +350,10 @@ class MirrorBase(object):
         
 
     def _orient2RotTransMats(self, orient):
-        """
-        This function computes the rotation matrices and translation
-        offsets from a given orientation. The outputs are used to
-        transform the cartesian coordinates of actuators based on the
-        orientation. 
+        """Compute transformation matrices for mirror positions for a given orientation.
+        
+        Compute matrices used to transform cartesian points on the mirror from
+        their location at zero orientation to their location at the specified orientation.
         
         Input:
         - orient:  an Orientation
@@ -489,10 +473,13 @@ class DirectMirror(MirrorBase):
 
       
 class TipTransMirror(MirrorBase):
-    """
-    Tip-Trans Mirror. Translate by tipping a central linear bearing.
-    orient2phys method is different, other methods are same as
-    DirectMirror obj.
+    """Tip-Trans Mirror.
+    
+    A mirror that rides on a central linear bearing;
+    the bearing is tipped about a ball joint to translate the mirror.
+    Actuators 0, 1, 2 are axial actuators attached to the mirror.
+    Actuators 3, 4 are attached to the linear bearing to tip it.
+    Actuator 5 is an antirotation link attached to the mirror.
     """
     def __init__(self, ctrMirZ, ctrBaseZ, actuatorList, fixedLinkList, encoderList = None):
         MirrorBase.__init__(self, actuatorList, fixedLinkList, encoderList)
