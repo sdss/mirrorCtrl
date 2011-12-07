@@ -127,7 +127,7 @@ class MirTests(unittest.TestCase):
         """
         fileDate = time.localtime()
         # minutes and seconds appended to filename
-        fileName = 'Errors' + linkType + '_' + str(fileDate[4]) + str(fileDate[5]) +'.txt'
+        fileName = 'Errors' + linkType + '_' + str(fileDate[4]) + str(fileDate[5]) +'.log'
         with open(fileName, 'w') as f:
             for line in errLog:
                 f.write(line)
