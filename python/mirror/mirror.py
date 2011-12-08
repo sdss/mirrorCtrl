@@ -76,6 +76,15 @@ class MirrorBase(object):
                 else:
                     self.encoderList.append(enc)
                     self.hasEncoders = True
+    
+    @property
+    def numAdjOrient(self):
+        """Return the number of adjustable axes of orientation
+        
+        Warning: even if rotZ is technically adjustable it is never counted
+        (the max returned value is always 5)
+        """
+        return min(5, 6 - len(self._fixedAxes))
 
     def orientFromEncoderMount(self, mount, initOrient=ZeroOrientation):
         """Compute mirror orientation from encoder mount lengths
