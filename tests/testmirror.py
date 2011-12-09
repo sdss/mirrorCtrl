@@ -22,9 +22,7 @@ MaxMountErr = 0.001
 maxDist = 25.0 # mm
 maxTilt = 2.0 * RadPerDeg # radians
 resolution = 5 # was 21
-# dist_range = numpy.linspace(-maxDist, maxDist, resolution)
-# ang_range = numpy.linspace(-maxTilt, maxTilt, resolution)
-# ranges = [dist_range, ang_range, ang_range, dist_range, dist_range]
+
 MaxOrient = (maxDist, maxTilt, maxTilt, maxDist, maxDist)
 orientRange = [MaxOrient]
 for ind in range(len(MaxOrient)):
@@ -57,13 +55,20 @@ for orient in orientList:
 
 # choose which mirrors you want to include in the tests
 # there are options for various mirrors, eg fixing a link on the 2.5m primary
-# they are explained in genMirDataLean
-mirList = [genMirDataLean.Prim25().makeMirror(),
+# they are shown in genMirDataLean
+mirList = [genMirDataLean.Prim25().makeMirror(), # defaults to AdjBase actuators.
+           # changed to AdjLen (old) type actuators.
+           genMirDataLean.Prim25(actType='adjLen').makeMirror(), 
+           genMirDataLean.Prim25(fix=1).makeMirror(),
+           # mirror below failed due to bug in (old) genMirData.py
+           # it was fixed (no pun inteded) in genMirDataLean.py
+           genMirDataLean.Prim25(fix=2).makeMirror(),
            genMirDataLean.Sec25().makeMirror(),
            genMirDataLean.Sec35().makeMirror(),
-           genMirDataLean.Tert35().makeMirror(),
+           genMirDataLean.Tert35().makeMirror(), # new non-inf length links
+           genMirDataLean.Tert35(vers='old').makeMirror() # old semi-inf length links
            ]
-           
+
 print 'mirList len: ', len(mirList)
 ############################# TESTS #####################################
 
@@ -71,20 +76,22 @@ class MirTests(unittest.TestCase):
     """Tests for mirrors
     """
     def testRoundTripAct(self):
+        # test all orientations in orientList
         linkType = 'Act'
-        errLog = self._roundTrip(linkType)
+        errLog = self._roundTrip(linkType, orientList)
         if len(errLog) > 0:
             self._errLogPrint(errLog, linkType)
         self.assertEqual(len(errLog), 0, 'Errors Found and Printed To File')
 
     def testRoundTripEnc(self):
+        # just check one orientation, the first in orientList
         linkType = 'Enc'
-        errLog = self._roundTrip(linkType)
+        errLog = self._roundTrip(linkType, [orientList[0]])
         if len(errLog) > 0:
             self._errLogPrint(errLog, linkType)
         self.assertEqual(len(errLog), 0, 'Errors Found and Printed To File')
         
-    def _roundTrip(self, linkType):
+    def _roundTrip(self, linkType, orientList):
     
         OrientNoiseAmplitude = numpy.array(MaxOrient) * 0.1
         errLog=[]
