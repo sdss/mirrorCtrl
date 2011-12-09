@@ -172,7 +172,9 @@ class Prim25(ConstDirectMirror):
         max = numpy.array([ 120000.,  120000.,  120000.,  90000.,  50000.,  50000])
         
         offset = numpy.array([11300.,  -650.,  5500., -1650., -6900., -6900])
-        scale  = numpy.array([15.696, 15.696, 15.696, 15.696,  33.22, 32.53])
+        # scale  = numpy.array([15.696, 15.696, 15.696, 15.696,  33.22, 32.53])  #<--True scale
+        # choose a higher resolution scale, same as 2.5m M2
+        scale  = numpy.array([1259.84, 1259.84, 1259.84, 31.496, 31.496, 31.496])
         
         mirX  = numpy.array([    0., -749.03,  749.03,     0.,     0.,    0.])
         mirY  = numpy.array([864.90, -432.45, -432.45, -1305., -1277., 1277.])
