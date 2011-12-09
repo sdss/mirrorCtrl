@@ -4,8 +4,7 @@ import numpy
 import math
 import time
 
-from data import genMirData
-import mirror
+from data import genMirDataLean
 
 MMPerMicron = 1 / 1000.0        # millimeters per micron
 RadPerDeg  = math.pi / 180.0    # radians per degree
@@ -14,13 +13,14 @@ RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
 
 #Define maximum allowable orient error, reusing from mirror.py, not using z rot
 # maxOrientErr = numpy.array([0.0001, 5e-8, 5e-8, 0.0001, 0.0001])
-maxOrientErr = numpy.array([.1 * MMPerMicron, .01 * RadPerArcSec, .01 * RadPerArcSec, .1 * MMPerMicron, .1 * MMPerMicron, 1*RadPerDeg])
+maxOrientErr = numpy.array([.1 * MMPerMicron, .01 * RadPerArcSec, .01 * RadPerArcSec, 
+                            .1 * MMPerMicron, .1 * MMPerMicron, 1 *RadPerDeg])
 maxMountErr = 0.001
 
 # construct range of orients to test +/- (0-25mm, 0-2 degrees)
 maxDist = 25. #mm
 maxTilt = 2. * RadPerDeg # 2 degrees
-resolution = 21
+resolution = 3
 dist_range = numpy.linspace(-maxDist, maxDist, resolution)
 ang_range = numpy.linspace(-maxTilt, maxTilt, resolution)
 ranges = [dist_range, ang_range, ang_range, dist_range, dist_range]
@@ -42,22 +42,14 @@ orientRand[:,[1, 2]] = numpy.vstack((tiltRand, tiltRand)).T
 # orientRange and orientRand
 orientList = orientRange
 
-# construct a list of all mirrors, with all actuator options.
-# from genMirData:
-# prim25List[8]: includes 2 faked fixed link versions and faked encoders
-# sec25List[4]: includes a faked fixed link and faked encoders
-# sec35List[4]: includes a faked fixed link and faked encoders
-# tert35List[2]: 
 
 
-prim25 = [mirror.DirectMirror(*input) for input in genMirData.prim25List]
-secCtrMirZ = -135.70
-secCtrBaseZ = -178.40
-sec25 = [mirror.TipTransMirror(secCtrMirZ, secCtrBaseZ, *input) for input in genMirData.sec25List]
-sec35 = [mirror.DirectMirror(*input) for input in genMirData.sec35List]
-tert35 = [mirror.DirectMirror(*input) for input in genMirData.tert35List]
 # choose which mirrors you want to include in the tests
-mirList = prim25 + sec25 + sec35 + tert35
+mirList = [ genMirDataLean.Prim25().makeMirror(),
+            genMirDataLean.Sec25().makeMirror(),
+            genMirDataLean.Sec35().makeMirror(),
+            genMirDataLean.Tert35().makeMirror(),
+            ]
 print 'mirList len: ', len(mirList)
 ############################# TESTS #####################################
 
