@@ -21,21 +21,24 @@ class ConstMirrorBase(object):
         z = numpy.zeros(100)
         fig.hold()
         
-        # plot the mirror black
+        # plot the mirror black concentric circles
         for r in numpy.linspace(0., self.mirRad, 50):
             x = r * numpy.sin(theta)
             y = r * numpy.cos(theta)
             if self.mirRad < 300: # mm
                 # 3.5m M3 mirror is rotated about x by -45 deg
                 phi = -90. * math.pi / 180.0
+                cosP = math.cos(phi)
+                sinP = math.sin(phi)
                 stack = numpy.vstack((x,y,z))
+                stack = stack.T
                 rotMat = numpy.array([ [1., 0., 0.],
-                                       [0., numpy.cos(phi), numpy.sin(phi)],
-                                       [0., -numpy.sin(phi), numpy.cos(phi)] ])
-                stackRot = numpy.dot(rotMat, stack)
-                x = stackRot[0,:]
-                y = stackRot[1,:]
-                z = stackRot[2,:]
+                                       [0., cosP, sinP],
+                                       [0., -sinP, cosP] ])
+                stackRot = numpy.dot(stack, rotMat)
+                x = stackRot[:,0]
+                y = stackRot[:,1]
+                z = stackRot[:,2]
             ax.plot(x, y, z, 'k')
         
         # plot actuators blue
@@ -63,7 +66,7 @@ class ConstMirrorBase(object):
         zrange = (-3 * self.mirRad, 2 * self.mirRad)
         matplotlib.pyplot.xlim(xyrange)
         matplotlib.pyplot.ylim(xyrange)
-        ax.set_zlim(zrange)        
+        ax.set_zlim(xyrange)        
         matplotlib.pyplot.show()
         
     def genActuators(self, minMnt, maxMnt, mntOffset, mntScale, mirPos, basePos, actType):
@@ -483,7 +486,6 @@ class Tert35(ConstDirectMirror):
         rotMat[1,2] = math.sin(rotAng)
         rotMat[2,2] = rotMat[1,1]
         rotMat[2,1] = -rotMat[1,2]
-        
         mirPos = numpy.dot(mirIP, rotMat)
         basePos = numpy.dot(baseIP, rotMat)
         encMirPos = numpy.dot(encMirIP, rotMat)
