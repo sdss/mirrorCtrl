@@ -5,12 +5,66 @@ import math
 import itertools
 
 import numpy
+import matplotlib.pyplot
+import mpl_toolkits.mplot3d
 
 import mirror
     
 class ConstMirrorBase(object):
     """This object is used to construct APO mirrors to be used in unit testing
     """
+    def plotMirror(self):
+        """ Plots links and glass when the mirror is in neutral position"""
+        fig = matplotlib.pyplot.figure()
+        ax = fig.gca(projection='3d')
+        theta = numpy.linspace(0., 2 * numpy.pi, 100)
+        z = numpy.zeros(100)
+        fig.hold()
+        
+        # plot the mirror black
+        for r in numpy.linspace(0., self.mirRad, 50):
+            x = r * numpy.sin(theta)
+            y = r * numpy.cos(theta)
+            if self.mirRad < 300: # mm
+                # 3.5m M3 mirror is rotated about x by -45 deg
+                phi = -90. * math.pi / 180.0
+                stack = numpy.vstack((x,y,z))
+                rotMat = numpy.array([ [1., 0., 0.],
+                                       [0., numpy.cos(phi), numpy.sin(phi)],
+                                       [0., -numpy.sin(phi), numpy.cos(phi)] ])
+                stackRot = numpy.dot(rotMat, stack)
+                x = stackRot[0,:]
+                y = stackRot[1,:]
+                z = stackRot[2,:]
+            ax.plot(x, y, z, 'k')
+        
+        # plot actuators blue
+        for act in self.actList:
+            x = numpy.array([act.mirPos[0], act.basePos[0]])  
+            y = numpy.array([act.mirPos[1], act.basePos[1]]) 
+            z = numpy.array([act.mirPos[2], act.basePos[2]])   
+            ax.plot(x, y, z, 'bo-')
+        
+        # plot encoders cyan
+        for act in self.encList:
+            x = numpy.array([act.mirPos[0], act.basePos[0]])  
+            y = numpy.array([act.mirPos[1], act.basePos[1]]) 
+            z = numpy.array([act.mirPos[2], act.basePos[2]])   
+            ax.plot(x, y, z, 'co-')
+        
+        # plot fixed links red
+        for act in self.fixList:
+            x = numpy.array([act.mirPos[0], act.basePos[0]])  
+            y = numpy.array([act.mirPos[1], act.basePos[1]]) 
+            z = numpy.array([act.mirPos[2], act.basePos[2]])   
+            ax.plot(x, y, z, 'ro-')
+        
+        xyrange=(-1.5 * self.mirRad, 1.5 * self.mirRad)
+        zrange = (-3 * self.mirRad, 2 * self.mirRad)
+        matplotlib.pyplot.xlim(xyrange)
+        matplotlib.pyplot.ylim(xyrange)
+        ax.set_zlim(zrange)        
+        matplotlib.pyplot.show()
         
     def genActuators(self, minMnt, maxMnt, mntOffset, mntScale, mirPos, basePos, actType):
         """Generate a list of actuators, to be used in a mirror.   
@@ -159,7 +213,8 @@ class Prim25(ConstDirectMirror):
             raise RuntimeError('vers must be "old" or "new"')
         if (actType not in ['adjBase', 'adjLen']):
             raise RuntimeError('actType must be "adjBase" or "adjLen"')
-            
+        
+        self.mirRad = 1250. # mm
         self.actList, self.fixList, self.encList = self.dataToLists(fix, vers, actType)
         
     def dataToLists(self, fix, vers, actType):
@@ -235,6 +290,7 @@ class Sec25(ConstTipTransMirror):
         """create the usable mirror"""
         if (actType not in ['adjBase', 'adjLen']):
             raise RuntimeError('actType must be "adjBase" or "adjLen"')
+        self.mirRad = 417. # mm (estimated)
         self.actList, self.fixList, self.encList = self.dataToLists(actType)
         
     def dataToLists(self, actType):
@@ -261,7 +317,7 @@ class Sec25(ConstTipTransMirror):
         
         # create a fake FixedLengthLink to constrain z rotation, extending in x, length = 150 mm
         linkLength = 150. #mm
-        mirRadius = 417. ## mm (estimation, a little small)
+        mirRadius = self.mirRad
         fixMirPos = numpy.array([[0., mirRadius, -193.]])
         fixBasePos = numpy.array([[linkLength, mirRadius, -193.]])
         
@@ -280,6 +336,7 @@ class Sec35(ConstDirectMirror):
         """create the usable mirror"""
         if (actType not in ['adjBase', 'adjLen']):
             raise RuntimeError('actType must be "adjBase" or "adjLen"')
+        self.mirRad = 417. # mm (true size, from Nick MacDonald solid model)
         self.actList, self.fixList, self.encList = self.dataToLists(actType)
         
     def dataToLists(self, actType):
@@ -302,7 +359,7 @@ class Sec35(ConstDirectMirror):
         
         # Fake FixedLengthLink
         linkLength = 150. #mm
-        mirRadius = 417. ## mm (from nmac solid model)
+        mirRadius = self.mirRad
         fixMirPos = numpy.array([[0., mirRadius, -152.806]])
         fixBasePos = numpy.array([[linkLength, mirRadius, -152.806]])
         
@@ -328,6 +385,7 @@ class Tert35(ConstDirectMirror):
         if (actType not in ['adjBase', 'adjLen']):
             raise RuntimeError('actType must be "adjBase" or "adjLen"')
         
+        self.mirRad = 297.54 # mm ( derived from 3.5m M3 Actuator Positions 2008-04-18.py)
         self.actList, self.fixList, self.encList = self.dataToLists(vers, actType)
         
     def dataToLists(self, vers, actType):
@@ -371,7 +429,7 @@ class Tert35(ConstDirectMirror):
         mirIP = numpy.zeros([6,3])
         baseIP = mirIP.copy()
         # first handle actuators A, B and C
-        # could compute encoders here too by adjusting rad, but I do it further below
+        # could compute encoders here too by adjusting rad, but I do it below
         for actInd, angRad in enumerate(angRadList):
             mirIP[actInd, :] = numpy.array((
                 math.cos(angRad) * rad,
