@@ -27,7 +27,7 @@ class ConstMirrorBase(object):
             y = r * numpy.cos(theta)
             if self.mirRad < 300: # mm
                 # 3.5m M3 mirror is rotated about x by -45 deg
-                phi = -90. * math.pi / 180.0
+                phi = 90. * math.pi / 180.0
                 cosP = math.cos(phi)
                 sinP = math.sin(phi)
                 stack = numpy.vstack((x,y,z))

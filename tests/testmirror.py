@@ -4,7 +4,12 @@ import numpy
 import math
 import time
 
-from data import genMirDataLean
+# This flag determines the initial guess to solve for orietation 
+# If False: start from a noisy (but close) guess to the solution
+# If True: start from all zeros.
+zeroFlag = False
+
+from data import genMirrors
 import mirror
 import RO.Astro.Tm
 
@@ -55,18 +60,18 @@ for orient in orientList:
 
 # choose which mirrors you want to include in the tests
 # there are options for various mirrors, eg fixing a link on the 2.5m primary
-# they are shown in genMirDataLean
-mirList = [genMirDataLean.Prim25().makeMirror(), # defaults to AdjBase actuators.
+# they are shown in genMirrors
+mirList = [genMirrors.Prim25().makeMirror(), # defaults to AdjBase actuators.
            # changed to AdjLen (old) type actuators.
-           genMirDataLean.Prim25(actType='adjLen').makeMirror(), 
-           genMirDataLean.Prim25(fix=1).makeMirror(),
+           genMirrors.Prim25(actType='adjLen').makeMirror(), 
+           genMirrors.Prim25(fix=1).makeMirror(),
            # mirror below failed due to bug in (old) genMirData.py
-           # it was fixed (no pun inteded) in genMirDataLean.py
-           genMirDataLean.Prim25(fix=2).makeMirror(),
-           genMirDataLean.Sec25().makeMirror(),
-           genMirDataLean.Sec35().makeMirror(),
-           genMirDataLean.Tert35().makeMirror(), # new non-inf length links
-           genMirDataLean.Tert35(vers='old').makeMirror() # old semi-inf length links
+           # it was fixed (no pun inteded) in genMirrors.py
+           genMirrors.Prim25(fix=2).makeMirror(),
+           genMirrors.Sec25().makeMirror(),
+           genMirrors.Sec35().makeMirror(),
+           genMirrors.Tert35().makeMirror(), # new non-inf length links
+           genMirrors.Tert35(vers='old').makeMirror() # old semi-inf length links
            ]
 
 print 'mirList len: ', len(mirList)
@@ -114,10 +119,15 @@ class MirTests(unittest.TestCase):
                 try:
                     desMount, adjOrient = mountFromOrient(desOrient, return_adjOrient=True)
 
-                    # to make the initial orientation guess for the fitter,
-                    # add noise to the user-adjustable components of adjOrient
-                    initOrient = numpy.array(adjOrient, copy=True)
-                    initOrient[0:numAdjOrient] += ((2 * numpy.random.random_sample(numAdjOrient)) - 1) * OrientNoiseAmplitude[0:numAdjOrient]
+                    # to make the initial orientation guess for the fitter
+                    if zeroFlag == True:
+                        # choose an initial guess of all zeros
+                        initOrient=numpy.zeros(numAdjOrient)
+                    else:
+                        # add noise to the user-adjustable components of adjOrient
+                        initOrient = numpy.array(adjOrient, copy=True)
+                        numpy.random.seed(0) # gen same random numbers each time
+                        initOrient[0:numAdjOrient] += ((2 * numpy.random.random_sample(numAdjOrient)) - 1) * OrientNoiseAmplitude[0:numAdjOrient]
 #                     print "adjOrient=", adjOrient
 #                     print "initOrient=", initOrient
                     
