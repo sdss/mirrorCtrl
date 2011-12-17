@@ -16,8 +16,8 @@ import numpy
 import TclActor
 import mirror
 
-# punk (office linux box) for testing
-ControllerAddr = '172.28.191.182'
+# punk (office linux box) for testing: '172.28.191.182'
+ControllerAddr = 'localhost'
 ControllerPort = 8000 # must match in twistedGalil.py for testing...i think
 
 class GalilStatus(object):
@@ -81,6 +81,7 @@ class GalilDevice(TclActor.TCPDevice):
         
         # check for errors '?'
         replyStr = replyStr.encode("ASCII", "ignore")
+        print 'got reply: ', replyStr
         # not sure what message code should be...using "d" whatever that is.
         # for now, spits everything back to user.
         self.actor.writeToUsers("d", "Galil Reply=%s" % (quoteStr(replyStr,)), cmd = self.currCmd)

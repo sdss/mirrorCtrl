@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 This runs on someother computer.  It pings faked Galil replies back for testing
 """
@@ -8,16 +9,26 @@ This runs on someother computer.  It pings faked Galil replies back for testing
 
 
 from twisted.internet import reactor, protocol
+from twisted.protocols.basic import LineReceiver
 
 
-class Echo(protocol.Protocol):
-    """This is just about the simplest possible protocol"""
+# class Echo(protocol.Protocol):
+#     """This is just about the simplest possible protocol"""
+#     
+#     def dataReceived(self, data):
+#         "As soon as any data is received, look at it and write something back." 
+#         print 'data recieved:', data
+#         replyStr = genStrFromData(data)
+#         self.transport.write(replyStr)
+
+class Echo(LineReceiver):
+    """Lines..."""
     
-    def dataReceived(self, data):
+    def lineReceived(self, line):
         "As soon as any data is received, look at it and write something back." 
-        print 'data recieved'
-        replyStr = genStrFromData(data)
-        self.transport.write(replyStr)
+        print 'line recieved:', line
+        replyStr = genStrFromData(line)
+        self.sendLine(replyStr)
 
 
 def main():

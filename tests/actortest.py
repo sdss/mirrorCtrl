@@ -5,7 +5,7 @@ import numpy
 import mirror
 
 from data import genMirrors
-UserPort = 8000 #1025
+UserPort = 1025
 Mir = genMirrors.Prim25().makeMirror()
 
 if __name__ == "__main__":
