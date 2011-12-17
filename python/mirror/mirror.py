@@ -397,8 +397,8 @@ class MirrorBase(object):
         sinZ = math.sin(orient.rotZ)
         cosZ = math.cos(orient.rotZ)        
         # small angle versions
-#        sinZ = orient.rotZ #small ang approx
-#        cosZ = 1 - (orient.rotZ)**2. / 2.  #small ang approx
+#         sinZ = orient.rotZ #small ang approx
+#         cosZ = 1 - (orient.rotZ)**2. / 2.  #small ang approx
         
         rotMatZ = numpy.array([ [cosZ, -sinZ, 0],
                                 [sinZ,  cosZ, 0],

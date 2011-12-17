@@ -21,11 +21,12 @@ RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
 #Define maximum allowable fitOrient error, reusing from mirror.py, not using z rot
 # MaxOrientErr = numpy.array([0.0001, 5e-8, 5e-8, 0.0001, 0.0001])
 MaxOrientErr = numpy.array([.1 * MMPerMicron, .01 * RadPerArcSec, .01 * RadPerArcSec, .1 * MMPerMicron, .1 * MMPerMicron, 1*RadPerDeg])
-MaxMountErr = 0.001
+MaxMountErr = 0.01
 
 # construct range of orients to test +/- (0-25mm, 0-2 degrees)
 maxDist = 25.0 # mm
 maxTilt = 2.0 * RadPerDeg # radians
+# set number of orientation 'samples' to test (per axis)
 resolution = 5 # was 21
 
 MaxOrient = (maxDist, maxTilt, maxTilt, maxDist, maxDist)
@@ -61,12 +62,10 @@ for orient in orientList:
 # choose which mirrors you want to include in the tests
 # there are options for various mirrors, eg fixing a link on the 2.5m primary
 # they are shown in genMirrors
+# mirrors can be viewed using the plotMirror() method, eg: genMirrors.Prim25().plotMirror()
 mirList = [genMirrors.Prim25().makeMirror(), # defaults to AdjBase actuators.
-           # changed to AdjLen (old) type actuators.
-           genMirrors.Prim25(actType='adjLen').makeMirror(), 
-           genMirrors.Prim25(fix=1).makeMirror(),
-           # mirror below failed due to bug in (old) genMirData.py
-           # it was fixed (no pun inteded) in genMirrors.py
+           genMirrors.Prim25(actType='adjLen').makeMirror(), # AdjLen (old) type actuators.
+           genMirrors.Prim25(fix=1).makeMirror(), 
            genMirrors.Prim25(fix=2).makeMirror(),
            genMirrors.Sec25().makeMirror(),
            genMirrors.Sec35().makeMirror(),
