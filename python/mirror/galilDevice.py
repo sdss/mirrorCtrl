@@ -19,7 +19,7 @@ import TclActor
 import mirror
 
 # punk (office linux box) for testing: '172.28.191.182'
-ControllerAddr = 'localhost'
+ControllerAddr = '172.28.191.182'
 ControllerPort = 8000 # must match in twistedGalil.py for testing...i think
 
 class GalilStatus(object):
@@ -44,7 +44,7 @@ class GalilStatus(object):
         return 'Info'
         
 class GalilDevice(TclActor.TCPDevice):
-    def __init__(self, mir, callFunc = None, actor = None):
+    def __init__(self, callFunc = None, actor = None):
         TclActor.TCPDevice.__init__(self,
             name = "Galil",
             addr = ControllerAddr,
@@ -53,7 +53,7 @@ class GalilDevice(TclActor.TCPDevice):
             actor = actor,
             cmdInfo = (),  # like agile FW device?
         )
-        self.mirror = mir
+        self.mirror = actor.mirror
         self.maxMountErr = 1 # define an array if different axes have different acceptable err
         self.currCmd = None # only 1 command can execute at a time
         self.desActPos = None # actuator length target
