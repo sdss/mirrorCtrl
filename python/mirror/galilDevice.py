@@ -9,7 +9,9 @@ import os
 import sys
 import traceback
 #############
+import time # for testing
 import itertools
+
 import Tkinter
 import numpy
 
@@ -61,8 +63,6 @@ class GalilDevice(TclActor.TCPDevice):
         self.iterNum = None
         self.iterMax = None
         self.status = GalilStatus()
-        # set NCORR and MAXCORRx to Zero, so Galil doesn't correct
-        #self.newCmd(self._initGalCmd())
         
     def handleReply(self, replyStr):
         """Handle a line of output from the device.
@@ -81,27 +81,29 @@ class GalilDevice(TclActor.TCPDevice):
         
         # check for errors '?'
         replyStr = replyStr.encode("ASCII", "ignore")
-        print 'got reply: ', replyStr
+        #print 'cmd: ', self.currCmd
         # not sure what message code should be...using "d" whatever that is.
         # for now, spits everything back to user.
-        self.actor.writeToUsers("d", "Galil Reply=%s" % (quoteStr(replyStr,)), cmd = self.currCmd)
+        self.actor.writeToUsers("d", "Galil Reply=%s" % (replyStr,), cmd = self.currCmd)
         self.replyList.append(replyStr)
         if '?' in replyStr:
             # there was an error. Does the Galil hang up on errors?
-            self.actor.writeToUsers("d", "Galil Error!=%s" % (quoteStr(replyStr,)), cmd = self.currCmd)
+            self.actor.writeToUsers("d", "Galil Error!=%s" % (replyStr,), cmd = self.currCmd)
             # end current process
             self._clearAll()
             return
-        if not replyStr.lower().endswith(" ok"):
+        if not replyStr.lower().endswith("ok"):
             # command not finished
             return
         else:
             if (self.iterNum < self.iterMax): # self.iter* default to None
                 # iterating has been enabled, current task is a move command
                 # check for err
+                time.sleep(2)
                 encMount = self._mountFromGalTxt(self.replyList)
-                orient = self.mirror.orientFromEncoderMount(encMount)
-                actMount = self.mirror.actuatorMountFromOrientation(orient)
+                orient = self.mirror.orientFromEncoderMount(encMount, self.desOrient)
+                actMount = self.mirror.actuatorMountFromOrient(orient)
+                actMount = numpy.asarray(actMount, dtype=float)
                 actErr = self.desActPos - actMount
                 if True in (numpy.abs(actErr) > self.maxMountErr):
                     # not within acceptable error range
@@ -113,8 +115,7 @@ class GalilDevice(TclActor.TCPDevice):
                     # send a new command
                     # note: self.currCmd is unchanged
                     self.conn.writeLine(cmdMoveStr) 
-                    return
-                
+                    return  
             # command is finished
             self.actor.writeToUsers("d", "Execution Finished", cmd = self.currCmd)
             # clear current command, iterNum, replyList, desActPos ...
@@ -151,9 +152,10 @@ class GalilDevice(TclActor.TCPDevice):
         self.iterNum = 0
         self.iterMax = 2
         # (user) commanded orient --> mount
-        mount = self.mirror.actuatorMountFromOrient(orient)
-        self.desActPos = mount # the goal
-        self.cmdActPos = mount # this will change upon iteration.
+        mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient=True)
+        self.desActPos = numpy.asarray(mount, dtype=float) # the goal
+        self.desOrient = numpy.asarray(adjOrient, dtype=float) # initial guess for fitter
+        self.cmdActPos = numpy.asarray(mount, dtype=float) # this will change upon iteration.
         # form Galil command
         cmdMoveStr = self._galCmdFromMount(mount)
         self.newCmd(cmdMoveStr, userCmd=userCmd)
@@ -165,7 +167,7 @@ class GalilDevice(TclActor.TCPDevice):
         self.conn.writeLine('ST;')
         self.actor.writeToUsers("d", "Galil Exection Stopped", cmd = self.currCmd)
         # clear current command
-        self.clearAll()
+        self._clearAll()
         
     def getStatus(self):
         """ Return the Galil status to the user."""
@@ -175,7 +177,6 @@ class GalilDevice(TclActor.TCPDevice):
         
     def home(self, axes, userCmd):
         """ Homes the actuators defined in the axes array"""
-        
         if self.currCmd == True:
             self.actor.writeToUsers("d", "Galil is busy", cmd = self.currCmd)
             return
@@ -183,24 +184,7 @@ class GalilDevice(TclActor.TCPDevice):
         cmdMoveStr = self._galCmdForHome(axes)
         self.newCmd(cmdMoveStr, userCmd=userCmd)
         # when move is done, check orientation from encoders
-        
-    def _initGalCmd(self):
-        """ (Pre)sets NCORR = 0 and MAXCORRx = 0.
-        
-        This will keep the Galil from correcting orientations. We have moved this
-        task to be handled by this code.
-        """
-        axes = ['A', 'B', 'C', 'D', 'E', 'F']
-        cmdStr = 'NCORR = 0; '
-        # set all MAXCORRx = 0.  will this be a problem for Galil's with < 6 axes?
-        for axis in axes:
-            # fortran code uses ';', do we want character return?
-            cmdStr += 'MAXCORR' + axis + '= 0' + '; ' # + '\n' 
-        # XQ #COMPVAR is necessary
-        cmdStr += 'XQ #COMPVAR;' # documentation says <CR> works, code examples seem to use ;       
-        return cmdStr
-        
-        
+                
     def _galCmdFromMount(self, mount):
         """ Converts mount information into a string command for a Galil
         
@@ -242,14 +226,14 @@ class GalilDevice(TclActor.TCPDevice):
       
     def _mountFromGalTxt(self, galTxt):
         """ Parses text returned from Galil into a mount """
-        
+        mount = numpy.random.randn(6) * 100
         return mount
              
     def _clearAll(self):
             self.currCmd = None
-            self.moving = False
             self.replyList = []
             self.iterNum = None
             self.iterMax = None
             self.desActPos = None
             self.cmdActPos = None
+            self.desOrient = None
