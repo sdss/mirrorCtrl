@@ -64,6 +64,9 @@ class MirrorBase(object):
         if not encoderList:
             self.encoderList = actuatorList
         else:
+            # how many true encoders are there? Necessary for actor to know this
+            # when parsing replies from Galil
+            self.hasEncoders = len(self.encoderList) - self.encoderList.count(None)
             if len(encoderList) != len(actuatorList):
                 raise RuntimeError("encoderList must contain %s encoders; has %s" % \
                     (len(actuatorList), len(encoderList)))
@@ -75,7 +78,7 @@ class MirrorBase(object):
                     self.encoderList.append(act)
                 else:
                     self.encoderList.append(enc)
-                    self.hasEncoders = True
+                    
     
     @property
     def numAdjOrient(self):
