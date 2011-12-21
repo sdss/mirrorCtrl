@@ -64,9 +64,7 @@ class MirrorBase(object):
         if not encoderList:
             self.encoderList = actuatorList
         else:
-            # how many true encoders are there? Necessary for actor to know this
-            # when parsing replies from Galil
-            self.hasEncoders = len(encoderList) - encoderList.count(None)
+            self.hasEncoders = True
             if len(encoderList) != len(actuatorList):
                 raise RuntimeError("encoderList must contain %s encoders; has %s" % \
                     (len(actuatorList), len(encoderList)))
