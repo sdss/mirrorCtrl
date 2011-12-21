@@ -3,6 +3,25 @@
 This talks to a Galil motor controller, which commands actuators to move the mirror and 
 reads from encoders to determine mirror position.
 
+questions/to do: should we run xq #status before move or home command to clear all variables?
+when should we set cmd state to "running", should we do it to device cmd or user cmd?
+
+remember:
+self.currCmd.cmdVerb.lower()
+
+we need a way to discover which axes have encoders, right now the mirror substitutes actuators
+for encoders...so we don't know if Galil final position reply is BS for certain axes since
+len(actuatorList) always = len(encoderList) ...
+
+    The auxiliary port process will halt (in mid-output) if an ST or RS
+    command is issued or the device is reset or power cycled. In the
+    case of ST the aux output will start up (from the beginning of a new
+    line) when the next XQ# command is issued. In the case of power
+    cycle/reset, startup happens when the Galil finished resetting.
+    Because of this, please sanity check the data carefully. Use the
+    "number of characters in a line" parameter! However, I don't
+    recommend reading the data as fixed-width input unless you really
+    think this adds safety, because the field widths may change. 
 """
 ############# imported in Agile's FW device but unused.  Need em?
 import os
@@ -19,7 +38,7 @@ import TclActor
 import mirror
 
 # punk (office linux box) for testing: '172.28.191.182'
-ControllerAddr = '172.28.191.182'
+ControllerAddr = 'localhost'
 ControllerPort = 8000 # must match in twistedGalil.py for testing...i think
 
 class GalilStatus(object):
@@ -34,9 +53,11 @@ class GalilStatus(object):
     def clear(self):
         self.cmd = None # most recent command recieved by GalilDevice
         self.time = None # time spent on current command
+        self.timeLeft = None 
         self.currentPos = None # current values on all axis
         self.desPos = None # desired values for all axis
-        self.err = None # error, if present
+        self.currentOrient = None
+        self.desOrient = None
 
     def genInfoStr(self):
         """ Return an info string about current status. """
@@ -62,6 +83,7 @@ class GalilDevice(TclActor.TCPDevice):
         self.replyList = []
         self.iterNum = None
         self.iterMax = None
+        self.nAct = self.mirror
         self.status = GalilStatus()
         
     def handleReply(self, replyStr):
@@ -78,49 +100,49 @@ class GalilDevice(TclActor.TCPDevice):
         - Parse status to update the model parameters
         - If a command has finished, call the appropriate command callback
         """
-        
-        # check for errors '?'
-        replyStr = replyStr.encode("ASCII", "ignore")
+        if not self.currCmd:
+            # ignore unsolicited input
+            return
+        replyStr = replyStr.encode("ASCII", "ignore").strip(':\r\n')
+        if not replyStr:
+            # ignore blank replies
+            return
+        print 'replyStr: ', replyStr
         #print 'cmd: ', self.currCmd
         # not sure what message code should be...using "d" whatever that is.
         # for now, spits everything back to user.
-        self.actor.writeToUsers("d", "Galil Reply=%s" % (replyStr,), cmd = self.currCmd)
         self.replyList.append(replyStr)
         if '?' in replyStr:
-            # there was an error. Does the Galil hang up on errors?
-            self.actor.writeToUsers("d", "Galil Error!=%s" % (replyStr,), cmd = self.currCmd)
+            # there was an error. 
+            self.currCmd.setState("failed", textMsg=replyStr)
+            self.actor.writeToUsers("f", "Galil Error!=%s" % (replyStr,), cmd = self.currCmd)
             # end current process
             self._clearAll()
             return
         if not replyStr.lower().endswith("ok"):
             # command not finished
             return
-        else:
-            if (self.iterNum < self.iterMax): # self.iter* default to None
-                # iterating has been enabled, current task is a move command
-                # check for err
-                time.sleep(2)
-                encMount = self._mountFromGalTxt(self.replyList)
-                orient = self.mirror.orientFromEncoderMount(encMount, self.desOrient)
-                actMount = self.mirror.actuatorMountFromOrient(orient)
-                actMount = numpy.asarray(actMount, dtype=float)
-                actErr = self.desActPos - actMount
-                if True in (numpy.abs(actErr) > self.maxMountErr):
-                    # not within acceptable error range
-                    # do another move
-                    self.iterNum += 1
-                    # add offset to previous command
-                    self.cmdActPos += actErr 
-                    cmdMoveStr = self._galCmdFromMount(self.cmdActPos)
-                    # send a new command
-                    # note: self.currCmd is unchanged
-                    self.conn.writeLine(cmdMoveStr) 
-                    return  
-            # command is finished
-            self.actor.writeToUsers("d", "Execution Finished", cmd = self.currCmd)
-            # clear current command, iterNum, replyList, desActPos ...
-            self._clearAll()
-
+        elif self.iterNum < self.iterMax:
+            # do another move before terminating current command            
+            self.iterNum += 1
+            encMount = self._mountFromGalTxt()
+            orient = self.mirror.orientFromEncoderMount(encMount, self.desOrient)
+            actMount = self.mirror.actuatorMountFromOrient(orient)
+            actMount = numpy.asarray(actMount, dtype=float)
+            actErr = self.desActPos - actMount
+            if True in (numpy.abs(actErr) > self.maxMountErr):
+                # not within acceptable error range
+                # do another move
+                # add offset to previous command
+                self.cmdActPos += actErr 
+                cmdMoveStr = self._galCmdFromMount(self.cmdActPos)
+                # send a new command and clear the reply list and start over
+                # note: self.currCmd is unchanged
+                self.replyList = []
+                self.conn.writeLine(cmdMoveStr) 
+                return
+        self.actor.writeToUsers("i", "Execution Finished", cmd = self.currCmd)
+        self.currCmd.setState("done")
             
     def newCmd(self, cmdStr, callFunc=None, userCmd=None):
         """Start a new command.
@@ -132,11 +154,11 @@ class GalilDevice(TclActor.TCPDevice):
         self.currCmd = cmd
         self.pendCmdDict[cmd.locCmdID] = cmd # do we need this?
        # fullCmdStr = cmd.getCmdWithID()
-       # try:
+        try:
             #print "Device.sendCmd writing %r" % (fullCmdStr,)
-        self.conn.writeLine(cmdStr)  #from fullCmdStr
-        #except Exception, e:
-         #   cmd.setState(isDone=True, isOK=False, textMsg=str(e))
+            self.conn.writeLine(cmdStr)  #from fullCmdStr
+        except Exception, e:
+            cmd.setState("failed", textMsg=str(e))
             
     def moveTo(self, orient, userCmd):
         """ Accepts an orientation then commands the move.
@@ -145,12 +167,13 @@ class GalilDevice(TclActor.TCPDevice):
         is reached (within errors)
         """
         # if Galil is busy, abort the command
-        if self.currCmd == True:
-            self.actor.writeToUsers("d", "Galil is busy", cmd = self.currCmd)
+        if self.currCmd:
+            self.actor.writeToUsers("f", "Galil is busy", cmd = self.currCmd)
             return
-        # enable iteration
-        self.iterNum = 0
-        self.iterMax = 2
+        # enable iteration for mirrors with encoders
+        if self.mirror.hasEncoders:
+            self.iterNum = 0
+            self.iterMax = 2
         # (user) commanded orient --> mount
         mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient=True)
         self.desActPos = numpy.asarray(mount, dtype=float) # the goal
@@ -158,7 +181,8 @@ class GalilDevice(TclActor.TCPDevice):
         self.cmdActPos = numpy.asarray(mount, dtype=float) # this will change upon iteration.
         # form Galil command
         cmdMoveStr = self._galCmdFromMount(mount)
-        self.newCmd(cmdMoveStr, userCmd=userCmd)
+        #self.newCmd(cmdMoveStr, userCmd=userCmd, callFunc=self._clearAll())
+        self.newCmd(cmdMoveStr, userCmd=userCmd, callFunc=self._clearAll)
         # when move is done, check orientation from encoders
     
     def stop(self):
@@ -169,22 +193,31 @@ class GalilDevice(TclActor.TCPDevice):
         # clear current command
         self._clearAll()
         
-    def getStatus(self):
+    def getStatus(self, userCmd):
         """ Return the Galil status to the user."""
         
+        if not self.currCmd:
+            # query the Galil and update/send status
+            self.newCmd("XQ#STATUS;", userCmd=userCmd, callFunc = self._updateStatus)
+            self.actor.writeToUsers("f", "Galil is busy", cmd = self.currCmd)
+            return
+            
         statusStr = self.status.genInfoStr()
-        self.actor.writeToUsers("d", statusStr, cmd = None)
+        self.actor.writeToUsers("i", statusStr, cmd = None)
         
     def home(self, axes, userCmd):
         """ Homes the actuators defined in the axes array"""
-        if self.currCmd == True:
-            self.actor.writeToUsers("d", "Galil is busy", cmd = self.currCmd)
+        if self.currCmd:
+            self.actor.writeToUsers("f", "Galil is busy", cmd = self.currCmd)
             return
+        else:
+            # this command makes the Galil busy
+            self.status.busy = True
         # form Galil command
         cmdMoveStr = self._galCmdForHome(axes)
-        self.newCmd(cmdMoveStr, userCmd=userCmd)
+        self.newCmd(cmdMoveStr, userCmd=userCmd, callFunc=self._clearAll)
         # when move is done, check orientation from encoders
-                
+    
     def _galCmdFromMount(self, mount):
         """ Converts mount information into a string command for a Galil
         
@@ -217,23 +250,48 @@ class GalilDevice(TclActor.TCPDevice):
         cmdStr = ''
         # first set relevant axes
         # XQ#STATUS will clear all, should we do that first?
-        # set each axis to 0, can be any number except MAXINT, as defined by Galil documentation.
+        # set each axis to 1, can be any number except MAXINT, as defined by Galil documentation.
         for axis in axes:
-            cmdStr += axis + '=' + '0' + ';' # + '\n' 
+            cmdStr += axis + '=' + '1' + ';' # + '\n' 
         # then command home
         cmdStr += 'XQ #HOME;' # documentation says <CR> works, code examples seem to use ;       
         return cmdStr
       
-    def _mountFromGalTxt(self, galTxt):
-        """ Parses text returned from Galil into a mount """
-        mount = numpy.random.randn(6) * 100
+    def _mountFromGalTxt(self):
+        """ Parses text returned from Galil into a mount. 
+        
+        Assumes self.replyList has put successfully put each Galil reply 
+        as seperate list item"""
+        
+        # get final position output line
+        mntStr = self.replyList[2].split(' ')
+        del mntStr[-1] # last split is just text: 'final position'
+        
+        # if no encoder, replace with commanded position?
+        mount = numpy.random.randn(5) * 100
         return mount
+
+    def _sendStatus(self):
+        """ Send status to users """
+        pass
+
+    def _updateStatus(self, cmd):
+        """ Updates and sends the most recent status from a replyList. When status has
+        been updated, it is sent"""
+        # determine current command, and parse replies/update accordingly
+        
+        
+        self._sendStatus()
              
-    def _clearAll(self):
-            self.currCmd = None
-            self.replyList = []
-            self.iterNum = None
-            self.iterMax = None
-            self.desActPos = None
-            self.cmdActPos = None
-            self.desOrient = None
+    def _clearAll(self, cmd):
+       # print 'DONE?:', cmd.isDone()
+        self.currCmd = None
+        self.replyList = []
+        self.iterNum = None
+        self.iterMax = None
+        self.desActPos = None
+        self.cmdActPos = None
+        self.desOrient = None
+        self.currCmd = None
+        self.replyList = []
+        print 'Clear All!'

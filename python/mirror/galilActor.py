@@ -33,27 +33,29 @@ class GalilActor(TclActor.Actor):
         Pass 1-5 comma seperated arguements.  Order of arguemnts corresponds to:
         [Piston (um), Tilt X ("), Tilt Y ("), Trans X (um), Trans Y (um)]
         
-        Non-specified orientation values are commanded as zeros.""" 
+        Non-specified orientation values are commanded as zeros. When an orientation
+        is specified for a non adjustable degree of freedom (eg, 3.5m tert translation),
+        it is silently replaced as zero.""" 
 
-        print 'mirr ', mirror.__name__
         if not cmd or not cmd.cmdArgs:
             raise TclActor.Command.CommandError("No orientation specified")
         try:    
             cmdArgList = numpy.asarray(cmd.cmdArgs.split(","), dtype=float)
         except Exception:
             raise TclActor.Command.CommandError('Could not convert arguments to\
-                a numeric array...' % (txt, ))
+                a numeric array. Arguments should be comma separated numbers.' % (txt, ))
         if not (0 < len(cmdArgList) < 6):
             raise TclActor.Command.CommandError("Must specify 1 to 5 orientation values, \
                 got %s" % (len(cmdArgList)))
-        # pad extra orientations with zeros, if commanded < 5.
+        # pad extra orientations with zeros, if not specified 5.
         if len(cmdArgList) < 5:
             pad = numpy.zeros(5 -  len(cmdArgList))
             cmdOrient = numpy.hstack((cmdArgList, pad))
+        # write info back
         orients = ['Piston (um)=', 'Tip X (")=', 'Tip Y (")=', 'Trans X (um)=', 'Trans Y (um)=' ]
-        self.writeToUsers("d", "Commanding Move For... %s " % (self.mirror), cmd = None)
+        self.writeToUsers("i", "Commanding Move ...", cmd = cmd)
         for txt, cmdArg in itertools.izip(orients, cmdOrient):
-           self.writeToUsers("d", "%s %f" % (txt, cmdArg), cmd = None)
+           self.writeToUsers("i", "%s %f" % (txt, cmdArg), cmd = cmd)
         try:
             # convert to natural units, mm and radians
             cmdOrient = cmdOrient * numpy.array([MMPerMicron, RadPerArcSec, RadPerArcSec,
@@ -61,22 +63,45 @@ class GalilActor(TclActor.Actor):
             self.galilDev.moveTo(cmdOrient, userCmd=cmd)
         except Exception, e:
             raise TclActor.Command.CommandError(str(e))
-        
-    
+            
     def cmd_home(self, cmd):
-        """ Home an inputed motor axis, if device isn't busy."""
-        # parse into axes array, eg: axes = ['A', 'B', ...]
-        axes = ['A', 'B']
-        self.galilDev.home(axes, userCmd=cmd)
-    
+        """ Home an inputed motor axis, if device isn't busy.
+        
+        Pass comma separated arguments A-F to specify which actuators to home.  If no arguments
+        are received then all actuators are homed."""
+        axesList = ['A', 'B', 'C', 'D', 'E', 'F']
+        # find number of movable actuators on this mirror
+        movActs = len(self.mirror.actuatorList)
+        # most mirrors have fewer choices than A-F
+        axesList = axesList[0:movActs]
+        if not cmd.cmdArgs:
+            self.writeToUsers("d", "Homing All Actuators")
+        else:
+            cmdArgList = cmd.cmdArgs.split(",")
+            # make ascii for nice printing
+            cmdArgList = [arg.encode('ascii') for arg in cmdArgList]
+            # check to make sure received args are in axesList
+            for arg in cmdArgList:
+                # remove spaces if present
+                arg = str(arg).replace(' ', '') 
+                if arg not in axesList:
+                    raise TclActor.Command.CommandError('Unrecognized actuator: %s.\
+                    Must be comma-separated and choose from: %s (For this mirror).' % (arg, axesList))    
+            # commanded actuators are all valid
+            axesList = cmdArgList
+            alert = "Homing Actuators: %s" % (axesList,)
+            self.writeToUsers("s", alert.encode('ascii'))
+        try:
+            self.galilDev.home(axesList, userCmd=cmd)
+        except Exception, e:
+            raise TclActor.Command.CommandError(str(e))
+            
     def cmd_status(self, cmd):
         """ Get current status of Galil (asynchronous) """
-        #parse
-        self.galilDev.getStatus()
+        self.galilDev.getStatus(cmd)
         
     def cmd_stop(self, cmd):
         """ Send an interrupting stop signal to Galil (asynchronous). """
-        #parse
         self.galilDev.stop()
         
 def runGalil(mir, userPort):
