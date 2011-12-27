@@ -86,8 +86,8 @@ class SpitBack(LineReceiver):
             raise RuntimeError('Command not recognized: %s' % (cmdRec))
         replyList = reply.split('\r\n') # split reply into seperate lines
         for line in replyList:
-            self.sendLine(line) # send back to Actor one line at a time
-            time.sleep(.2) # pause inbetween lines sent, for the hell of it.
+            self.sendLine(line) # send one line at a time
+            time.sleep(1) # pause inbetween lines sent, for the hell of it.
 
 
 def main():

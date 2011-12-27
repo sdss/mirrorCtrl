@@ -15,6 +15,9 @@ RadPerDeg  = math.pi / 180.0    # radians per degree
 ArcSecPerDeg = 60.0 * 60.0      # arcseconds per degree
 RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
 
+ConvertOrient = numpy.array([MMPerMicron, RadPerArcSec, RadPerArcSec,
+                             MMPerMicron, MMPerMicron], dtype = float)
+
 
 class GalilActor(TclActor.Actor):
     def __init__(self, mir, userPort, maxUsers = 5):
@@ -51,15 +54,16 @@ class GalilActor(TclActor.Actor):
         if len(cmdArgList) < 5:
             pad = numpy.zeros(5 -  len(cmdArgList))
             cmdOrient = numpy.hstack((cmdArgList, pad))
+        else:
+            cmdOrient = cmdArgList
         # write info back
-        orients = ['Piston (um)=', 'Tip X (")=', 'Tip Y (")=', 'Trans X (um)=', 'Trans Y (um)=' ]
+        orients = ['Piston (um) =', 'Tip X (") =', 'Tip Y (") =', 'Trans X (um) =', 'Trans Y (um) =' ]
         self.writeToUsers("i", "Commanding Move ...", cmd = cmd)
         for txt, cmdArg in itertools.izip(orients, cmdOrient):
-           self.writeToUsers("i", "%s %f" % (txt, cmdArg), cmd = cmd)
+           self.writeToUsers("i", "%s %.2f" % (txt, cmdArg), cmd = cmd)
         try:
             # convert to natural units, mm and radians
-            cmdOrient = cmdOrient * numpy.array([MMPerMicron, RadPerArcSec, RadPerArcSec,
-                MMPerMicron, MMPerMicron], dtype = float)
+            cmdOrient = cmdOrient * ConvertOrient
             self.galilDev.moveTo(cmdOrient, userCmd=cmd)
         except Exception, e:
             raise TclActor.Command.CommandError(str(e))
@@ -99,6 +103,10 @@ class GalilActor(TclActor.Actor):
     def cmd_status(self, cmd):
         """ Get current status of Galil (asynchronous) """
         self.galilDev.getStatus(cmd)
+        
+    def cmd_showparams(self, cmd):
+        """ Get current status of Galil (asynchronous) """
+        self.galilDev.showParams(cmd)
         
     def cmd_stop(self, cmd):
         """ Send an interrupting stop signal to Galil (asynchronous). """
