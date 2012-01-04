@@ -20,22 +20,15 @@ self.currCmd.cmdVerb.lower()
     recommend reading the data as fixed-width input unless you really
     think this adds safety, because the field widths may change. 
 """
-############# imported in Agile's FW device but unused.  Need em?
-import os
-import sys
-import traceback
-#############
 import time
 import itertools
 import collections
 import math
 import re
-
 import Tkinter
-import numpy
 
+import numpy
 import TclActor
-import mirror
 
 # punk (office linux box) for testing: '172.28.191.182'
 ControllerAddr = 'localhost'
@@ -64,7 +57,8 @@ MaxIter = 2 # for repeated movments
 MaxMountErr = 1 # don't repeat move if mount difference is less (same for each axes, could use array)
 
 class GalilTimer(object):
-    """ Keeps track of execution times """
+    """Keep track of execution times
+    """
     def __init__(self):
         self.reset()
     
@@ -72,11 +66,11 @@ class GalilTimer(object):
         self.initTime = None
     
     def startTimer(self):
-        """ start time"""
+        """start time"""
         self.initTime = time.time()
         
     def getTime(self):
-        """ return time spent executing, so far"""
+        """return time spent executing, so far"""
         if not self.initTime:
             # this may never happen since status is queried before being reset...nevertheless
             return 'Execution Finished'
@@ -85,7 +79,7 @@ class GalilTimer(object):
 
 
 class GalilStatus(object):
-    """ A container for holding the status of the Galil """
+    """A container for holding the status of the Galil """
     def __init__(self, actor):
         """Initialize all keywords in StatusKeys as attributes = None, except for the timer """
         self.actor = actor
@@ -96,10 +90,11 @@ class GalilStatus(object):
                 setattr(self, keyword, None)   
                 
     def _printToUsers(self):
-        """ Outputs the current status to users 
+        """Output the current status to users 
         
         note: currently prints seperate line for each status slot, we could format it
-        to print a single block..."""
+        to print a single block...
+        """
         for keyword in StatusKeys:
             numpy.set_printoptions(precision=0, suppress=True)
             val = getattr(self, keyword)
@@ -114,7 +109,8 @@ class GalilStatus(object):
         
 
 class GalilDevice(TclActor.TCPDevice):
-    """ The Galil Device Object! """
+    """The Galil Device Object
+    """
     def __init__(self, callFunc = None, actor = None):
         TclActor.TCPDevice.__init__(self,
             name = "Galil",
@@ -128,11 +124,11 @@ class GalilDevice(TclActor.TCPDevice):
         self.currCmd = None # only 1 command can execute at a time
         self.replyList = []
         self.nAct = len(self.mirror.actuatorList)
+        self.validAxisList =  ('A', 'B', 'C', 'D', 'E', 'F')[0:self.nAct]
         self.status = GalilStatus(actor)
         
     def handleReply(self, replyStr):
-        """Handle a line of output from the device.
-        Called whenever the device outputs a new line of data.
+        """Handle a line of output from the device. Called whenever the device outputs a new line of data.
         
         Inputs:
         - replyStr  the reply, minus any terminating \n
@@ -190,7 +186,6 @@ class GalilDevice(TclActor.TCPDevice):
                 self.replyList = []
                 self.conn.writeLine(cmdMoveStr) 
                 return
-        self.actor.writeToUsers("i", "Execution Finished", cmd = self.currCmd)
         self.currCmd.setState("done")
             
     def newCmd(self, cmdStr, callFunc=None, userCmd=None):
@@ -202,17 +197,16 @@ class GalilDevice(TclActor.TCPDevice):
         cmd = self.cmdClass(cmdStr, userCmd=userCmd, callFunc=callFunc)
         self.currCmd = cmd
         self.status.currExecTime.startTimer()
-        self.status.currCmd = userCmd.cmdVerb # most recent command recieved by GalilDevice
+        self.status.currCmd = userCmd.cmdVerb # most recent command received by GalilDevice
         try:
             self.conn.writeLine(cmdStr)  #from fullCmdStr
         except Exception, e:
             cmd.setState("failed", textMsg=str(e))
             
     def moveTo(self, orient, userCmd):
-        """ Accepts an orientation then commands the move.
+        """Accepts an orientation then commands the move.
         
-        Subsequent moves are commanded until an acceptable orientation
-        is reached (within errors)
+        Subsequent moves are commanded until an acceptable orientation is reached (within errors)
         """
         # if Galil is busy, abort the command
         if self.currCmd:
@@ -227,24 +221,20 @@ class GalilDevice(TclActor.TCPDevice):
         self.status.desOrient = numpy.asarray(adjOrient, dtype=float) # initial guess for fitter
         self.status.cmdActPos = numpy.asarray(mount, dtype=float) # this will change upon iteration.
         self.status.cmdOrient = orient
-       # form Galil command
+        # format Galil command
         cmdMoveStr = self._galCmdFromMount(mount)
         self.newCmd(cmdMoveStr, userCmd=userCmd, callFunc=self._cmdCleanUp)
     
     def stop(self):
-        """ Sends an 'ST' to the Galial, causing it to stop whatever it is doing. """
-        if not self.currCmd:
-            # there is no process to stop
-            self.actor.writeToUsers("i", "Stop Ignored, no processes are running", cmd = self.currCmd)
-            return
+        """Sends an 'ST' to the Galil, causing it to stop whatever it is doing.
+        """
         self.conn.writeLine('ST;')
-        #self.actor.writeToUsers("d", "Galil Exection Stopped", cmd = self.currCmd)
-        # clear current command
-        #self._cmdCleanUp()
+        if self.currCmd:
+            self.actor.writeToUsers("f", "aborted", cmd = self.currCmd)
         
     def getStatus(self, userCmd):
-        """ Return the Galil status to the user."""
-        
+        """Return the Galil status to the user.
+        """
         if not self.currCmd:
             # query the Galil and update/send status
             self.newCmd("XQ #STATUS;", userCmd=userCmd, callFunc = self._statusFromGalTxt)
@@ -255,94 +245,115 @@ class GalilDevice(TclActor.TCPDevice):
         self.status._printToUsers()
         
     def showParams(self, userCmd):
-        """ Return the Galil status to the user."""
+        """Show Galil parameters
+        """
         if self.currCmd:
             self.actor.writeToUsers("f", "Galil is busy", cmd = self.currCmd)
             return
             
         self.newCmd("XQ #SHOWPAR;", userCmd=userCmd, callFunc = self._paramsFromGalTxt)
-
         
-    def home(self, axes, userCmd):
-        """ Homes the actuators defined in the axes array"""
+    def home(self, axisList, userCmd):
+        """Home the specified actuators
+        
+        Inputs:
+        - axisList: a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
+        """
         if self.currCmd:
             self.actor.writeToUsers("f", "Galil is busy", cmd = self.currCmd)
             return
 
-        # form Galil command
-        cmdMoveStr = self._galCmdForHome(axes)
+        # format Galil command
+        axisList, cmdMoveStr = self._galCmdForHome(axisList)
+
+        self.actor.writeToUsers("d", "Homing actuators: %s" % (axisList,))
+
         self.newCmd(cmdMoveStr, userCmd=userCmd, callFunc=self._cmdCleanUp)
         # send homing axes to status.
         homeStatus = numpy.zeros(self.nAct)
-        allAxes = ['A', 'B', 'C', 'D', 'E', 'F']
-        for axis in axes:
-            ind = allAxes.index(axis) # which one is homing?
+        for axis in axisList:
+            ind = self.validAxisList.index(axis) # which one is homing?
             homeStatus[ind] = 1  # set it to 1
         self.status.homing = homeStatus
         # when move is done, check orientation from encoders
     
-    def _galCmdFromMount(self, mount):
-        """ Converts mount information into a string command for a Galil
+    def _galCmdFromMount(self, mountList):
+        """Converts mount information into a string command for a Galil
         
         notes: 
         The actuator mechanical/positional data needs to be defined in the
         correct order for each mirror...no way to check if that was done once
-        we're here."""
+        we're here.
+        """
+        if len(mountList) > self.nAct:
+            raise RuntimeError("Too many mount values")
+        argList = []
+        for ind, mount in enumerate(mountList):
+            # axes to move
+            argList.append("%s=%.0f;" % (self.validAxisList[ind], mount))
+        for ind in range(len(mountList), self.nAct):
+            # axes to leave alone (paranoia)
+            argList.append("%s=MAXINT;" % (self.validAxisList[ind],))
+        return " ".join(argList) + 'XQ #MOVE'
         
-        axes = ['A', 'B', 'C', 'D', 'E', 'F']
-        cmdStr = ''
-        # first set relevant axes
-        # XQ#STATUS will clear all, should we do that first?
-        for ind, mnt in enumerate(mount):
-            # fortran code uses ';', do we want character return?
-            cmdStr += axes[ind] + '=' + '%.0f'%(mnt) + ';' # + '\n' 
-        # then command move
-        cmdStr += 'XQ #MOVE;' # documentation says <CR> works, code examples seem to use ;       
-        return cmdStr
-        
-    def _galCmdForHome(self, axes):
-        """ Converts mount information into a string command for a Galil
+    def _galCmdForHome(self, axisList):
+        """Format Galil home command from a list of axes
         
         Input:
-        -axes: a list of upper case letters.  like: axes = ['A', 'B', 'C', 'D', 'E', 'F']
-        notes: 
-        The actuator mechanical/positional data needs to be defined in the
-        correct order for each mirror...no way to check if that was done once
-        we're here."""
+        - axisList: a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
         
-        cmdStr = ''
-        # first set relevant axes
-        # XQ#STATUS will clear all, should we do that first?
-        # set each axis to 1, can be any number except MAXINT, as defined by Galil documentation.
-        for axis in axes:
-            cmdStr += axis + '=' + '1' + ';' # + '\n' 
-        # then command home
-        cmdStr += 'XQ #HOME;' # documentation says <CR> works, code examples seem to use ;       
-        return cmdStr
+        Return:
+        - final axis list (full set if [] supplied; forced to uppercase)
+        - command string
+        
+        Raise TclActor.Command.CommandError if invalid axes are specified
+        """
+        if not axisList:
+            axisList = self.validAxisList
+        else:
+            axisList = [axis.upper() for axis in axisList]
+
+        axisSet = set()
+        validAxisSet = set(self.validAxisList)
+        
+        invalidAxisSet = axisSet - validAxisSet
+        if invalidAxisSet:
+            invalidAxisList = sorted(list(invalidAxisSet))
+            raise TclActor.Command.CommandError(
+                "Invalid axes %s; must be in: %s" % (invalidAxisList, self.validAxisList))
+
+        argList = []
+        for axis in self.validAxisList:
+            if axis in axisSet:
+                argList.append("%s=1" % (axis,))
+            else:
+                argList.append("%s=MAXINT" % (axis,))
+        return axisList, " ".join(argList) + 'XQ #HOME'
 
     def _paramsFromGalTxt(self, cmd):
-        """ Parse and print the parameters returned from the XQ# SHOWPAR query to the Galil
+        """Parse and print the parameters returned from the XQ# SHOWPAR query to the Galil
         
         cmd must be passed to this method for callback-ability
-        """  
-        
+        """
         for line in self.replyList[0:-2]: # don't include 'OK'
             self.actor.writeToUsers("i", "%s" % (line.lstrip()), cmd = None)
         self._cmdCleanUp()       
 
-    def _statusFromGalTxt(self, cmd):
-        """ Parses reply from Galil after a status query.
+    def _statusFromGalTxt(self, cmd=None):
+        """Parse a reply from Galil after a status query.
         
-        cmd must be passed to this method for callback-ability
+        Inputs:
+        - none (the cmd argument is ignored; it is only present to allow use as a callback function).
         
-        note: different mirrors may have different returns for status! This is coded
+        Note: different mirrors may have different returns for status! This is coded
         so that the correct lines are always grabbed by checking Galil line descriptors,
-        called galKeywords below."""        
+        called galKeywords below.
+        """      
         # sample line (before parse):' -001497400, -000767250, -001199000 commanded position'
         # 2D array of values. Keywords will be smashed together with numumber at
         # in last list entry of each line...
         statList = [line.replace(' ', '').split(',') for line in self.replyList]
-        del statList[-1] # this should be the 'OK' line recieved from Galil (nothing useful).
+        del statList[-1] # this should be the 'OK' line received from Galil (nothing useful).
         galKeywords = []
         for line in statList:
             # regExes compiled up top
@@ -383,9 +394,8 @@ class GalilDevice(TclActor.TCPDevice):
         self._cmdCleanUp()
 
     def _parseStatusWord(self, statusWordList):
-        """ parse a list of status words (one for each axis), and update Galil Status
-        accordingly"""
-        
+        """Parse a list of status words (one for each axis), and update Galil Status accordingly
+        """
         self.status.motorsOn = []
         self.status.onFullStep = []
         self.status.forwardLimitSwitchEngaged = []
@@ -404,11 +414,10 @@ class GalilDevice(TclActor.TCPDevice):
             self.status.reverseLimitSwitchEngaged.append(int(inBin[-11]))
                   
     def _mountFromGalTxt(self):
-        """ Parses text returned from Galil into a mount. 
+        """Parse text returned from Galil into a mount
         
-        Assumes self.replyList has successfully put each Galil reply 
-        as seperate list item"""
-        
+        Assumes self.replyList has successfully put each Galil reply  as seperate list item
+        """
         # only use final position output (3rd) line
         mntList = self.replyList[2].split(',')
         if 'final position' not in mntList[-1]:
@@ -420,9 +429,11 @@ class GalilDevice(TclActor.TCPDevice):
         return mount  
                      
     def _cmdCleanUp(self, cmd=None):
-        """ Clean up when a command finishes
-        
-        cmd must be passed to this method for callback-ability"""
+        """Clean up when a command finishes
+
+        Inputs:
+        - none (the cmd argument is ignored; it is only present to allow use as a callback function).
+        """
         self.replyList = []
         self.status.iterNum = None
         self.status.iterMax = None
