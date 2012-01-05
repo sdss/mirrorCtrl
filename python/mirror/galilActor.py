@@ -34,6 +34,17 @@ class GalilActor(TclActor.Actor):
             devs = [self.galilDev],
             maxUsers = 5
         )
+        
+    def initialCon(self):
+        """Perform initial connections.  Same as Actor Base Class method, but with the
+        addition of commanding 'stop' to put the Galil in a known state upon connection.
+        """
+        TclActor.Actor.initialConn()
+        # do we need a pause?
+        # get device state
+        self.cmd_stop(cmd=None)
+        # or?
+        # self.galilDev.stop()
 
     def cmd_move(self, cmd):
         """Move mirror to a commanded orientation, if device isn't busy. 

@@ -47,12 +47,6 @@ MatchNumBeg = re.compile('^.[0-9]*') # dot to allow negative sign
 MatchNameEnd = re.compile('[a-z]*$')
 MatchQMBeg = re.compile('^\?')
 
-# all the Status keyword/value pairs we care about 
-StatusKeys = ("currCmd", "currExecTime", "lastActPos",
-            "desActPos", "cmdActPos",  "iterNum", "currOrient",
-            "desOrient", "motorsOn", "stopCode", "axesHomed", "homing", "cmdFailed",
-           "onFullStep", "forwardLimitSwitchEngaged", "reverseLimitSwitchEngaged")
-
 MaxIter = 2 # for repeated movments 
 MaxMountErr = 1 # don't repeat move if mount difference is less (same for each axes, could use array)
 
@@ -83,7 +77,25 @@ class GalilStatus(object):
     def __init__(self, actor):
         """Initialize all keywords in StatusKeys as attributes = None, except for the timer """
         self.actor = actor
-        for keyword in StatusKeys:
+        self.mirror = actor.mirror
+        self.nAct = len(self.mirror.actuatorList)
+        # all the Status keyword/value pairs we care about, and their initial values 
+        self.statusKeys = (
+            ("currCmd", "?"), 
+            ("currExecTime", GalilTimer()), 
+            ("lastActPos", ["NaN" for x in self.nAct]),
+            ("desActPos", ["NaN" for x in self.nAct]), 
+            ("cmdActPos", ["NaN" for x in self.nAct]),  
+            ("iterNum", "NaN"), 
+            ("currOrient", ["NaN" for x in range(6)]]),
+            ("desOrient", ["NaN" for x in range(6)]]), 
+            ("statusWord", "NaN"), 
+            ("motorsOn", ["?" for x in self.nAct]), 
+            ("axesHomed", ["?" for x in self.nAct]), 
+            ("homing", ["?" for x in self.nAct]), 
+            ("cmdFailed", "?")
+            )
+        for keyword, init in StatusKeys:
             if keyword == 'currExecTime':
                 setattr(self, keyword, GalilTimer())
             else:
@@ -195,6 +207,7 @@ class GalilDevice(TclActor.TCPDevice):
         """
         # cmdStr is pre-formatted for Galil, might be the wrong way to use cmdClass... 
         cmd = self.cmdClass(cmdStr, userCmd=userCmd, callFunc=callFunc)
+        cmd.setState("running", textMsg="")
         self.currCmd = cmd
         self.status.currExecTime.startTimer()
         self.status.currCmd = userCmd.cmdVerb # most recent command received by GalilDevice
@@ -230,8 +243,13 @@ class GalilDevice(TclActor.TCPDevice):
         """
         self.conn.writeLine('ST;')
         if self.currCmd:
-            self.actor.writeToUsers("f", "aborted", cmd = self.currCmd)
-        
+            self.actor.writeToUsers("f", "current command aborted", cmd = self.currCmd)
+            self._cmdCleanUp()
+        # wait a sec for the motors to stop
+        time.sleep(1)
+        # get the status
+        self.getStatus(userCmd=None)
+                
     def getStatus(self, userCmd):
         """Return the Galil status to the user.
         """
@@ -388,30 +406,12 @@ class GalilDevice(TclActor.TCPDevice):
         
         # status word
         ind = galKeywords.index('statusword')
-        self._parseStatusWord(statList[ind])        
+        # zeropad status word to 32 bits
+        self.status.statusWord = [int(stat) for stat in statList[ind]]        
         
         self.status._printToUsers()
         self._cmdCleanUp()
 
-    def _parseStatusWord(self, statusWordList):
-        """Parse a list of status words (one for each axis), and update Galil Status accordingly
-        """
-        self.status.motorsOn = []
-        self.status.onFullStep = []
-        self.status.forwardLimitSwitchEngaged = []
-        self.status.reverseLimitSwitchEngaged = []
-        self.status.stopCode = []
-        for ind, word in enumerate(statusWordList):
-            # just keep numeric part, get rid of the leading '0b'
-            inBin = bin(int(word))[2:]
-            # zero pad to 32 bits, although most are unused.
-            inBin = inBin.zfill(32  - len(inBin))
-            # stop code, bits 1-8
-            self.status.stopCode.append(int(inBin[-8:], 2))
-            self.status.motorsOn.append(int(inBin[-14]))
-            self.status.onFullStep.append(int(inBin[-17]))
-            self.status.forwardLimitSwitchEngaged.append(int(inBin[-12]))
-            self.status.reverseLimitSwitchEngaged.append(int(inBin[-11]))
                   
     def _mountFromGalTxt(self):
         """Parse text returned from Galil into a mount
