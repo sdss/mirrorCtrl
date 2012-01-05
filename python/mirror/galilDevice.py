@@ -95,7 +95,7 @@ class GalilStatus(object):
             ("homing", ["?" for x in self.nAct]), 
             ("cmdFailed", "?")
             )
-        for keyword, init in StatusKeys:
+        for keyword, init in self.statusKeys:
             if keyword == 'currExecTime':
                 setattr(self, keyword, GalilTimer())
             else:
