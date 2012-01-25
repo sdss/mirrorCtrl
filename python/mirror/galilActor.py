@@ -72,7 +72,7 @@ class GalilActor(TclActor.Actor):
             cmdOrient = cmdArgList
         # write info back
         orients = ['Piston (um) =', 'Tip X (") =', 'Tip Y (") =', 'Trans X (um) =', 'Trans Y (um) =' ]
-        self.writeToUsers("i", "Commanding Move ...", cmd = cmd)
+        self.writeToUsers("i", "Move Command ...", cmd = cmd)
         for txt, cmdArg in itertools.izip(orients, cmdOrient):
            self.writeToUsers("i", "%s %.2f" % (txt, cmdArg), cmd = cmd)
         try:
@@ -113,7 +113,7 @@ class GalilActor(TclActor.Actor):
     def cmd_stop(self, cmd):
         """Abort any executing Galil command
         """
-        self.galilDev.stop()
+        self.galilDev.stop(cmd)
         return True
         
 def runGalil(mir, userPort):
