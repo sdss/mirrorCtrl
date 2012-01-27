@@ -7,7 +7,7 @@ Port = 8000 # must match device port in Galil Actor.
 # Copyright (c) Twisted Matrix Laboratories.
 # See LICENSE for details.
 
-from twisted.internet import reactor, protocol
+from twisted.internet import reactor, protocol, defer
 from twisted.protocols.basic import LineReceiver
 import time
 import collections
@@ -66,7 +66,8 @@ def genStrFromShowpar():
 def genStrFromSt():
     """ Not actual output"""
 
-    str = '? Stop Error!'
+    #str = '? Stop Error!'
+    str = ''
     return str
 
 CmdsTup = collections.namedtuple("CmdList", ["move", "home", "status", "showpar", "st"])    
@@ -75,26 +76,39 @@ validCmds = CmdsTup(*cmdRplList) # for matching replies to commands
 
 class SpitBack(LineReceiver):
     """Lines..."""
-    
+
     def lineReceived(self, line):
         """As soon as any data is received, look at it and write something back."""
+        print 'Got a line!'
+        self.replylist = None
+        
         splitLine = line.lower().split("xq #")
         cmdRec = splitLine[-1].strip("; ") # just get the cmd without any ';' or ' '.
         try:
             reply = getattr(validCmds, cmdRec)
         except:
             raise RuntimeError('Command not recognized: %s' % (cmdRec))
-        replyList = reply.split('\r\n') # split reply into seperate lines
-        for line in replyList:
-            self.sendLine(line) # send one line at a time
-            time.sleep(1) # pause inbetween lines sent, for the hell of it.
-
+        self.replyList = reply.split('\r\n') # split reply into seperate lines
+        self.ind = 0
+        reactor.callLater(2, self.writeBack)
+        
+    def writeBack(self):
+        print 'Sending Line:', self.replyList[self.ind]
+        self.sendLine(self.replyList[self.ind]) # send one line at a time
+        time.sleep(2) # pause inbetween lines sent, for the hell of it.
+        self.ind += 1
+        if self.ind <= len(self.replyList):
+            # do another iter
+            reactor.callLater(2, self.writeBack)
+        else:
+            return
 
 def main():
     """This runs the protocol on specified port"""
     factory = protocol.ServerFactory()
     factory.protocol = SpitBack
     reactor.listenTCP(Port,factory) # Port defined up top
+    #reactor.connectTCP('localhost', Port, factory, timeout=1)
     reactor.run()
 
 
