@@ -80,7 +80,6 @@ class SpitBack(LineReceiver):
     def lineReceived(self, line):
         """As soon as any data is received, look at it and write something back."""
         print 'Got a line!'
-        self.replylist = None
         
         splitLine = line.lower().split("xq #")
         cmdRec = splitLine[-1].strip("; ") # just get the cmd without any ';' or ' '.
@@ -88,20 +87,25 @@ class SpitBack(LineReceiver):
             reply = getattr(validCmds, cmdRec)
         except:
             raise RuntimeError('Command not recognized: %s' % (cmdRec))
+        if cmdRec == "st":
+            #interrupt everything
+            self.replyList = None
+            self.ind = None
         self.replyList = reply.split('\r\n') # split reply into seperate lines
         self.ind = 0
-        reactor.callLater(2, self.writeBack)
+        reactor.callLater(1, self.writeBack)
         
     def writeBack(self):
         print 'Sending Line:', self.replyList[self.ind]
-        self.sendLine(self.replyList[self.ind]) # send one line at a time
-        time.sleep(2) # pause inbetween lines sent, for the hell of it.
-        self.ind += 1
-        if self.ind <= len(self.replyList):
-            # do another iter
-            reactor.callLater(2, self.writeBack)
-        else:
-            return
+        if self.replyList != None: # to allow interrupt
+            self.sendLine(self.replyList[self.ind]) # send one line at a time
+            time.sleep(2) # pause inbetween lines sent, for the hell of it.
+            self.ind += 1
+            if self.ind <= len(self.replyList):
+                # do another iter
+                reactor.callLater(1, self.writeBack)
+            else:
+                return
 
 def main():
     """This runs the protocol on specified port"""
