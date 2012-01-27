@@ -43,8 +43,6 @@ class GalilActor(TclActor.Actor):
         # do we need a pause?
         # get device state
         self.cmd_stop(cmd=None)
-        # or?
-        # self.galilDev.stop()
 
     def cmd_move(self, cmd):
         """Move mirror to a commanded orientation, if device isn't busy. 
@@ -70,15 +68,10 @@ class GalilActor(TclActor.Actor):
             cmdOrient = numpy.hstack((cmdArgList, pad))
         else:
             cmdOrient = cmdArgList
-        # write info back
-        orients = ['Piston (um) =', 'Tip X (") =', 'Tip Y (") =', 'Trans X (um) =', 'Trans Y (um) =' ]
-        self.writeToUsers("i", "Move Command ...", cmd = cmd)
-        for txt, cmdArg in itertools.izip(orients, cmdOrient):
-           self.writeToUsers("i", "%s %.2f" % (txt, cmdArg), cmd = cmd)
         try:
             # convert to natural units, mm and radians
             cmdOrient = cmdOrient * ConvertOrient
-            self.galilDev.moveTo(cmdOrient, userCmd=cmd)
+            self.galilDev.cmdMove(cmdOrient, userCmd=cmd)
         except Exception, e:
             raise TclActor.Command.CommandError(str(e))
         return True
@@ -93,7 +86,7 @@ class GalilActor(TclActor.Actor):
                 raise TclActor.Command.CommandError(
                     "Could not parse %s as a comma-separated list of letters" % (cmd.cmdArgs,))
         try:
-            self.galilDev.home(axisList, userCmd=cmd)
+            self.galilDev.cmdHome(axisList, userCmd=cmd)
         except Exception, e:
             raise TclActor.Command.CommandError(str(e))
         return True
@@ -101,19 +94,19 @@ class GalilActor(TclActor.Actor):
     def cmd_status(self, cmd):
         """Show status of Galil mirror controller
         """
-        self.galilDev.getStatus(cmd)
+        self.galilDev.cmdStatus(cmd)
         return True
         
     def cmd_showparams(self, cmd):
         """Show parameters of Galil mirror controller
         """
-        self.galilDev.showParams(cmd)
+        self.galilDev.cmdParams(cmd)
         return True
         
     def cmd_stop(self, cmd):
         """Abort any executing Galil command
         """
-        self.galilDev.stop(cmd)
+        self.galilDev.cmdStop(cmd)
         return True
         
 def runGalil(mir, userPort):

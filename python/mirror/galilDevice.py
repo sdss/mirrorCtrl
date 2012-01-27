@@ -4,7 +4,7 @@ This talks to a Galil motor controller, which commands actuators to move the mir
 reads from encoders to determine mirror position.
 
 remember:
-self.currCmd.cmdVerb.lower()
+self.currDevCmd.cmdVerb.lower()
 
 
     The auxiliary port process will halt (in mid-output) if an ST or RS
@@ -52,11 +52,10 @@ MatchNameEnd = re.compile('[a-z]*$')
 MatchQMBeg = re.compile('^\?')
 
 MaxMountErr = 1 # don't repeat move if mount difference is less (same for each axes, could use array)
+MaxMoveIter = 2
 
 class GalilTimer(object):
-    """Keep track of execution times
-    
-    note: add time remaining functionality
+    """Keep track of execution time
     """
     def __init__(self):
         self.reset()
@@ -69,13 +68,12 @@ class GalilTimer(object):
         self.initTime = time.time()
         
     def getTime(self):
-        """return time spent executing, so far"""
+        """return time spent executing, so far
+        """
         if not self.initTime:
-            # this may never happen since status is queried before being reset...nevertheless
-            return 'Execution Finished'
+            raise RuntimeError("No initial time present")
         else:
             return time.time() - self.initTime
-
 
 class GalilStatus(object):
     """A container for holding the status of the Galil """
@@ -84,41 +82,63 @@ class GalilStatus(object):
         self.actor = actor
         self.mirror = actor.mirror
         self.nAct = len(self.mirror.actuatorList)
-        # all the Status keyword/value pairs we care about, and their initial values 
+        # all the Status keyword/value pairs we care about, and their initial values
+        # perhapps this shouldn't be an attribute...I'll leave it for now
         self.statusKeys = (
-            ("lastCmd", "?"), 
+            ("userCmd", "?"),
+            ("totalTime", numpy.nan),
             ("currExecTime", GalilTimer()), 
-            ("lastActPos", [numpy.nan for x in range(self.nAct)]),
-            ("desActPos", [numpy.nan for x in range(self.nAct)]), 
-            ("cmdActPos", [numpy.nan for x in range(self.nAct)]),  
-            ("iterNum", numpy.nan), 
-            ("maxIter", 2), # adjusted below for non-encoder mirrors
+            ("remainExecTime", GalilTimer()),
+            ("currActPos", [numpy.nan for x in range(self.nAct)]),
+            ("desActPos", [numpy.nan for x in range(self.nAct)]), # updated upon iteration 
             ("currOrient", [numpy.nan for x in range(6)]),
             ("desOrient", [numpy.nan for x in range(6)]), 
-            ("statusWord", numpy.nan), 
-            ("motorsOn", ["?" for x in range(self.nAct)]), 
+            ("moveIter", numpy.nan), 
+            ("maxMoveIter", MaxMoveIter), # adjusted below for non-encoder mirrors
+            ("homing", ["?" for x in range(self.nAct)]),            
             ("axesHomed", ["?" for x in range(self.nAct)]), 
-            ("homing", ["?" for x in range(self.nAct)])
+            ("statusWord", numpy.nan), 
             )
         # set each statusKey as a slot and initialize it.
         for keyword, init in self.statusKeys:
-                if (not self.mirror.hasEncoders) and keyword=="maxIter":
+                if (not self.mirror.hasEncoders) and keyword=="maxMoveIter":
                     # mirrors without encoders shouldn't iterate on moves
-                    setattr(self, keyword, 0)
+                    setattr(self, keyword, 1)
                 else:
                     setattr(self, keyword, init)    
 
-    def _getKeyValStr(self):
+    def _getKeyValStr(self, subset=None):
         """Package and return current keyword value info
+        
+        input:
+        - subset: a list of keywords for which you wish to return a formatted string.
+                    If unspecified (default) all keywords are returned.
         
         output:
         - statusStr: string in the correct keword value format to be sent to users
         """
-        statusStr = ''
-        for keyword, val in self.statusKeys:
+        keywords = [key for key, initVal in self.statusKeys]
+        if subset and (type(subset) ==  list):
+            #find the indices of specific keywords in subset
+            indices = [keywords.index(key) for key in subset]
+            keywords = keywords[indices]
+        if subset and (type(subset) == str):
+            # find the index of specific keyword specifiec by subset
+            index = keywords.index(subset)
+            keywords = [keywords[index]] # outer brackets for an iterable object
+         
+        statusStr = '' 
+        for keyword in keywords:
+            val = getattr(self, keyword)
+            if keyword == 'userCmd':
+                # get the verb
+                val = val.cmdVerb.lower()
             if keyword == 'currExecTime':
                 # get current execution time
                 val = val.getTime()
+            if keyword == 'remainExecTime':
+                # get current execution time
+                    val = self.totalTime - self.currExecTime.getTime()
             if ('Orient' in keyword):
                 # convert to user-friendly units
                 val = numpy.divide(val, ConvertOrient)
@@ -147,8 +167,8 @@ class GalilDevice(TclActor.TCPDevice):
             cmdInfo = (),  # like agile FW device?
         )
         self.mirror = actor.mirror
-        self.currCmd = None # only 1 command can execute at a time
-        self.replyList = []
+        self.currDevCmd = None # only 1 command can execute at a time
+        self.replyList = None
         self.nAct = len(self.mirror.actuatorList)
         self.validAxisList =  ('A', 'B', 'C', 'D', 'E', 'F')[0:self.nAct]
         self.status = GalilStatus(actor)
@@ -166,151 +186,155 @@ class GalilDevice(TclActor.TCPDevice):
         - Parse status to update the model parameters
         - If a command has finished, call the appropriate command callback
         """
-        print 'CurrCmd in reply: ', self.currCmd
-        print 'CurrCmd == "move"', self.currCmd == "move"
-        if not self.currCmd:
+        print 'REPLY'
+        if not self.currDevCmd:
             # ignore unsolicited input
+            print 'Unsolicited!'
             return
         replyStr = replyStr.encode("ASCII", "ignore").strip(':\r\n')
         if not replyStr:
             # ignore blank replies
             return
-        print 'Galil Reply: ', replyStr
+        print 'Galil reply: ', replyStr
         self.replyList.append(replyStr)
         if MatchQMBeg.match(replyStr.lstrip()): # if line begins with '?'
-            # there was an error. 
-            self.actor.writeToUsers("f", "cmdFailed; reply=%s" % (replyStr,), cmd = self.currCmd)
-            self.currCmd.setState("failed", textMsg=replyStr)
-            # end current process
-            self._cmdCleanUp() # put this as a callback?
+            # there was an error. End current process
+            self.actor.writeToUsers("f", "cmdFailed; reply=%s" % (replyStr,), cmd = self.currDevCmd)
+            self.currDevCmd.setState("failed", textMsg=replyStr)
+            self.status.userCmd.setState("failed", textMsg=replyStr)
+            self._clrDevCmd()        
             return
-        if (self.status.currCmd == 'move') and (len(self.replyList) == 1):
+        if (self.status.userCmd.cmdVerb == 'move') and (len(self.replyList) == 1):
             #print estimated time for move, the first Galil reply from an XQ#MOVE cmd...
-            self.actor.writeToUsers("i", "reply=Move time estimates from Galil: %s" % (replyStr,), cmd = self.currCmd)
+            self.actor.writeToUsers("i", "reply=Move time estimates from Galil: %s" % (replyStr,), cmd = self.currDevCmd)
             # add a time parser that updates status
         if not replyStr.lower().endswith("ok"):
             # command not finished
             return
-        if (self.status.currCmd == 'move'): 
-            self.actor.writeToUsers("i", "reply=Move Iteration %i Finished" % (self.status.iterNum), cmd = self.currCmd)
-            self.status.iterNum += 1
-            if (self.status.iterNum < self.status.maxIter):
-                # do another move before terminating current command
-                encMount = self._mountFromGalTxt()
-                orient = self.mirror.orientFromEncoderMount(encMount, self.status.desOrient)
-                actMount = self.mirror.actuatorMountFromOrient(orient)
-                actMount = numpy.asarray(actMount, dtype=float)
-                # add these new values to status
-                self.status.currOrient = numpy.asarray(orient[:])
-                self.status.lastActPos = actMount
-                actErr = self.status.desActPos - actMount
-                if True in (numpy.abs(actErr) > MaxMountErr):
-                    # not within acceptable error range
-                    # do another move
-                    # add offset to previous command
-                    self.status.cmdActPos += actErr 
-                    cmdMoveStr = self._galCmdFromMount(self.status.cmdActPos)
-                    # send a new command and clear the reply list and start over
-                    # note: self.currCmd is unchanged
-                    self.replyList = []
-                    self.conn.writeLine(cmdMoveStr) 
-                    return
-        self.currCmd.setState("done")
+        try:
+            self.currDevCmd.setState("done")
+        except RuntimeError:
+            print 'what cmd is done? (dev cmd id):', self.currDevCmd.cmdID
             
     def newCmd(self, cmdStr, callFunc=None, userCmd=None):
-        """Start a new command.
+        """Start a new device command.
         
         Slightly changed from base class definition.
         """
         # cmdStr is pre-formatted for Galil, might be the wrong way to use cmdClass... 
         cmd = self.cmdClass(cmdStr, userCmd=userCmd, callFunc=callFunc)
-        userCmd.setState("running", textMsg="")    
-        self.currCmd = cmd
+        if self.currDevCmd != None:
+            raise RuntimeError("Cannot start new command, cmd slot not empty!")
+        self.replyList = []
+        self.currDevCmd = cmd
         self.status.currExecTime.startTimer()
-        self.status.currCmd = userCmd.cmdVerb # most recent command received by GalilDevice
         try:
             self.conn.writeLine(cmdStr)  #from fullCmdStr
         except Exception, e:
             cmd.setState("failed", textMsg=str(e))
+            self._clrDevCmd()
             
-    def moveTo(self, orient, userCmd):
+    def cmdMove(self, orient, userCmd):
         """Accepts an orientation then commands the move.
         
-        Subsequent moves are commanded until an acceptable orientation is reached (within errors)
+        Subsequent moves are commanded until an acceptable orientation is reached (within errors).
+        userCmd not tied to state of devCmd, because of subsequent moves. 
         """
         # if Galil is busy, abort the command
-        if self.currCmd:
+        if self.currDevCmd:
             self.actor.writeToUsers("f", "cmdFailed; reply=Galil is busy", cmd = userCmd)
             userCmd.setState("cancelled", textMsg="Galil is busy")
             return
+        
+        userCmd.setState("running")
+        self.status.userCmd = userCmd
         # enable iteration for mirrors with encoders
         if self.mirror.hasEncoders:
-            self.status.iterNum = 0
+            self.status.moveIter = 1 #start counting from 1 or 0?
         # (user) commanded orient --> mount
         mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient=True)
         self.status.desActPos = numpy.asarray(mount, dtype=float) # the goal
         self.status.desOrient = numpy.asarray(adjOrient, dtype=float) # initial guess for fitter
         self.status.cmdActPos = numpy.asarray(mount, dtype=float) # this will change upon iteration.
-        self.status.cmdOrient = orient
         # format Galil command
         cmdMoveStr = self._galCmdFromMount(mount)
-        self.newCmd(cmdMoveStr, userCmd=userCmd, callFunc=self._cmdCleanUp)
+        updateStr = self.status._getKeyValStr("desOrient")
+        self.actor.writeToUsers(">", updateStr, cmd=userCmd)
+        self.newCmd(cmdMoveStr, userCmd=None, callFunc=self._moveCallback)
     
-    def stop(self, userCmd):
+    def cmdStop(self, userCmd):
         """Sends an 'ST' to the Galil, causing it to stop whatever it is doing,
         waits 1 sec for motors to decelerate, then queries for status.
         """
+        self._clrDevCmd() # stop listening for replies        
+        userCmd.setState("running")
+        #self.status.userCmd.setState("cancelled", textMsg="cmd stopped")
+        #self.actor.writeToUsers(">", "reply=Stop Sent", cmd=userCmd)
         self.conn.writeLine('ST;')
-        # wait a sec for the motors to stop
-        time.sleep(1)
-        if self.currCmd:
-            self.actor.writeToUsers("f", "reply=current command aborted", cmd = self.currCmd)
-            self.currCmd.setState("cancelled", textMsg="current command interrupted by stop") 
-            self._cmdCleanUp()
-        else:
-            self.actor.writeToUsers("w", "reply=stop signal recieved, but no processes are running", cmd = self.currCmd) 
+#         if self.currDevCmd:
+#             axeThisCmd = self.currDevCmd
+#             self._clrDevCmd()
+#             axeThisCmd.setState("cancelled", textMsg="current device command interrupted by stop")             
+#             if self.status.userCmd != "?":
+#                 # a stop is run upon startup, so userCmd may be empty
+#                 self.status.userCmd.setState("cancelled", textMsg="current device command interrupted by stop")            
+#         else:
+#             self.actor.writeToUsers("w", "reply=stop signal recieved, but no processes are running", cmd = self.currDevCmd) 
+            
+            
         # get the status
-        self.getStatus(userCmd)
-                
-    def getStatus(self, userCmd):
-        """Return the Galil status to the user.
-        """
-        if not self.currCmd:
-            # query the Galil and update/send status
-            self.newCmd("XQ #STATUS;", userCmd=userCmd, callFunc = self._statusFromGalTxt)
-            self.actor.writeToUsers("i", "reply=Checking Galil Status", cmd = self.currCmd)
-            return
-        else:
-            self.actor.writeToUsers("i", "reply=Galil is busy (cannot send new query), checking last known status", cmd = self.currCmd)            
-            statusStr = self.status._getKeyValStr()
-            self.actor.writeToUsers("i", statusStr, cmd = self.currCmd)
+        # wait a sec for the motors to stop
         
-    def showParams(self, userCmd):
+        #print '10 sec begin?'
+        #time.sleep(10)
+        #print '10 seconds is up'
+        self.cmdStatus(userCmd)
+                
+    def cmdStatus(self, userCmd):
+        """Return the Galil status to the user.
+        
+        Called directly from the user, or indirectly through a cmdStop. userCmd 
+        (cmd_stop or cmd_status) state tied to devCmd state.
+        """
+        if self.currDevCmd:
+            self.actor.writeToUsers(">", "reply=Galil is busy, current status is...", cmd = self.currDevCmd)            
+            statusStr = self.status._getKeyValStr()
+            userCmd.setState("done")
+            return
+        userCmd.setState("running")
+        self.status.userCmd = userCmd 
+        self.actor.writeToUsers(">", "reply=Signaling Galil for Status", cmd=userCmd)
+        self.newCmd("XQ #STATUS;", userCmd=None, callFunc = self._statusCallback)
+            
+            
+    def cmdParams(self, userCmd):
         """Show Galil parameters
         """
-        if self.currCmd:
+        if self.currDevCmd:
             self.actor.writeToUsers("f", "cmdFailed; reply=Galil is busy", cmd = userCmd)
             userCmd.setState("cancelled", textMsg="Galil is busy")
-            return            
-        self.newCmd("XQ #SHOWPAR;", userCmd=userCmd, callFunc = self._paramsFromGalTxt)
+            return    
+        userCmd.setState("running")
+        self.status.userCmd = userCmd  
+        self.actor.writeToUsers(">", "reply=Signaling Galil", cmd=userCmd)
+        self.newCmd("XQ #SHOWPAR;", userCmd=None, callFunc = self._paramsCallback)
         
-    def home(self, axisList, userCmd):
+    def cmdHome(self, axisList, userCmd):
         """Home the specified actuators
         
         Inputs:
         - axisList: a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
         """
-        if self.currCmd:
+        if self.currDevCmd:
             self.actor.writeToUsers("f", "cmdFailed; reply=Galil is busy", cmd = userCmd)
             userCmd.setState("cancelled", textMsg="Galil is busy")
             return
-
+        userCmd.setState("running")
+        self.status.userCmd = userCmd
+        self.actor.writeToUsers(">", "reply=Homing actuators: %s" % (axisList,), cmd = userCmd)
         # format Galil command
         axisList, cmdMoveStr = self._galCmdForHome(axisList)
-
-        self.actor.writeToUsers("i", "reply=Homing actuators: %s" % (axisList,))
-
-        self.newCmd(cmdMoveStr, userCmd=userCmd, callFunc=self._cmdCleanUp)
+        self.newCmd(cmdMoveStr, userCmd=None, callFunc=self._homeCallback)
         # send homing axes to status.
         homeStatus = numpy.zeros(self.nAct)
         for axis in axisList:
@@ -318,7 +342,156 @@ class GalilDevice(TclActor.TCPDevice):
             homeStatus[ind] = 1  # set it to 1
         self.status.homing = homeStatus
         # when move is done, check orientation from encoders
-    
+
+    def _moveCallback(self, cmd):
+        """This code is executed when a device move command changes state.  If the cmd is
+        done, then it parses the galil reply. Issues a subsequent move if necessary.
+        
+        Inputs: 
+        - cmd: passed automatically due to TclActor callback framework
+        """
+        
+        if not cmd.state == "done":
+            return
+        self.actor.writeToUsers("i", "reply=Move Iteration %i Finished" % \
+                                (self.status.moveIter), cmd = self.currDevCmd)
+        encMount = self._mountFromGalTxt()
+        orient = self.mirror.orientFromEncoderMount(encMount, self.status.desOrient)
+        actMount = self.mirror.actuatorMountFromOrient(orient)
+        actMount = numpy.asarray(actMount, dtype=float)
+        # add these new values to status
+        self.status.currOrient = numpy.asarray(orient[:])
+        self.status.currActPos = actMount
+        actErr = self.status.desActPos - actMount
+        # do another iteration?
+        if True in (numpy.abs(actErr) > MaxMountErr) and \
+                    (self.status.moveIter < self.status.maxMoveIter):
+                # not within acceptable error range and more iterations are available
+                # do another move
+                # add offset to previous command
+                self.status.desActPos += actErr
+                # clear or update the relevant slots before beginning a new device cmd
+                self.replyList = []
+                self.currDevCmd = None
+                self.status.moveIter += 1
+                self.status.currExecTime.reset() # new timer for new move
+                cmdMoveStr = self._galCmdFromMount(self.status.desActPos)
+                # note: self.currDevCmd will be overwritten in newCmd, but never set to None, so 
+                # shouldn't encounter race condition with other commands.
+                self.actor.writeToUsers("i", "moveIter=%s" % (self.status.moveIter), \
+                                         cmd = self.status.userCmd)
+                self.newCmd(cmdMoveStr, userCmd=None, callFunc=self._moveCallback)
+                # send a new command and clear the reply list and start over
+                # note: self.currDevCmd is unchanged
+                return
+        # no more iterations, free up the Galil...        
+        self._clrDevCmd()
+        self.status.userCmd.setState("done")
+       # self.actor.writeToUsers(":", "reply=Move Finished", cmd=self.status.userCmd)
+
+    def _statusCallback(self, cmd):
+        """Parse a reply from Galil after a status query.  
+        
+        This is a callback function for a status command.
+        
+        Inputs:
+        - cmd: passed automatically because this is a callback.
+        
+        Note: different mirrors may have different returns for status! This is coded
+        so that the correct lines are always grabbed by checking Galil line descriptors,
+        called galKeywords below.
+        """
+        # because this is a command callback
+        if not cmd.state == "done":
+            return
+        # sample line (before parse):' -001497400, -000767250, -001199000 commanded position'
+        # 2D array of values. Keywords will be smashed together with numumber at
+        # in last list entry of each line...
+        print 'ReplyList!: ', self.replyList
+        statList = [line.replace(' ', '').split(',') for line in self.replyList]
+        del statList[-1] # this should be the 'OK' line received from Galil (nothing useful).
+        galKeywords = []
+        for line in statList:
+            # regExes compiled up top
+            # search last entry of each line for a status txt
+            galKeywords.append(MatchNameEnd.search(line[-1]).group(0))
+            # keep only the number in the last entry
+            line[-1] = MatchNumBeg.search(line[-1]).group(0)
+        
+        # homed axes?
+        ind = galKeywords.index('axishomed')
+        self.status.axesHomed = [int(stat) for stat in statList[ind]]
+        
+        # commanded position
+        ind = galKeywords.index('commandedposition')
+        self.status.cmdActPos = [int(stat) for stat in statList[ind]]
+        
+        # measured position (adjusted)
+        # account for encoder --> actuator spatial difference
+        # this code below is also in handleReply(), could be broken out.
+        ind = galKeywords.index('actualposition')
+        encMount = numpy.asarray(statList[ind], dtype=float)
+        # start initial guess for fitter from zeros, to be safe
+        # because self.desOrient may not be defined
+        # initOrient = self.desOrient
+        initOrient = numpy.zeros(6)
+        orient = self.mirror.orientFromEncoderMount(encMount, initOrient)
+        actMount = self.mirror.actuatorMountFromOrient(orient)
+        actMount = numpy.asarray(actMount, dtype=float)
+        # add these new values to status
+        self.status.currOrient = numpy.asarray(orient[:]) 
+        self.status.currActPos = actMount    
+        
+        # status word
+        ind = galKeywords.index('statusword')
+        # zeropad status word to 32 bits
+        self.status.statusWord = [int(stat) for stat in statList[ind]]        
+        
+        statusStr = self.status._getKeyValStr()
+        self.actor.writeToUsers("i", statusStr, cmd = self.currDevCmd)
+        self._clrDevCmd()
+        self.status.userCmd.setState("done")
+        
+    def _paramsCallback(self, cmd):
+        """Parse and print the parameters returned from the XQ# SHOWPAR query to the Galil
+        
+        This is a callback function for a cmdParams command.
+        
+        Inputs:
+        - cmd: passed automatically because this is a callback.
+        """
+        # because this is a command callback
+        if not cmd.state == "done":
+            return
+        
+        for line in self.replyList[0:-2]: # don't include 'OK'
+            # could parse into individual keywords?
+            self.actor.writeToUsers("i", "reply=%s" % (line.lstrip()), cmd = None)
+        self._clrDevCmd()    
+        self.status.userCmd.setState("done")
+ 
+    def _homeCallback(self, cmd):
+        """This code is executed when a device cmdHome command changes state.  If the cmd is
+        done, then it parses the galil reply.
+        
+        Inputs: 
+        - cmd: passed automatically due to TclActor callback framework
+        """        
+        if not cmd.state == "done":
+            return           
+        # parse info needed
+        self._clrDevCmd() 
+        self.status.userCmd.setState("done")
+         
+    def _clrDevCmd(self):
+        """Clean up device command when finished.
+        """
+        self.replyList = None
+        self.status.moveIter = numpy.nan
+        self.currDevCmd = None
+        self.status.homing = [0 for x in range(self.nAct)]
+        self.status.currExecTime.reset()
+ 
     def _galCmdFromMount(self, mountList):
         """Converts mount information into a string command for a Galil
         
@@ -371,77 +544,6 @@ class GalilDevice(TclActor.TCPDevice):
             else:
                 argList.append("%s=MAXINT" % (axis,))
         return axisList, " ".join(argList) + 'XQ #HOME'
-
-    def _paramsFromGalTxt(self, cmd):
-        """Parse and print the parameters returned from the XQ# SHOWPAR query to the Galil
-        
-        cmd must be passed to this method for callback-ability
-        """
-        for line in self.replyList[0:-2]: # don't include 'OK'
-            self.actor.writeToUsers("i", "reply=%s" % (line.lstrip()), cmd = None)
-        self._cmdCleanUp()       
-
-    def _statusFromGalTxt(self, cmd):
-        """Parse a reply from Galil after a status query.  
-        
-        This is a callback function for a status command.
-        
-        Inputs:
-        - cmd: passed automatically because this is a callback.
-        
-        Note: different mirrors may have different returns for status! This is coded
-        so that the correct lines are always grabbed by checking Galil line descriptors,
-        called galKeywords below.
-        """
-        # because this is a command callback
-        if not cmd.isDone():
-            return
-        # sample line (before parse):' -001497400, -000767250, -001199000 commanded position'
-        # 2D array of values. Keywords will be smashed together with numumber at
-        # in last list entry of each line...
-        statList = [line.replace(' ', '').split(',') for line in self.replyList]
-        del statList[-1] # this should be the 'OK' line received from Galil (nothing useful).
-        galKeywords = []
-        for line in statList:
-            # regExes compiled up top
-            # search last entry of each line for a status txt
-            galKeywords.append(MatchNameEnd.search(line[-1]).group(0))
-            # keep only the number in the last entry
-            line[-1] = MatchNumBeg.search(line[-1]).group(0)
-        
-        # homed axes?
-        ind = galKeywords.index('axishomed')
-        self.status.axesHomed = [int(stat) for stat in statList[ind]]
-        
-        # commanded position
-        ind = galKeywords.index('commandedposition')
-        self.status.cmdActPos = [int(stat) for stat in statList[ind]]
-        
-        # measured position (adjusted)
-        # account for encoder --> actuator spatial difference
-        # this code below is also in handleReply(), could be broken out.
-        ind = galKeywords.index('actualposition')
-        encMount = numpy.asarray(statList[ind], dtype=float)
-        # start initial guess for fitter from zeros, to be safe
-        # because self.desOrient may not be defined
-        # initOrient = self.desOrient
-        initOrient = numpy.zeros(6)
-        orient = self.mirror.orientFromEncoderMount(encMount, initOrient)
-        actMount = self.mirror.actuatorMountFromOrient(orient)
-        actMount = numpy.asarray(actMount, dtype=float)
-        # add these new values to status
-        self.status.currOrient = numpy.asarray(orient[:]) 
-        self.status.lastActPos = actMount    
-        
-        # status word
-        ind = galKeywords.index('statusword')
-        # zeropad status word to 32 bits
-        self.status.statusWord = [int(stat) for stat in statList[ind]]        
-        
-        statusStr = self.status._getKeyValStr()
-        self.actor.writeToUsers("i", statusStr, cmd = self.currCmd)
-        self._cmdCleanUp()
-
                   
     def _mountFromGalTxt(self):
         """Parse text returned from Galil into a mount
@@ -451,25 +553,15 @@ class GalilDevice(TclActor.TCPDevice):
         # only use final position output (3rd) line
         mntList = self.replyList[2].split(',')
         if 'final position' not in mntList[-1]:
-            self.actor.writeToUsers("f", "Parsing Error", cmd = self.currCmd)
+            self.actor.writeToUsers("f", "reply=Parsing Error", cmd = self.currDevCmd)
         # print 'mntList: ', mntList
         mntList = [int(mnt.strip(' finalposition')) for mnt in mntList]
         mount = numpy.asarray(mntList, dtype=float)
         # print 'Recovered Mount!: ', mount
         return mount  
                      
-    def _cmdCleanUp(self, cmd=None):
-        """Clean up when a command finishes
 
-        Inputs:
-        - cmd: passed when specified as a callback. Defaults to None so it can be called
-               anytime (not just as a RO callback).
-        """
-        # because this is a command callback
-        if (cmd) and (not cmd.isDone()): # because this isn't always a callback
-            return
-        self.replyList = []
-        self.status.iterNum = numpy.nan
-        self.currCmd = None
-        self.status.homing = None
-        self.status.currExecTime.reset()
+        
+        
+        
+        
