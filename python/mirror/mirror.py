@@ -25,7 +25,7 @@ ZeroOrientation = Orientation(0, 0, 0, 0, 0, 0)
 #     return 
 
 class MirrorBase(object):
-    def __init__(self, actuatorList, fixedLinkList, encoderList):
+    def __init__(self, actuatorList, fixedLinkList, encoderList, id):
         """Construct a MirrorBase
 
         Inputs:
@@ -36,11 +36,19 @@ class MirrorBase(object):
                         actuator has no encoder.
         - fixAxes: List of orientation axes that are fixed. Integer values [0:5].
                         Must be specified if fixed length links are present.
+        - id: Mirror id.  Actor looks at this to determine Mirror specific
+                        behavior.  Must be one of the following:
+                        ['2.5m M1', '2.5m M2', '3.5m M2', '3.5m M3']
         
         Two configurations are supported:
         - control piston, tip and tilt only (no translation or z rotation)
         - control piston, tip, tilt and translation (no z rotation)
         """
+        if not (id in ['2.5m M1', '2.5m M2', '3.5m M2', '3.5m M3']):
+            raise RuntimeError("Please specify mirror id.  Choose from:\
+              ['2.5m M1', '2.5m M2', '3.5m M2', '3.5m M3'] instead of %s:" %(id))
+        self.id = id
+        self.id
         if len(actuatorList) + len(fixedLinkList) != 6:
             raise RuntimeError("Need exactly 6 actuators + fixed-length links; %s + %s supplied" % \
                  (len(actuatorList), len(fixedLinkList)))
