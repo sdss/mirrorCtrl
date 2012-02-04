@@ -3,6 +3,9 @@
 This talks to a Galil motor controller, which commands actuators to move the mirror and 
 reads from encoders to determine mirror position.
 
+There is lots of info at:
+http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html#InterfaceReplies
+
 remember:
 self.currDevCmd.cmdVerb.lower()
 
@@ -57,6 +60,8 @@ MatchQMBeg = re.compile('^\?')
 
 MaxMountErr = 1 # don't repeat move if mount difference is less (same for each axes, could use array)
 MaxMoveIter = 2
+
+
 
 class GalilTimer(object):
     """Keep track of execution time
@@ -171,12 +176,77 @@ class GalilDevice(TclActor.TCPDevice):
             cmdInfo = (),  # like agile FW device?
         )
         self.mirror = actor.mirror
-        self.currDevCmd = None # only 1 command can execute at a time
+        self.currDevCmd = self.cmdClass('null') # initialize empty command in cmd slot
+        self.currDevCmd.setState("done") # set it to a done state so subsequent cmds can execute
         self.replyList = None
         self.nAct = len(self.mirror.actuatorList)
         self.validAxisList =  ('A', 'B', 'C', 'D', 'E', 'F')[0:self.nAct]
         self.status = GalilStatus(actor)
+        # a list of all expected galil reply keywords for parsing purposes
+        # listed in order of expected reply
+        moveReplies = [
+            'max sec for move', 
+            'target position',
+            'final position',
+            ]
+        statusReplies = [
+            'axis homed',
+            'commanded position',
+            'actual position', 
+            'status word',
+            ]            
+        homeReplies = []        
+        paramReplies = [
+            'software version',
+            'NAXES number of axes',
+            'DOAUX aux status?',
+            'MOFF motors off when idle?',
+            'NCORR # corrections',
+            'WTIME',
+            'ENCTIME',
+            'LSTIME',
+            '-RNGx/2 reverse limits',
+            'RNGx/2 forward limits',
+            'SPDx speed',
+            'HMSPDx homing speed',
+            'ACCx acceleration',
+            'MINCORRx min correction',
+            'MAXCORRx max correction',
+            'ST_FSx microsteps/full step',
+            'MARGx dist betwe hard & soft rev lim',
+            'INDSEP index encoder pulse separation',
+            'ENCRESx encoder resolution (microsteps/tick)',
+            ]
+        # update for device specific replies
+        # insert additional keywords before the 'ok'
+        if self.mirror.id == '2.5m M1':
+            #need example txt!
         
+        if self.mirror.id == '2.5m M2':
+            # XQ#LMOVE needs to be supported
+            extraMove = ['piezo status word', 'piezo corrections (microsteps)']
+            moveReplies.extend(extraMove)
+            
+            extraParams = [
+            'version of M2-specific additions',
+            'min, max piezo position (microsteps)',
+            'number of steps of piezo position',
+            'resolution (microsteps/piezo ctrl bit)'
+            ]
+            paramReplies.extend(extraParams)
+            
+            extraStatus = ['piezo status word', 'piezo corrections (microsteps)']
+            statusReplies.extend(extraStatus)
+            
+        # create a dictionary matching user cmd verbs to expected Galil responses
+        self.galilResponse = dict(
+            move = moveReplies,
+            status = statusReplies,
+            home = homeReplies,
+            showparams = paramReplies,
+            stop = statusReplies # stop cmd calls a status cmd immediately after stopping motors.
+            )
+                
     def handleReply(self, replyStr):
         """Handle a line of output from the device. Called whenever the device outputs a new line of data.
         
@@ -190,17 +260,18 @@ class GalilDevice(TclActor.TCPDevice):
         - Parse status to update the model parameters
         - If a command has finished, call the appropriate command callback
         """
-        if not self.currDevCmd:
+        if self.currDevCmd.isDone():
             # ignore unsolicited input
             return
         replyStr = replyStr.encode("ASCII", "ignore").strip(':\r\n')
         if not replyStr:
             # ignore blank replies
             return
-        self.replyList.append(replyStr)
+        self.replyList.append(replyStr)  # add reply to buffer
+        
         if MatchQMBeg.match(replyStr.lstrip()): # if line begins with '?'
             # there was an error. End current process
-            self.actor.writeToUsers("f", "cmdFailed; reply=%s" % (replyStr,), cmd = self.currDevCmd)
+            self.actor.writeToUsers("f", "reply=%s" % (replyStr,), cmd = self.currDevCmd)
             self.currDevCmd.setState("failed", textMsg=replyStr)
             self.status.userCmd.setState("failed", textMsg=replyStr)
             self._clrDevCmd()        
@@ -222,15 +293,15 @@ class GalilDevice(TclActor.TCPDevice):
         """
         # cmdStr is pre-formatted for Galil, might be the wrong way to use cmdClass... 
         cmd = self.cmdClass(cmdStr, userCmd=userCmd, callFunc=callFunc)
-        if self.currDevCmd != None:
-            raise RuntimeError("Cannot start new command, cmd slot not empty!")
+        if not self.currDevCmd.isDone():
+            raise RuntimeError("Cannot start new command, there is a cmd currently running")
         self.replyList = []
         self.currDevCmd = cmd
         self.status.currExecTime.startTimer()
         try:
             self.conn.writeLine(cmdStr)  #from fullCmdStr
         except Exception, e:
-            cmd.setState("failed", textMsg=str(e))
+            cmd.setState("write to device failed", textMsg=str(e))
             self._clrDevCmd()
             
     def cmdMove(self, orient, userCmd):
@@ -240,7 +311,7 @@ class GalilDevice(TclActor.TCPDevice):
         userCmd not tied to state of devCmd, because of subsequent moves. 
         """
         # if Galil is busy, abort the command
-        if self.currDevCmd:
+        if not self.currDevCmd.isDone():
             #self.actor.writeToUsers("f", "cmdFailed; reply=Galil is busy", cmd = userCmd)
             userCmd.setState("cancelled", textMsg="Galil is busy")
             return
@@ -279,7 +350,7 @@ class GalilDevice(TclActor.TCPDevice):
         Called directly from the user, or indirectly through a cmdStop. userCmd 
         (cmd_stop or cmd_status) state tied to devCmd state.
         """
-        if self.currDevCmd:
+        if not self.currDevCmd.isDone():
             self.actor.writeToUsers(">", "reply=Galil is busy, current status is...", cmd = self.currDevCmd)            
             statusStr = self.status._getKeyValStr()
             self.actor.writeToUsers("i", statusStr, cmd=userCmd)
@@ -293,7 +364,7 @@ class GalilDevice(TclActor.TCPDevice):
     def cmdParams(self, userCmd):
         """Show Galil parameters
         """
-        if self.currDevCmd:
+        if not self.currDevCmd.isDone():
             #self.actor.writeToUsers("f", "cmdFailed; reply=Galil is busy", cmd = userCmd)
             userCmd.setState("cancelled", textMsg="Galil is busy")
             return    
@@ -308,7 +379,7 @@ class GalilDevice(TclActor.TCPDevice):
         Inputs:
         - axisList: a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
         """
-        if self.currDevCmd:
+        if not self.currDevCmd.isDone():
          #   self.actor.writeToUsers("f", "cmdFailed; reply=Galil is busy", cmd = userCmd)
             userCmd.setState("cancelled", textMsg="Galil is busy")
             return
@@ -357,7 +428,7 @@ class GalilDevice(TclActor.TCPDevice):
                 self.status.desActPos += actErr
                 # clear or update the relevant slots before beginning a new device cmd
                 self.replyList = []
-                self.currDevCmd = None
+                #self.currDevCmd.setState("done")
                 self.status.moveIter += 1
                 self.status.currExecTime.reset() # new timer for new move
                 cmdMoveStr = self._galCmdFromMount(self.status.desActPos)
@@ -369,7 +440,7 @@ class GalilDevice(TclActor.TCPDevice):
                 # send a new command and clear the reply list and start over
                 # note: self.currDevCmd is unchanged
                 return
-        # no more iterations, free up the Galil...        
+        # no more iterations, free up the Galil...
         self._clrDevCmd()
         self.status.userCmd.setState("done")
 
@@ -474,9 +545,8 @@ class GalilDevice(TclActor.TCPDevice):
         self.replyList = None
         self.status.moveIter = numpy.nan
         if not self.currDevCmd.isDone():
-            # failsafe, cmd should always be done.
+            # failsafe, cmd should always be done at this point.
             self.currDevCmd.setState("failed")
-        self.currDevCmd = None
         self.status.homing = [0 for x in range(self.nAct)]
         self.status.currExecTime.reset()
 
