@@ -61,8 +61,6 @@ MatchQMBeg = re.compile('^\?')
 MaxMountErr = 1 # don't repeat move if mount difference is less (same for each axes, could use array)
 MaxMoveIter = 2
 
-
-
 class GalilTimer(object):
     """Keep track of execution time
     """
@@ -182,29 +180,31 @@ class GalilDevice(TclActor.TCPDevice):
         self.nAct = len(self.mirror.actuatorList)
         self.validAxisList =  ('A', 'B', 'C', 'D', 'E', 'F')[0:self.nAct]
         self.status = GalilStatus(actor)
-        # a list of all expected galil reply keywords for parsing purposes
-        # listed in order of expected reply
-        moveReplies = [
+        self.expectedReplies = [
             'max sec for move', 
             'target position',
             'final position',
-            ]
-        statusReplies = [
             'axis homed',
             'commanded position',
             'actual position', 
             'status word',
-            ]            
-        homeReplies = []        
-        paramReplies = [
-            'software version',
-            'NAXES number of axes',
-            'DOAUX aux status?',
-            'MOFF motors off when idle?',
-            'NCORR # corrections',
-            'WTIME',
-            'ENCTIME',
-            'LSTIME',
+            'max sec to find reverse limit switch', # homing 
+            'reverse limit switch not depressed for axes:', # data follows this one
+            'trying again',
+            'max sec to find home switch',
+            'sec to move away from home switch',
+            'finding next full step',
+            'microsteps', #share line
+            'sec to find full step' # share line
+            'position error',
+            'software version', #share line
+            'NAXES number of axes', # share line
+            'DOAUX aux status?', # share line
+            'MOFF motors off when idle?', # share line
+            'NCORR # corrections', # share line
+            'WTIME', # share line
+            'ENCTIME', # share line
+            'LSTIME', # share line
             '-RNGx/2 reverse limits',
             'RNGx/2 forward limits',
             'SPDx speed',
@@ -217,35 +217,12 @@ class GalilDevice(TclActor.TCPDevice):
             'INDSEP index encoder pulse separation',
             'ENCRESx encoder resolution (microsteps/tick)',
             ]
-        # update for device specific replies
-        # insert additional keywords before the 'ok'
-        if self.mirror.id == '2.5m M1':
-            #need example txt!
-        
-        if self.mirror.id == '2.5m M2':
-            # XQ#LMOVE needs to be supported
-            extraMove = ['piezo status word', 'piezo corrections (microsteps)']
-            moveReplies.extend(extraMove)
-            
-            extraParams = [
-            'version of M2-specific additions',
-            'min, max piezo position (microsteps)',
-            'number of steps of piezo position',
-            'resolution (microsteps/piezo ctrl bit)'
-            ]
-            paramReplies.extend(extraParams)
-            
-            extraStatus = ['piezo status word', 'piezo corrections (microsteps)']
-            statusReplies.extend(extraStatus)
-            
-        # create a dictionary matching user cmd verbs to expected Galil responses
-        self.galilResponse = dict(
-            move = moveReplies,
-            status = statusReplies,
-            home = homeReplies,
-            showparams = paramReplies,
-            stop = statusReplies # stop cmd calls a status cmd immediately after stopping motors.
-            )
+
+    def parseLine(self, line):
+        """Tries to parse a reply from the Galil and seperate into keyword value format.
+        """
+        regExGalilLine = re.compile(
+        dataMatched = regExGalilLine
                 
     def handleReply(self, replyStr):
         """Handle a line of output from the device. Called whenever the device outputs a new line of data.
@@ -263,12 +240,11 @@ class GalilDevice(TclActor.TCPDevice):
         if self.currDevCmd.isDone():
             # ignore unsolicited input
             return
-        replyStr = replyStr.encode("ASCII", "ignore").strip(':\r\n')
+        replyStr = replyStr.encode("ASCII", "ignore").strip(' :\r\n')
         if not replyStr:
             # ignore blank replies
             return
-        self.replyList.append(replyStr)  # add reply to buffer
-        
+        self.replyList.append(replyStr)  # add reply to buffer        
         if MatchQMBeg.match(replyStr.lstrip()): # if line begins with '?'
             # there was an error. End current process
             self.actor.writeToUsers("f", "reply=%s" % (replyStr,), cmd = self.currDevCmd)
@@ -276,6 +252,7 @@ class GalilDevice(TclActor.TCPDevice):
             self.status.userCmd.setState("failed", textMsg=replyStr)
             self._clrDevCmd()        
             return
+            
         if (self.status.userCmd.cmdVerb == 'move') and (len(self.replyList) == 1):
             #this line has move time estimates, put them in status
             self._setMoveTimeEst(replyStr)
@@ -635,7 +612,39 @@ class GalilDevice(TclActor.TCPDevice):
         return mount  
                      
 
+class GalilDevice35M3(GalilDevice):
+    """A Galil Device controller that is specific to the 3.5m Tertiary mirror
+    """
+    def __init__(self, callFunc = None, actor = None):
+        GalilDevice.__init__(self, callFunc = None, actor = None)
+        self.expectedReplies.extend([
+            'version of M3-specific additions',
+            'off-on-error?',
+            'error limit for tertiary rotation',
+            'time to close rotation clamp', 
+            'open clamp',
+            'turn on at-slot sensor (sec)',
+            'max time',
+            'poll time',
+            'addtl run time for primary mirror cover motion (sec)',
+            'time for primary mirror eyelid motion (sec)',
+            'sec to finish move'
+            ])
         
-        
-        
-        
+
+class GalilDevice25M2(GalilDevice):
+    """A Galil Device controller that is specific to the 2.5m Secondary mirror
+    
+    note: add in piezo corrections for move
+    """
+    def __init__(self, callFunc = None, actor = None):
+        GalilDevice.__init__(self, callFunc = None, actor = None)
+        self.expectedReplies.extend([
+            'piezo status word', 
+            'piezo corrections (microsteps)',
+            'version of M2-specific additions',
+            'min, max piezo position (microsteps)',
+            'number of steps of piezo position',
+            'resolution (microsteps/piezo ctrl bit)'
+            ])
+            
