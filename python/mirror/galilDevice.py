@@ -220,9 +220,47 @@ class GalilDevice(TclActor.TCPDevice):
 
     def parseLine(self, line):
         """Tries to parse a reply from the Galil and seperate into keyword value format.
+        I consider any descriptive text following the data a keyword, there can be multiple 
+        keywords and values on a single line.
+        
+        example lines:
+            0000.2,  0362.7,  0000.2,  0000.0,  0000.0 max sec to find reverse limit switch\r\n\
+             0300.1,  0300.1,  0300.1,  0000.0,  0000.0 max sec to find home switch\r\n\
+             0008.2,  0008.2,  0008.2,  0000.0,  0000.0 sec to move away from home switch\r\n\
+            Finding next full step\r\n\
+             041,  006.6 microsteps, sec to find full step\r\n\
+            -000006732,  000014944,  000003741,  999999999,  999999999 position error\r\n\
+             1,  1,  1,  0,  0 axis homed\r\n\        
         """
-        regExGalilLine = re.compile(
-        dataMatched = regExGalilLine
+        
+        # Grab the data in each line:
+        # Match only numbers (including decimal pt and negative sign) that are not preceeded by '/'
+        # This is due to the param named 'RNGx/2' which I don't want to match
+        getDataRegEx = re.compile(r'(?<!/)[0-9-.]+')
+        dataMatched = getDataRegEx.findall(line) # will put datavalues in a list
+        numVals = len(dataMatched)
+        # Grab keyword/text info on each line, which follows data.
+        # Only keep last split, should contain keyword/text associated with each line
+        textOnly = re.split(r' +', line, maxsplit = (numVals +1))[-1]
+        # if there are multiple keywords on a line, they will be separated by a ',' 
+        # or whitespace following a '?'
+        # ....so split the text further
+        keys = re.split(r',|(?<=\?) ', textOnly)
+        # remove leading and trailing whitespace in each key
+        keys = [key.strip() for key in keys]
+        # on each incoming data line we expect either 
+        # (1) 1 keyword and 1 value for each actuator 
+        # or
+        # (2) n keywords and n values
+        missMatch = ((len(keys) > 1) and (len(keys) != len(dataMatched)) or
+                    ((len(keys) == 1) and (len(dataMatched) != self.nAct)) or
+                    ((len(keys) == 1) and (len(dataMatched) != 1))
+        if missMatch:
+            # There is confusion in the amount of keywords and values in this particular line.
+            self.actor.writeToUsers("w", "reply=Galil Line: %s\nGalil Parse Error, unexpected amount of params and/or values." % (line,), cmd = self.status.userCmd))
+        
+            
+        
                 
     def handleReply(self, replyStr):
         """Handle a line of output from the device. Called whenever the device outputs a new line of data.
