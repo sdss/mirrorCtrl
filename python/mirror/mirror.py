@@ -416,7 +416,7 @@ class MirrorBase(object):
 class DirectMirror(MirrorBase):
     """A mirror supported by 6 actuators or fixed links connected directly to the mirror.
     """
-    def __init__(self, actuatorList, fixedLinkList, encoderList = None):
+    def __init__(self, actuatorList, fixedLinkList, encoderList = None, name=None):
         """
         Inputs:
         - actuatorList: List of the 6 actuators actuators and fixed links that support the mirror.
@@ -428,7 +428,7 @@ class DirectMirror(MirrorBase):
         - control piston, tip and tilt only (no translation or z rotation)
         - control piston, tip, tilt and translation (no z rotation)
         """
-        MirrorBase.__init__(self, actuatorList, fixedLinkList, encoderList)
+        MirrorBase.__init__(self, actuatorList, fixedLinkList, encoderList, name)
 
     def _physFromOrient(self, orient, linkList):
         """Compute desired physical position of actuators, encoders or fixed
@@ -493,8 +493,8 @@ class TipTransMirror(MirrorBase):
     Actuators 3, 4 are attached to the linear bearing to tip it.
     Actuator 5 is an antirotation link attached to the mirror.
     """
-    def __init__(self, ctrMirZ, ctrBaseZ, actuatorList, fixedLinkList, encoderList = None):
-        MirrorBase.__init__(self, actuatorList, fixedLinkList, encoderList)
+    def __init__(self, ctrMirZ, ctrBaseZ, actuatorList, fixedLinkList, encoderList = None, name=None):
+        MirrorBase.__init__(self, actuatorList, fixedLinkList, encoderList, name)
         self.ctrMirZ = ctrMirZ
         self.ctrBaseZ = ctrBaseZ
         if len(self.fixedLinkList) != 1:

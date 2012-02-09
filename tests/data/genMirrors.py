@@ -172,15 +172,15 @@ class ConstMirrorBase(object):
 class ConstDirectMirror(ConstMirrorBase):
     """Direct Mirror Constructor"""
         
-    def makeMirror(self, mirId):
+    def makeMirror(self, name=None):
         """Returns a Direct mirror ready for use"""
-        return mirror.DirectMirror(self.actList, self.fixList, self.encList, mirId) #must specify mirror id....
+        return mirror.DirectMirror(self.actList, self.fixList, self.encList, name) #must specify mirror id....
         
         
 class ConstTipTransMirror(ConstMirrorBase):
     """TipTrans Mirror Constructor"""
         
-    def makeMirror(self, mirId):
+    def makeMirror(self, name=None):
         """Returns a TipTrans mirror ready for use.
         
         Ctr base/mir pos are hard-coded for the 2.5m secondary, since that is the only 
@@ -189,7 +189,7 @@ class ConstTipTransMirror(ConstMirrorBase):
         secCtrMirZ = -135.70
         secCtrBaseZ = -178.40
         return mirror.TipTransMirror(secCtrMirZ, secCtrBaseZ, self.actList, 
-                                     self.fixList, self.encList, mirId)
+                                     self.fixList, self.encList, name)
                                      
 
 class Prim25(ConstDirectMirror):

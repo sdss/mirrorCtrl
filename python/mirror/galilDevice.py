@@ -58,6 +58,11 @@ MatchNumBeg = re.compile('^.[0-9]*') # dot to allow negative sign
 MatchNameEnd = re.compile('[a-z]*$')
 MatchQMBeg = re.compile('^\?')
 
+startsWithNumRegEx = re.compile(r'^[0-9]|^-[0-9]')
+getDataRegEx = re.compile(r'(?<!/)[0-9-.]+')
+paramRegEx = re.compile(r'^[A-Z]|^-[A-Z]')
+timeEstRegEx = re.compile(r'^sec +to +move|^max +sec')
+
 MaxMountErr = 1 # don't repeat move if mount difference is less (same for each axes, could use array)
 MaxMoveIter = 2
 
@@ -219,49 +224,147 @@ class GalilDevice(TclActor.TCPDevice):
             ]
 
     def parseLine(self, line):
-        """Tries to parse a reply from the Galil and seperate into keyword value format.
-        I consider any descriptive text following the data a keyword, there can be multiple 
-        keywords and values on a single line.
+        """Tries to parse a reply from the Galil and seperate into descriptor-value format.
+        I consider any descriptive text following the data a descriptor, there can be multiple 
+        descriptor and values on a single line.
+        
+        output:
+        - dataMatched: numpy array containing any data
+        - keys: text describing any data, may be a list.
         
         example lines:
-            0000.2,  0362.7,  0000.2,  0000.0,  0000.0 max sec to find reverse limit switch\r\n\
-             0300.1,  0300.1,  0300.1,  0000.0,  0000.0 max sec to find home switch\r\n\
-             0008.2,  0008.2,  0008.2,  0000.0,  0000.0 sec to move away from home switch\r\n\
-            Finding next full step\r\n\
-             041,  006.6 microsteps, sec to find full step\r\n\
-            -000006732,  000014944,  000003741,  999999999,  999999999 position error\r\n\
-             1,  1,  1,  0,  0 axis homed\r\n\        
-        """
-        
+            0000.2,  0362.7,  0000.2,  0000.0,  0000.0 max sec to find reverse limit switch
+             0300.1,  0300.1,  0300.1,  0000.0,  0000.0 max sec to find home switch
+             0008.2,  0008.2,  0008.2,  0000.0,  0000.0 sec to move away from home switch
+            Finding next full step
+             041,  006.6 microsteps, sec to find full step
+            -000006732,  000014944,  000003741,  999999999,  999999999 position error
+             1,  1,  1,  0,  0 axis homed       
+        """      
         # Grab the data in each line:
         # Match only numbers (including decimal pt and negative sign) that are not preceeded by '/'
         # This is due to the param named 'RNGx/2' which I don't want to match
-        getDataRegEx = re.compile(r'(?<!/)[0-9-.]+')
-        dataMatched = getDataRegEx.findall(line) # will put datavalues in a list
+        
+        dataMatched = getDataRegEx.findall(line) # will put non-overlapping data (numbers) in a list
+        dataMatched = numpy.asarray(dataMatched, dtype=float)
         numVals = len(dataMatched)
-        # Grab keyword/text info on each line, which follows data.
-        # Only keep last split, should contain keyword/text associated with each line
+        # Grab descriptor info on each line, which follows data.
+        # split on whitespace n times, last split will be descriptor info
         textOnly = re.split(r' +', line, maxsplit = (numVals +1))[-1]
-        # if there are multiple keywords on a line, they will be separated by a ',' 
+        # if there are multiple descriptors on a line, they will be separated by a ',' 
         # or whitespace following a '?'
         # ....so split the text further
         keys = re.split(r',|(?<=\?) ', textOnly)
-        # remove leading and trailing whitespace in each key
+        # remove leading and trailing whitespace in each descriptor
         keys = [key.strip() for key in keys]
         # on each incoming data line we expect either 
-        # (1) 1 keyword and 1 value for each actuator 
+        # (1) 1 descriptor and 1 value for each actuator 
         # or
-        # (2) n keywords and n values
-        missMatch = ((len(keys) > 1) and (len(keys) != len(dataMatched)) or
-                    ((len(keys) == 1) and (len(dataMatched) != self.nAct)) or
+        # (2) n descriptors and n values
+        missMatch = ((len(keys) > 1) and (len(keys) != len(dataMatched))) or\
+                    ((len(keys) == 1) and (len(dataMatched) != self.nAct)) or\
                     ((len(keys) == 1) and (len(dataMatched) != 1))
         if missMatch:
-            # There is confusion in the amount of keywords and values in this particular line.
-            self.actor.writeToUsers("w", "reply=Galil Line: %s\nGalil Parse Error, unexpected amount of params and/or values." % (line,), cmd = self.status.userCmd))
+            # There is confusion in the amount of descriptors and values in this particular line.
+            # report it but keep going
+            self.actor.writeToUsers("w", "Suspicious Galil Parse: %s, num descriptors do not match num values." % (line,), cmd=self.status.userCmd)
+            return
+        # check to see if descriptor/s are an expected reply
+        knownReply = [(key in self.expectedReplies) for key in keys]
+        if False in knownReply:
+            # a descriptor wasn't recognized as an expected reply for this Galil/mirror
+            # report it but keep going
+            self.actor.writeToUsers("w","Suspicious Galil Parse: %s, Descriptor text not recognized." % (line,), cmd=self.status.userCmd)
+            return
+        return dataMatched, keys
         
+    def sendGalilParam(self, key, data):
+        """Key is determined to be a Galil parameter, send the key and data to the user.
+        Keyword for Galil Paramaters are 'GalilPar<par>' where par is the name from the
+        Galil itself.
+        
+        key example: -RNGx/2 reverse limits
+       
+        """
+        param = key.split()[0] # in example: just keep -RNGx/2
+        dataStr = ','.join(['%s' % (x) for x in data]) # comma separate
+        str = 'GalilPar%s=%s' % ((param, dataStr))
+        self.actor.writeToUsers("i", str, cmd = self.status.userCmd)        
+
+    def actOnKey(self, key, data):
+        """Takes a key parsed from self.parseLine, and chooses what to do with the data
+        
+        inputs:
+        -key: parsed descriptive string from self.parseLine
+        -data: parsed data from self.parseLine, may be a numpy array
+        """
+         #line begins with cap letter (or -cap letter)
+        
+        if paramRegEx.match(key):
+            # this is a Galil parameter, format it and send it to the user
+            self.sendGalilParam(key, data)
+            return
             
+        elif 'software version' in key:
+            # this is a special parameter case, and can't be treated using sendParam
+            str = 'GalilPar%s=%s' % ((param, data[0])) #data is a single element list
+            self.actor.writeToUsers("i", str, cmd = self.status.userCmd)
+            return
+                   
+        elif timeEstRegEx.match(key):
+            # contains information about estimated execution time
+            # update status and notify users
+            maxTime = numpy.max(data) # get time for longest move
+            self.status.totalTime = maxTime
+            updateStr = self.status._getKeyValStr(["totalTime", "currExecTime", "remainExecTime"])
+            self.actor.writeToUsers("i", updateStr, cmd=self.status.userCmd)
+            # update cmd timeouts here!
+            return
         
-                
+        elif 'axis homed' in key:
+            self.status.axesHomed = [int(num) for num in data]
+            updateStr = self.status._getKeyValStr(["axisHomed"])
+            self.actor.writeToUsers("i", updateStr, cmd=self.status.userCmd)
+            return
+        
+        elif ('commanded position' in key) or ('target position' in key):
+            self.status.cmdActPos = [int(num) for num in data]
+            updateStr = self.status._getKeyValStr(["cmdActPos"])
+            self.actor.writeToUsers("i", updateStr, cmd=self.status.userCmd)
+            return
+
+        elif ('actual position' in key) or ('final position' in key):        
+            # measured position (adjusted)
+            # account for encoder --> actuator spatial difference
+            encMount = data[:]
+            # desOrient may be nans
+            if numpy.isfinite(sum(self.desOrient)):
+                initOrient = self.desOrient
+            else:
+                initOrient = numpy.zeros(6)
+            orient = self.mirror.orientFromEncoderMount(encMount, initOrient)
+            actMount = self.mirror.actuatorMountFromOrient(orient)
+            actMount = numpy.asarray(actMount, dtype=float)
+            # add these new values to status
+            self.status.currOrient = numpy.asarray(orient[:]) 
+            self.status.currActPos = actMount
+            updateStr = self.status._getKeyValStr(["currOrient", "currActPos"])
+            self.actor.writeToUsers("i", updateStr, cmd=self.status.userCmd)
+            return
+        
+        elif 'status word' in key:
+            # zeropad status word to 32 bits
+            self.status.statusWord = [int(num) for num in data]
+            updateStr = self.status._getKeyValStr(["statusWord"])
+            self.actor.writeToUsers("i", updateStr, cmd=self.status.userCmd)
+            return
+        
+        else:
+            # send the remaining info back to the user
+            str = "reply=%s: %s" % (key, data)
+            self.actor.writeToUsers("i", str, cmd=self.status.userCmd)
+            return
+                                
     def handleReply(self, replyStr):
         """Handle a line of output from the device. Called whenever the device outputs a new line of data.
         
@@ -283,23 +386,40 @@ class GalilDevice(TclActor.TCPDevice):
             # ignore blank replies
             return
         self.replyList.append(replyStr)  # add reply to buffer        
-        if MatchQMBeg.match(replyStr.lstrip()): # if line begins with '?'
+        if MatchQMBeg.match(replyStr): # if line begins with '?'
             # there was an error. End current process
-            self.actor.writeToUsers("f", "reply=%s" % (replyStr,), cmd = self.currDevCmd)
+            self.actor.writeToUsers("f", "reply=Galil Error: %s" % (replyStr,), cmd = self.currDevCmd)
             self.currDevCmd.setState("failed", textMsg=replyStr)
             self.status.userCmd.setState("failed", textMsg=replyStr)
             self._clrDevCmd()        
             return
-            
-        if (self.status.userCmd.cmdVerb == 'move') and (len(self.replyList) == 1):
-            #this line has move time estimates, put them in status
-            self._setMoveTimeEst(replyStr)
-            #self.actor.writeToUsers("i", "reply=Move time estimates from Galil: %s" % (replyStr,), cmd = self.currDevCmd)
-            # add a time parser that updates status
-        if not replyStr.lower().endswith("ok"):
-            # command not finished
+        okLineRegEx = re.compile(r'^OK$', re.IGNORECASE)
+        if okLineRegEx.match(replyStr):
+            # command finished
+            self.currDevCmd.setState("done")
+            return       
+                
+        if not startsWithNumRegEx.match(replyStr):
+            # line doesn't begin with a data value, eg 'Finding next full step'
+            # show it to the user and return
+            self.actor.writeToUsers("i", "reply=Galil Line: %s" % (replyStr,), cmd = self.status.userCmd)
             return
-        self.currDevCmd.setState("done")
+        # if we made it this far, separate the data from the descriptive text
+        parsedLine = self.parseLine(replyStr)
+        if not parsedLine:
+            # parse didn't work, but keep going
+            return
+        else:
+            data = parsedLine[0]
+            description = parsedLine[1]
+        if len(description) == 1:
+            # if one key, all the data goes with it
+            self.actOnKey(description, data)
+        else:
+            # one data value for each key
+            for key, dat in itertools.izip(description, data):
+                self.actOnKey(key, dat)
+
             
     def newCmd(self, cmdStr, callFunc=None, userCmd=None):
         """Start a new device command.
@@ -374,7 +494,7 @@ class GalilDevice(TclActor.TCPDevice):
         userCmd.setState("running")
         self.status.userCmd = userCmd 
         self.actor.writeToUsers(">", "reply=Signaling Galil for Status", cmd=userCmd)
-        self.newCmd("XQ #STATUS;", userCmd=None, callFunc = self._statusCallback)
+        self.newCmd("XQ #STATUS;", userCmd=userCmd, callFunc = self._userCmdCallback)
                         
     def cmdParams(self, userCmd):
         """Show Galil parameters
@@ -386,7 +506,7 @@ class GalilDevice(TclActor.TCPDevice):
         userCmd.setState("running")
         self.status.userCmd = userCmd  
         self.actor.writeToUsers(">", "reply=Signaling Galil", cmd=userCmd)
-        self.newCmd("XQ #SHOWPAR;", userCmd=None, callFunc = self._paramsCallback)
+        self.newCmd("XQ #SHOWPAR;", userCmd=userCmd, callFunc = self._userCmdCallback)
         
     def cmdHome(self, axisList, userCmd):
         """Home the specified actuators
@@ -403,7 +523,7 @@ class GalilDevice(TclActor.TCPDevice):
         self.actor.writeToUsers(">", "reply=Homing actuators: %s" % (axisList,), cmd = userCmd)
         # format Galil command
         axisList, cmdMoveStr = self._galCmdForHome(axisList)
-        self.newCmd(cmdMoveStr, userCmd=None, callFunc=self._homeCallback)
+        self.newCmd(cmdMoveStr, userCmd=userCmd, callFunc=self._userCmdCallback)
         # send homing axes to status.
         homeStatus = numpy.zeros(self.nAct)
         for axis in axisList:
@@ -424,16 +544,7 @@ class GalilDevice(TclActor.TCPDevice):
         
         if not cmd.state == "done":
             return
-        self.actor.writeToUsers("i", "reply=Move Iteration %i Finished" % \
-                                (self.status.moveIter), cmd = self.currDevCmd)
-        encMount = self._mountFromGalTxt()
-        orient = self.mirror.orientFromEncoderMount(encMount, self.status.desOrient)
-        actMount = self.mirror.actuatorMountFromOrient(orient)
-        actMount = numpy.asarray(actMount, dtype=float)
-        # add these new values to status
-        self.status.currOrient = numpy.asarray(orient[:])
-        self.status.currActPos = actMount
-        actErr = self.status.desActPos - actMount
+        actErr = self.status.desActPos - self.status.currActPos
         # do another iteration?
         if True in (numpy.abs(actErr) > MaxMountErr) and \
                     (self.status.moveIter < self.status.maxMoveIter):
@@ -451,7 +562,7 @@ class GalilDevice(TclActor.TCPDevice):
                 # shouldn't encounter race condition with other commands.
                 self.actor.writeToUsers("i", "moveIter=%s" % (self.status.moveIter), \
                                          cmd = self.status.userCmd)
-                self.newCmd(cmdMoveStr, userCmd=None, callFunc=self._moveCallback)
+                self.newCmd(cmdMoveStr, userCmd=self.status.userCmd, callFunc=self._moveCallback)
                 # send a new command and clear the reply list and start over
                 # note: self.currDevCmd is unchanged
                 return
@@ -553,6 +664,19 @@ class GalilDevice(TclActor.TCPDevice):
         # parse info needed
         self._clrDevCmd() 
         self.status.userCmd.setState("done")
+
+    def _userCmdCallback(self, cmd):
+        """Generic callback that sets the user cmd done
+        
+        Inputs:
+        -cmd: passed automatically due to TclActor callback framework
+        """
+        if not cmd.state == "done":
+            return           
+        # parse info needed
+        self._clrDevCmd() 
+        self.status.userCmd.setState("done")
+        
          
     def _clrDevCmd(self):
         """Clean up device command when finished.
