@@ -6,10 +6,7 @@ reads from encoders to determine mirror position.
 There is lots of info at:
 http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html#InterfaceReplies
 
-remember:
-self.currDevCmd.cmdVerb.lower()
-
-
+From Russell:
     The auxiliary port process will halt (in mid-output) if an ST or RS
     command is issued or the device is reset or power cycled. In the
     case of ST the aux output will start up (from the beginning of a new
@@ -26,21 +23,8 @@ self.currDevCmd.cmdVerb.lower()
 To Do:
 add mirror-specific galil replies
 format reply to user output - ints, floats (how many decimals?)
-fix time parsing to output what we're waiting for.
 
-figure out why this happens after every user command finishes:
-
-Callback of <bound method UserCmd.trackUpdate of <TclActor.Command.UserCmd object at 0x1e89610>> by DevCmd('A=MAXINT B=MAXINT C=MAXINT D=MAXINT E=MAXINTXQ #HOME') failed: Command is done; cannot change state
-Traceback (most recent call last):
-  File "/Users/csayres/APO/RO-2.9.3/python/RO/AddCallback.py", line 162, in _basicDoCallbacks
-    func(*args, **kargs)
-  File "/Users/csayres/APO/TclActor/python/TclActor/Command.py", line 102, in trackUpdate
-    self.setState(state, textMsg, hubMsg)
-  File "/Users/csayres/APO/TclActor/python/TclActor/Command.py", line 79, in setState
-    raise RuntimeError("Command is done; cannot change state")
-RuntimeError: Command is done; cannot change state
-
-
+Notes:
 Update Galil Code Constants:
 2.5m secondary, turn off piezo corrections, we handle them here now
 All mirrors w/ encoders, disable subsequent moves, we handle them here now
@@ -72,8 +56,10 @@ MatchQMBeg = re.compile('^\?')
 startsWithNumRegEx = re.compile(r'^[0-9]|^-[0-9]')
 # find numbers not preceeded by a '/' or a letter and not followed by a letter
 getDataRegEx = re.compile(r'(?<!/|[A-Za-z])[0-9-.]+(?![A-Za-z])')
+# params are uppercase
 paramRegEx = re.compile(r'^[A-Z]|^-[A-Z]')
 timeEstRegEx = re.compile(r'^sec +to|^max +sec|^time +for')
+okLineRegEx = re.compile(r'^OK$', re.IGNORECASE)
 
 MaxMountErr = 1 # don't repeat move if mount difference is less (same for each axes, could use array)
 MaxMoveIter = 2
@@ -107,8 +93,10 @@ class GalilStatus(object):
         self.mirror = actor.mirror
         self.nAct = len(self.mirror.actuatorList)
         # all the Status keyword/value pairs we will cache, and their initial values
+        userCmdInit = device.cmdClass('null')
+        userCmdInit.setState("done")
         statusInit = (
-            ("userCmd", device.cmdClass('null')),
+            ("userCmd", userCmdInit),
             ("totalTime", numpy.nan),
             ("currExecTime", GalilTimer()), 
             ("remainExecTime", numpy.nan),
@@ -180,7 +168,7 @@ class GalilDevice(TclActor.TCPDevice):
         )
         self.mirror = actor.mirror
         self.currDevCmd = self.cmdClass('null') # initialize empty command in cmd slot
-        #self.currDevCmd.setState("done") # set it to a done state so subsequent cmds can execute
+        self.currDevCmd.setState("done") # set it to a done state so subsequent cmds can execute
         self.replyLog = []
         self.parsedKeyList = None 
         self.nAct = len(self.mirror.actuatorList)
@@ -313,8 +301,8 @@ class GalilDevice(TclActor.TCPDevice):
         """Takes a key parsed from self.parseLine, and chooses what to do with the data
         
         inputs:
-        -key: parsed descriptive string from self.parseLine
-        -data: parsed data from self.parseLine, may be a numpy array
+        -key: parsed descriptive string from self.parseLine (a list)
+        -data: parsed data from self.parseLine (a list)
         """
          #line begins with cap letter (or -cap letter)
         if paramRegEx.match(key):
@@ -408,7 +396,7 @@ class GalilDevice(TclActor.TCPDevice):
         if not replyStr:
             # ignore blank replies
             return
-        self.replyLog.append(replyStr)  # add reply to buffer        
+        self.replyLog.append(replyStr)  # add reply to log       
         if MatchQMBeg.match(replyStr): # if line begins with '?'
             # there was an error. End current process
             self.actor.writeToUsers("f", "Text=Galil Error: %s" % (replyStr,), cmd = self.currDevCmd)
@@ -416,7 +404,6 @@ class GalilDevice(TclActor.TCPDevice):
             self.status.userCmd.setState("failed", textMsg=replyStr)
             self._clrDevCmd()        
             return
-        okLineRegEx = re.compile(r'^OK$', re.IGNORECASE)
         if okLineRegEx.match(replyStr):
             # command finished
             self.currDevCmd.setState("done")
@@ -459,15 +446,16 @@ class GalilDevice(TclActor.TCPDevice):
         # 
         cmd = self.cmdClass(cmdStr, callFunc=callFunc)
         if not self.currDevCmd.isDone():
+            # this should never happen, but...
             raise RuntimeError("Cannot start new command, there is a cmd currently running")
         self.parsedKeyList=[]
         self.currDevCmd = cmd
         self.status.currExecTime.startTimer()
         cmd.timeLimit=5
         try:
-            self.conn.writeLine(cmdStr)  #from fullCmdStr
+            self.conn.writeLine(cmdStr)
         except Exception, e:
-            cmd.setState("write to device failed", textMsg=str(e))
+            cmd.setState("failed", textMsg=str(e))
             self._clrDevCmd()
     
     def cmdLog(self, userCmd):
@@ -494,15 +482,14 @@ class GalilDevice(TclActor.TCPDevice):
         self.status.userCmd = userCmd
         # enable iteration for mirrors with encoders
         if self.mirror.hasEncoders:
-            self.status.moveIter = 1 #start counting from 1 or 0?
+            self.status.moveIter = 1 
         # (user) commanded orient --> mount
         mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient=True)
-        self.status.desActPos = numpy.asarray(mount, dtype=float) # the goal
+        self.status.desActPos = numpy.asarray(mount, dtype=float) # this will change upon iteration
         self.status.desOrient = numpy.asarray(adjOrient, dtype=float) # initial guess for fitter
-        self.status.cmdActPos = numpy.asarray(mount, dtype=float) # this will change upon iteration.
         # format Galil command
         cmdMoveStr = self._galCmdFromMount(mount)
-        updateStr = self.status._getKeyValStr(["desOrient"])
+        updateStr = self.status._getKeyValStr(["desOrient", "desActPos"])
         self.actor.writeToUsers(">", updateStr, cmd=userCmd)
         self.newCmd(cmdMoveStr, callFunc=self._moveCallback)
     
@@ -555,7 +542,6 @@ class GalilDevice(TclActor.TCPDevice):
         """Show Galil parameters
         """
         if not self.currDevCmd.isDone():
-            #self.actor.writeToUsers("f", "cmdFailed; Text=Galil is busy", cmd = userCmd)
             userCmd.setState("cancelled", textMsg="Galil is busy")
             return    
         userCmd.setState("running")
@@ -571,7 +557,6 @@ class GalilDevice(TclActor.TCPDevice):
         - axisList: a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
         """
         if not self.currDevCmd.isDone():
-         #   self.actor.writeToUsers("f", "cmdFailed; Text=Galil is busy", cmd = userCmd)
             userCmd.setState("cancelled", textMsg="Galil is busy")
             return
         userCmd.setState("running")
@@ -591,25 +576,23 @@ class GalilDevice(TclActor.TCPDevice):
 
     def _moveCallback(self, cmd):
         """This code is executed when a device move command changes state.  If the cmd is
-        done, then it parses the galil reply. Issues a subsequent move if necessary.
+        done, then it issues a subsequent move if necessary.
         
         Inputs: 
         - cmd: passed automatically due to TclActor callback framework
-        
-        todo: call for status update after every iter?
         """
         
         if not cmd.state == "done":
             return
         # check if we got all expected information from Galil...
         if not ('max sec for move' in self.parsedKeyList):
-            self.actor.writeToUsers("w", "Text=Move time estimates were not received", cmd=self.status.userCmd)
+            self.actor.writeToUsers("w", "Text=Move time estimates were not received from move", cmd=self.status.userCmd)
         if not('target position' in self.parsedKeyList):
-            self.actor.writeToUsers("w", "Text=Target actuator positions not received", cmd=self.status.userCmd)
+            self.actor.writeToUsers("w", "Text=Target actuator positions not received from move", cmd=self.status.userCmd)
         if not('final position' in self.parsedKeyList):
             # final actuator positions are needed for subsequent moves...better fail the cmd
             self._clrDevCmd()
-            self.status.userCmd.setState("failed", textMsg="Final actuator positions not received")
+            self.status.userCmd.setState("failed", textMsg="Final actuator positions not received from move")
             return
 
         actErr = self.status.desActPos - self.status.currActPos
@@ -622,24 +605,19 @@ class GalilDevice(TclActor.TCPDevice):
                 self.status.desActPos += actErr
                 # clear or update the relevant slots before beginning a new device cmd
                 self.parsedKeyList = []
-                #self.currDevCmd.setState("done")
                 self.status.moveIter += 1
                 self.status.currExecTime.reset() # new timer for new move
+                statusStr = self.status._getKeyValStr(["desActPos", "moveIter"])
+                self.actor.writeToUsers("i", statusStr, cmd=self.status.userCmd)
                 cmdMoveStr = self._galCmdFromMount(self.status.desActPos)
-                # note: self.currDevCmd will be overwritten in newCmd, but never set to None, so 
-                # shouldn't encounter race condition with other commands.
-                self.actor.writeToUsers("i", "moveIter=%s" % (self.status.moveIter), \
-                                         cmd = self.status.userCmd)
                 self.newCmd(cmdMoveStr, callFunc=self._moveCallback)
-                # send a new command and clear the reply list and start over
-                # note: self.currDevCmd is unchanged
                 return
         # no more iterations, free up the Galil...
         self._clrDevCmd()
         self.status.userCmd.setState("done")
 
     def _statusCallback(self, cmd):
-        """Generic callback that sets the user cmd done
+        """Callback for status command.
         
         Inputs:
         -cmd: passed automatically due to TclActor callback framework
@@ -695,22 +673,6 @@ class GalilDevice(TclActor.TCPDevice):
         self.status.homing = [0 for x in range(self.nAct)]
         self.status.currExecTime.reset()
 
-    def _setMoveTimeEst(self, replyStr):
-        """Parses the line (Gaili reply from 'cmdMove') with move time estimates 
-        for each actuator and puts the longest time estimate in status.
-                
-        Inputs:
-        - replyStr: the correct line from Gailil with move time estimates
-        """
-        numList = replyStr.replace(' ', '').split(',')
-        # grab only digits (text is smashed at end of replyStr)
-        numList = [float(re.search('\d+.\d+', num).group(0)) for num in numList]
-        numList = numpy.asarray(numList, dtype=float)
-        maxTime = numpy.max(numList) # get time for longest move
-        self.status.totalTime = maxTime
-        updateStr = self.status._getKeyValStr(["totalTime", "currExecTime", "remainExecTime"])
-        self.actor.writeToUsers("i", updateStr, cmd=self.status.userCmd)
- 
     def _galCmdFromMount(self, mountList):
         """Converts mount information into a string command for a Galil
         
