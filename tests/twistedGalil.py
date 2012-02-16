@@ -41,7 +41,7 @@ def genStrFromHome():
              02.10, 5 software version, NAXES number of axes\r\n\
              1, 1, 01 DOAUX aux status? MOFF motors off when idle? NCORR # corrections\r\n\
              00.10, 00.00, 30.00 WTIME, ENCTIME, LSTIME\r\n\
-            -007250000, -007250000, -007250000,  000000000, -002510000 -RNGx/2 reverse limits\r\n\
+            -007250000, -007250000, -007250000,  000000000, -002510000 \r\n\
              007250000,  007250000,  007250000,  000000000,  002510000 RNGx/2 forward limits\r\n\
              000050000,  000050000,  000050000,  000050000,  000082000 SPDx speed\r\n\
              000005000,  000005000,  000005000,  000005000,  000004000 HMSPDx homing speed\r\n\
@@ -125,17 +125,17 @@ class SpitBack(LineReceiver):
         self.replyList = reply.split('\r\n') # split reply into seperate lines
         self.replyList.insert(0, line) # for echoing back the received cmd.
         self.ind = 0     
-        reactor.callLater(1, self.writeBack)
+        reactor.callLater(.1, self.writeBack)
         
     def writeBack(self):
         print 'Sending Line:', self.replyList[self.ind]
         if self.replyList != None: # to allow interrupt
             self.sendLine(self.replyList[self.ind]) # send one line at a time
-            time.sleep(2) # pause inbetween lines sent, for the hell of it.
+            time.sleep(.25) # pause inbetween lines sent, for the hell of it.
             self.ind += 1
             if self.ind <= len(self.replyList):
                 # do another iter
-                reactor.callLater(1, self.writeBack)
+                reactor.callLater(.1, self.writeBack)
             else:
                 return
 

@@ -7,7 +7,7 @@ import Tkinter
 import numpy
 import TclActor
 
-from .galilDevice import GalilDevice
+from .galilDevice import GalilDevice, GalilDevice35M3
 
 MMPerMicron = 1 / 1000.0        # millimeters per micron
 RadPerDeg  = math.pi / 180.0    # radians per degree
@@ -19,7 +19,7 @@ ConvertOrient = numpy.array([MMPerMicron, RadPerArcSec, RadPerArcSec,
 
 
 class GalilActor(TclActor.Actor):
-    def __init__(self, mir, userPort, maxUsers = 5):
+    def __init__(self, mir, userPort, controllerAddr, controllerPort, maxUsers = 5):
         """Create a Galil mirror controller actor
         
         Inputs:
@@ -28,22 +28,24 @@ class GalilActor(TclActor.Actor):
         - maxUsers: maximum allowed simultaneous users
         """
         self.mirror = mir
-        self.galilDev = GalilDevice(callFunc = None, actor = self)
+        self.galilDev = GalilDevice35M3(controllerAddr, controllerPort, actor=self)
         TclActor.Actor.__init__(self,
             userPort = userPort,
             devs = [self.galilDev],
             maxUsers = 5
         )
         
-    def initialCon(self):
+    def initialConn(self):
         """Perform initial connections.  Same as Actor Base Class method, but with the
         addition of commanding 'stop' to put the Galil in a known state upon connection.
         """
-        TclActor.Actor.initialConn()
+        TclActor.Actor.initialConn(self)
         # do we need a pause?
         # get device state
-        self.cmd_stop(cmd=None)
-
+        initCmd = TclActor.Command.UserCmd()
+        initCmd.timeLimit = 10 # give it 10 seconds before timeout
+        self.cmd_stop(initCmd) # put Galil in known state   
+    
     def cmd_move(self, cmd):
         """Move mirror to a commanded orientation, if device isn't busy. 
         
@@ -90,30 +92,48 @@ class GalilActor(TclActor.Actor):
         except Exception, e:
             raise TclActor.Command.CommandError(str(e))
         return True
+        
+    def cmd_log(self, cmd):
+        """Prints raw (unparsed) Galil reply log to user
+        """
+        try:
+            self.galilDev.cmdLog(userCmd=cmd)
+        except Exception, e:
+            raise TclActor.Command.CommandError(str(e))
+        return True 
             
     def cmd_status(self, cmd):
         """Show status of Galil mirror controller
         """
-        self.galilDev.cmdStatus(cmd)
+        try:
+            self.galilDev.cmdStatus(cmd)
+        except Exception, e:
+            raise TclActor.Command.CommandError(str(e))
         return True
         
     def cmd_showparams(self, cmd):
         """Show parameters of Galil mirror controller
         """
-        self.galilDev.cmdParams(cmd)
+        try:
+            self.galilDev.cmdParams(cmd)
+        except Exception, e:
+            raise TclActor.Command.CommandError(str(e))
         return True
         
     def cmd_stop(self, cmd):
         """Abort any executing Galil command
         """
-        self.galilDev.cmdStop(cmd)
+        try:
+            self.galilDev.cmdStop(cmd)
+        except Exception, e:
+            raise TclActor.Command.CommandError(str(e))        
         return True
         
-def runGalil(mir, userPort):
+def runGalil(mir, userPort, controllerAddr, controllerPort):
     root = Tkinter.Tk()
     print "Galil actor is starting up on port %s" % (userPort,)
     galilActor = None
-    galilActor = GalilActor(mir=mir, userPort=userPort)
+    galilActor = GalilActor(mir=mir, userPort=userPort, controllerAddr=controllerAddr, controllerPort = controllerPort)
     print "Galil ICC is running on port %s" % (userPort,)
     root.mainloop()
     print "Galil ICC is shutting down"
