@@ -247,8 +247,8 @@ class GalilDevice(TclActor.TCPDevice):
         descriptor and values on a single line.
         
         output:
-        - dataMatched: string array containing data with any leading zeros stripped
-        - keys: text describing any data, may be a list.
+        - dataMatched: string array containing data
+        - keys: string array, text describing any data
         
         example lines:
             0000.2,  0362.7,  0000.2,  0000.0,  0000.0 max sec to find reverse limit switch
@@ -261,10 +261,9 @@ class GalilDevice(TclActor.TCPDevice):
         """      
         # Grab the data in each line:
         # Match only numbers (including decimal pt and negative sign) that are not preceeded by '/'
-        # This is due to the param named 'RNGx/2' which I don't want to match
-        
+        # or immediately surrounded by any letters letters.
+        # Eg: 'RNGx/2' which I don't want to match
         dataMatched = getDataRegEx.findall(line) # will put non-overlapping data (numbers) in a list
-        #dataMatched = numpy.asarray(dataMatched, dtype=float)
         numVals = len(dataMatched)
         # Grab descriptor info on each line, which follows data.
         # split on whitespace n times, last split will be descriptor info
@@ -286,14 +285,14 @@ class GalilDevice(TclActor.TCPDevice):
         if not (True in goodMatch):
             # There is confusion in the amount of descriptors and values in this particular line.
             # report it but keep going
-            self.actor.writeToUsers("w", "Suspicious Galil Parse: %s, num descriptors do not match num values." % (line,), cmd=self.status.userCmd)
+            self.actor.writeToUsers("w", "Text=Suspicious Galil Parse: %s, num descriptors do not match num values." % (line,), cmd=self.status.userCmd)
             return
         # check to see if descriptor/s are an expected reply
         knownReply = [(key in self.expectedReplies) for key in keys]
         if False in knownReply:
             # a descriptor wasn't recognized as an expected reply for this Galil/mirror
             # report it but keep going
-            self.actor.writeToUsers("w","Suspicious Galil Parse: %s, Descriptor text not recognized." % (line,), cmd=self.status.userCmd)
+            self.actor.writeToUsers("w","Text=Suspicious Galil Parse: %s, Descriptor text not recognized." % (line,), cmd=self.status.userCmd)
             return
         return dataMatched, keys
         
