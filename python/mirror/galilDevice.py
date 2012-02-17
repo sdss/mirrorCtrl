@@ -27,6 +27,11 @@ ConstRMS keyword - how close the mirror can get to commanded orientation?
 prepend <MirName> to all status - output keywords
 user CmdDTime?
 
+Questions:
+Do we want to compute error in orientation, or error in actuator position when determining 
+what adjustments to send to actuators?  I need to think more about this...it is relevant for
+piezo adjustments too.
+
 Notes:
 Update Galil Code Constants:
 2.5m secondary, turn off piezo corrections, we handle them here now
@@ -352,13 +357,13 @@ class GalilDevice(TclActor.TCPDevice):
 #             self.actor.writeToUsers("i", updateStr, cmd=self.status.Cmd)
 #             return
         
-        elif ('commanded position' in key) or ('target position' in key):
+        elif ('commanded position' == key) or ('target position' == key):
             self.status.CmdMount = [int(x) for x in data]
             updateStr = self.status._getKeyValStr(["CmdMount"])
             self.actor.writeToUsers("i", updateStr, cmd=self.status.Cmd)
             return
 
-        elif ('actual position' in key) or ('final position' in key):        
+        elif ('actual position' == key) or ('final position' == key):        
             # measured position (adjusted)
             # account for encoder --> actuator spatial difference
             encMount = numpy.asarray(data, dtype=float)
@@ -377,7 +382,7 @@ class GalilDevice(TclActor.TCPDevice):
             self.actor.writeToUsers("i", updateStr, cmd=self.status.Cmd)
             return
         
-        elif 'status word' in key:
+        elif key == 'status word':
             data = [int(num) for num in data]
             self.status.Status = data
             updateStr = self.status._getKeyValStr(["Status"])
@@ -589,17 +594,14 @@ class GalilDevice(TclActor.TCPDevice):
             homeStatus[ind] = 1  # set it to 1
         self.status.homing = homeStatus
         # when move is done, check orientation from encoders
-
-    def _moveCallback(self, cmd):
-        """This code is executed when a device move command changes state.  If the cmd is
-        done, then it issues a subsequent move if necessary.
         
-        Inputs: 
-        - cmd: passed automatically due to TclActor callback framework
+    def _actOnMove(self):
+        """Called after a move command.  This method tests if all went well with the move, 
+        and commands another if wanted.
+        
+        Outputs:
+        returns True if move command is finished and no more moves are necessary
         """
-        
-        if not cmd.state == "done":
-            return
         # check if we got all expected information from Galil...
         if not ('max sec for move' in self.parsedKeyList):
             self.actor.writeToUsers("w", "Text=Move time estimates were not received from move", cmd=self.status.Cmd)
@@ -609,7 +611,7 @@ class GalilDevice(TclActor.TCPDevice):
             # final actuator positions are needed for subsequent moves...better fail the cmd
             self._clrDevCmd()
             self.status.Cmd.setState("failed", textMsg="Final actuator positions not received from move")
-            return
+            return False
 
         actErr = self.status.CmdMount - self.status.ActMount
         # do another iteration?
@@ -627,10 +629,26 @@ class GalilDevice(TclActor.TCPDevice):
                 self.actor.writeToUsers("i", statusStr, cmd=self.status.Cmd)
                 cmdMoveStr = self._galCmdFromMount(self.status.CmdMount)
                 self.newCmd(cmdMoveStr, callFunc=self._moveCallback)
-                return
-        # no more iterations, free up the Galil...
-        self._clrDevCmd()
-        self.status.Cmd.setState("done")
+                return False
+        # no more iterations
+        return True
+
+    def _moveCallback(self, cmd):
+        """This code is executed when a device move command changes state. Most of the work
+        is in the _actOnMove() method...
+        
+        Inputs: 
+        - cmd: passed automatically due to TclActor callback framework
+        """
+        
+        if not cmd.state == "done":
+            return
+        done = self._actOnMove()
+        if done:
+            self._clrDevCmd()
+            self.status.Cmd.setState("done")
+        else:
+            return
 
     def _statusCallback(self, cmd):
         """Callback for status command.
@@ -783,21 +801,82 @@ class GalilDevice25M2(GalilDevice):
             'resolution (microsteps/piezo ctrl bit)'
             ])
             
-    def actOnKey(self, key, data):
-        """An overwritten version from the base class to incorporate 2.5m Specific Keywords.
-        Takes a key parsed from self.parseLine, and chooses what to do with the data
+#     def actOnKey(self, key, data):
+#         """An overwritten version from the base class to incorporate 2.5m Specific Keywords.
+#         Takes a key parsed from self.parseLine, and chooses what to do with the data
+#         
+#         inputs:
+#         -key: parsed descriptive string from self.parseLine
+#         -data: parsed data from self.parseLine, may be a numpy array
+#         """
+#         # test for 2.5m specifics
+#         if 'piezo status word' in key:
+#             data = [int(num) for num in data]
+#             outStr = self.formatAsKeyValStr("piezoStatusWord", data)
+#             self.actor.writeToUsers("i", outStr, cmd=self.status.Cmd)
+#             return
+#         # then run as normal
+#         else:
+#             GalilDevice.actOnKey(key, data)
+            
+    def cmdMovePiezos(self):
+        """A command for moving piezos that are set in series with actuators A, B, and C.  
         
-        inputs:
-        -key: parsed descriptive string from self.parseLine
-        -data: parsed data from self.parseLine, may be a numpy array
+        Inputs:
+        piezoMount: 3 item list containing the ammount of required adjustment (microsteps) for A, B, C.
         """
-        # test for 2.5m specifics
-        if 'piezo status word' in key:
-            data = [int(num) for num in data]
-            outStr = self.formatAsKeyValStr("piezoStatusWord", data)
-            self.actor.writeToUsers("i", outStr, cmd=self.status.Cmd)
+        actErr = self.status.CmdMount - self.status.ActMount
+        self.status.CmdMount[0:3] = self.status.CmdMount[0:3] + actErr[0:3]
+        # only first 3 actuators have piezos
+        cmdStr = self._galPiezoCmdFromMount(self.status.CmdMount[0:3])
+        self.newCmd(cmdStr, callFunc=self._piezoMoveCallback)
+        
+    def _moveCallback(self, cmd):
+        """Overwritten from base class, to allow for a piezo move command after all the
+        coarse moves have been finished.
+        
+        Inputs: 
+        - cmd: passed automatically due to TclActor callback framework
+        """
+        
+        if not cmd.state == "done":
             return
-        # if not special run as normal
+        done = self._actOnMove()
+        if done:
+            # command a piezo move
+            self._clrDevCmd()
+            self.cmdMovePiezos()
         else:
-            GalilDevice.actOnKey(key, data)
+            return
+
+    def _piezoMoveCallback(self, cmd):
+        """Called when the piezos are finished moving
+        """
+        if not('commanded position' in self.parsedKeyList):
+            self.actor.writeToUsers("w", "Text=Commanded actuator positions not received from piezo move", cmd=self.status.Cmd)
+        if not('actual position' in self.parsedKeyList):        
+            self.actor.writeToUsers("w", "Text=Actual actuator positions not received from piezo move", cmd=self.status.Cmd)
+        if not('status word' in self.parsedKeyList):        
+            self.actor.writeToUsers("w", "Text=Status word not received from piezo move", cmd=self.status.Cmd)
+        if not('piezo status word' in self.parsedKeyList):        
+            self.actor.writeToUsers("w", "Text=Piezo status word not received from piezo move", cmd=self.status.Cmd)
+        if not('piezo corrections (microsteps)' in self.parsedKeyList):        
+            self.actor.writeToUsers("w", "Text=piezo corrections not received from piezo move", cmd=self.status.Cmd)
+        self._clrDevCmd()
+        self.status.Cmd.setState("done")
+            
+    def _galPiezoCmdFromMount(self, mountOffset):
+        """Converts mount information into a string command for a Galil.  Only actuators
+        A, B, and C have piezos, so no translational fine-tuning is available here.
+        
+        Inputs:
+        mountList: a list of 3 mount values (microsteps) for each piezo to move. 
+        """
+        if len(mountList) != 3:
+            raise RuntimeError("Must provide 3 peizo values")
+        argList = []
+        for ind, mount in enumerate(mountList):
+            # axes to move
+            argList.append("LDESPOS%s=%.0f;" % (self.validAxisList[ind], mount))
+        return " ".join(argList) + 'XQ #LMOVE'            
             
