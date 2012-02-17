@@ -36,7 +36,8 @@ class MirrorBase(object):
                         actuator has no encoder.
         - fixAxes: List of orientation axes that are fixed. Integer values [0:5].
                         Must be specified if fixed length links are present.
-        - name: Mirror name, if you care to specify
+        - name: Mirror name, if you care to specify. Choose from 'Prim', 'Sec', or 'Tert'
+                this is read by the actor and used to generate appriate keywords
         
         Two configurations are supported:
         - control piston, tip and tilt only (no translation or z rotation)
