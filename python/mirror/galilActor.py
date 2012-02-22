@@ -19,16 +19,17 @@ ConvertOrient = numpy.array([MMPerMicron, RadPerArcSec, RadPerArcSec,
 
 
 class GalilActor(TclActor.Actor):
-    def __init__(self, mir, userPort, controllerAddr, controllerPort, maxUsers = 5):
+    def __init__(self, device, mir, userPort, controllerAddr, controllerPort, maxUsers = 5):
         """Create a Galil mirror controller actor
         
         Inputs:
+        - device: A TclActor.TCPDevice from galilDevice.py
         - mir: an instance of mirror.MirrorBase
         - userPort: port on which to listen for client connections
         - maxUsers: maximum allowed simultaneous users
         """
         self.mirror = mir
-        self.galilDev = GalilDevice35M3(controllerAddr, controllerPort, actor=self)
+        self.galilDev = device(controllerAddr, controllerPort, actor=self)
         TclActor.Actor.__init__(self,
             userPort = userPort,
             devs = [self.galilDev],
@@ -133,7 +134,8 @@ def runGalil(mir, userPort, controllerAddr, controllerPort):
     root = Tkinter.Tk()
     print "Galil actor is starting up on port %s" % (userPort,)
     galilActor = None
-    galilActor = GalilActor(mir=mir, userPort=userPort, controllerAddr=controllerAddr, controllerPort = controllerPort)
+    device = GalilDevice35M3
+    galilActor = GalilActor(device, mir=mir, userPort=userPort, controllerAddr=controllerAddr, controllerPort = controllerPort)
     print "Galil ICC is running on port %s" % (userPort,)
     root.mainloop()
     print "Galil ICC is shutting down"

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-"""starts up the galil actor, allowing for testing"""
+"""starts up the galil actor, allowing for testing
+Intended for communication via telnet"""
 
 import numpy
 import mirror

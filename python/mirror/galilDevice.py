@@ -100,7 +100,7 @@ class GalilStatus(object):
         self.MaxIter = MaxIter if self.mirror.hasEncoders else 1
         self.Status = [numpy.nan]*self.nAct
 #         self.homing = ["?"]*self.nAct
-#         self.axesHomed = ["?"]*self.nAct
+        self.AxisHomed = ["?"]*self.nAct
 
     def _getKeyValStr(self, keywords):
         """Package and return current keyword value info in status cache
@@ -265,14 +265,17 @@ class GalilDevice(TclActor.TCPDevice):
         
     def sendGalilParam(self, key, data):
         """Key is determined to be a Galil parameter, send the key and data to the user.
-        Keyword for Galil Paramaters are 'GalilPar<par>' where par is the name from the
+        Keyword for Galil Paramaters are 'GPar<par>' where par is the name from the
         Galil itself.
         
         key example: -RNGx/2 reverse limits
        
         """
         param = key.split()[0] # in example: just keep -RNGx/2
-        keyword = 'GalilPar%s' % (param)
+        # format as a legal keyword swap out '-' and '/' if present
+        param = param.replace('-', '_')
+        param = param.replace('/', 'div')
+        keyword = 'GPar%s' % (param)
         outStr = self.formatAsKeyValStr(keyword, data)
         self.actor.writeToUsers("i", outStr, cmd = self.status.Cmd)        
 
@@ -291,7 +294,7 @@ class GalilDevice(TclActor.TCPDevice):
             
         elif 'software version' in key:
             # this is a special parameter case, and can't be treated using sendParam
-            msgStr = 'GalilPar%s=%s' % (('SoftwareVersion', data[0])) #data is a single element list
+            msgStr = 'GPar%s=%s' % (('SoftwareVersion', data[0])) #data is a single element list
             self.actor.writeToUsers("i", msgStr, cmd = self.status.Cmd)
             return
                    
@@ -311,12 +314,6 @@ class GalilDevice(TclActor.TCPDevice):
             # add 15% more time than estimated for the user cmd
             self.status.Cmd.timeLimit += 1.15 * maxTime
             return
-        
-#         elif 'axis homed' in key:
-#             self.status.axesHomed = [int(num) for num in data]
-#             updateStr = self.status._getKeyValStr(["axesHomed"])
-#             self.actor.writeToUsers("i", updateStr, cmd=self.status.Cmd)
-#             return
         
         elif ('commanded position' == key) or ('target position' == key):
             self.status.CmdMount = [int(x) for x in data]
@@ -343,13 +340,20 @@ class GalilDevice(TclActor.TCPDevice):
             self.actor.writeToUsers("i", updateStr, cmd=self.status.Cmd)
             return
         
+        elif key == 'axis homed':
+            data = [int(num) for num in data]
+            self.status.AxisHomed = data
+            updateStr = self.status._getKeyValStr(["AxisHomed"])
+            self.actor.writeToUsers("i", updateStr, cmd=self.status.Cmd)
+            return
+        
         elif key == 'status word':
             data = [int(num) for num in data]
             self.status.Status = data
             updateStr = self.status._getKeyValStr(["Status"])
             self.actor.writeToUsers("i", updateStr, cmd=self.status.Cmd)
             return
-        
+                
         else:
             # send the remaining info back to the user
             msgStr = "UnparsedReply=%s, %s" % (quoteStr(key), quoteStr(str(data)))
@@ -379,7 +383,7 @@ class GalilDevice(TclActor.TCPDevice):
         self.replyLog.append(replyStr)  # add reply to log       
         if MatchQMBeg.match(replyStr): # if line begins with '?'
             # there was an error. End current process
-            self.actor.writeToUsers("f", "Text=Galil Error: %s" % (replyStr,), cmd = self.currDevCmd)
+            self.actor.writeToUsers("f", "Text=\"Galil Error: %s\"" % (replyStr,), cmd = self.currDevCmd)
             self.currDevCmd.setState("failed", textMsg=replyStr)
             self.status.Cmd.setState("failed", textMsg=replyStr)
             self._clrDevCmd()        
@@ -395,7 +399,7 @@ class GalilDevice(TclActor.TCPDevice):
         if not startsWithNumRegEx.match(replyStr):
             # line doesn't begin with a data value, eg 'Finding next full step'
             # show it to the user and return
-            self.actor.writeToUsers("i", "Text=Galil Line: %s" % (replyStr,), cmd = self.status.Cmd)
+            self.actor.writeToUsers("i", "UnparsedReply=\"%s\"" % (replyStr,), cmd = self.status.Cmd)
             return
         # if we made it this far, separate the data from the descriptive text
         parsedLine = self.parseLine(replyStr)
@@ -541,6 +545,8 @@ class GalilDevice(TclActor.TCPDevice):
         userCmd.setState("running")
         userCmd.timeLimit = 5
         self.status.Cmd = userCmd
+        if not axisList:
+            axisList = self.validAxisList
         self.actor.writeToUsers(">", "Homing=%s" % (", ".join(str(v) for v in axisList)), cmd = userCmd)
         # format Galil command
         axisList, cmdMoveStr = self._galCmdForHome(axisList)
@@ -626,7 +632,11 @@ class GalilDevice(TclActor.TCPDevice):
             statusStr = self.status._getKeyValStr(["ActMount"])
             self.actor.writeToUsers("i", statusStr, cmd = self.status.Cmd)
         if not ('status word' in self.parsedKeyList):
+            # don't send cached value?
             self.actor.writeToUsers("w", "Text=\"status word not received\"", cmd=self.status.Cmd)
+        if not ('axis homed' in self.parsedKeyList):
+            # don't send cached value?
+            self.actor.writeToUsers("w", "Text=\"homed axis info not received\"", cmd=self.status.Cmd)
         # grab cached info that wasn't already sent to the user
         getThese = [
             "Cmd",
@@ -699,10 +709,7 @@ class GalilDevice(TclActor.TCPDevice):
         
         Raise TclActor.Command.CommandError if invalid axes are specified
         """
-        if not axisList:
-            axisList = self.validAxisList
-        else:
-            axisList = [axis.upper() for axis in axisList]
+        axisList = [axis.upper() for axis in axisList]
 
         axisSet = set()
         validAxisSet = set(self.validAxisList)
@@ -811,15 +818,15 @@ class GalilDevice25M2(GalilDevice):
         """Called when the piezos are finished moving
         """
         if not('commanded position' in self.parsedKeyList):
-            self.actor.writeToUsers("w", "Text=Commanded actuator positions not received from piezo move", cmd=self.status.Cmd)
+            self.actor.writeToUsers("w", "Text=\"Commanded actuator positions not received from piezo move\"", cmd=self.status.Cmd)
         if not('actual position' in self.parsedKeyList):        
-            self.actor.writeToUsers("w", "Text=Actual actuator positions not received from piezo move", cmd=self.status.Cmd)
+            self.actor.writeToUsers("w", "Text=\"Actual actuator positions not received from piezo move\"", cmd=self.status.Cmd)
         if not('status word' in self.parsedKeyList):        
-            self.actor.writeToUsers("w", "Text=Status word not received from piezo move", cmd=self.status.Cmd)
+            self.actor.writeToUsers("w", "Text=\"Status word not received from piezo move\"", cmd=self.status.Cmd)
         if not('piezo status word' in self.parsedKeyList):        
-            self.actor.writeToUsers("w", "Text=Piezo status word not received from piezo move", cmd=self.status.Cmd)
+            self.actor.writeToUsers("w", "Text=\"Piezo status word not received from piezo move\"", cmd=self.status.Cmd)
         if not('piezo corrections (microsteps)' in self.parsedKeyList):        
-            self.actor.writeToUsers("w", "Text=piezo corrections not received from piezo move", cmd=self.status.Cmd)
+            self.actor.writeToUsers("w", "Text=\"Piezo corrections not received from piezo move\"", cmd=self.status.Cmd)
         self._clrDevCmd()
         self.status.Cmd.setState("done")
             
