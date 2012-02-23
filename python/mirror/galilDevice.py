@@ -225,7 +225,7 @@ class GalilDevice(TclActor.TCPDevice):
              041,  006.6 microsteps, sec to find full step
             -000006732,  000014944,  000003741,  999999999,  999999999 position error
              1,  1,  1,  0,  0 axis homed       
-        """      
+        """ 
         # Grab the data in each line:
         # Match only numbers (including decimal pt and negative sign) that are not preceeded by '/'
         # or immediately surrounded by any letters letters.
@@ -373,6 +373,7 @@ class GalilDevice(TclActor.TCPDevice):
         - Parse status to update the model parameters
         - If a command has finished, call the appropriate command callback
         """
+        
         if self.currDevCmd.isDone():
             # ignore unsolicited input
             return
@@ -459,6 +460,8 @@ class GalilDevice(TclActor.TCPDevice):
         # if Galil is busy, abort the command
         if not self.currDevCmd.isDone():
             userCmd.setState("cancelled", textMsg="Galil is busy")
+            print 'Galil is busy'
+            print self.currDevCmd.cmdStr
             return
         userCmd.setState("running")
         userCmd.timeLimit = 5

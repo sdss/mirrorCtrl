@@ -110,7 +110,6 @@ class SpitBack(LineReceiver):
 
     def lineReceived(self, line):
         """As soon as any data is received, look at it and write something back."""
-        print 'Got a line!'
         
         splitLine = line.lower().split("xq #")
         cmdRec = splitLine[-1].strip("; ") # just get the cmd without any ';' or ' '.
@@ -132,7 +131,7 @@ class SpitBack(LineReceiver):
             if self.ind >= len(self.replyList):
                 print "Error in writeBack: index = %s >= %s" % (self.ind, len(self.replyList))
                 return
-            print "Sending:", self.replyList[self.ind]
+            #print "Sending:", self.replyList[self.ind]
             self.sendLine(self.replyList[self.ind]) # send one line at a time
             time.sleep(.25) # pause inbetween lines sent, for the hell of it.
             self.ind += 1
