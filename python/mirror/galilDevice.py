@@ -460,8 +460,6 @@ class GalilDevice(TclActor.TCPDevice):
         # if Galil is busy, abort the command
         if not self.currDevCmd.isDone():
             userCmd.setState("cancelled", textMsg="Galil is busy")
-            print 'Galil is busy'
-            print self.currDevCmd.cmdStr
             return
         userCmd.setState("running")
         userCmd.timeLimit = 5

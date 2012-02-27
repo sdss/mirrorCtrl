@@ -4,13 +4,11 @@ import Tkinter
 import thread
 import multiprocessing
 import time
-import twisted.internet
 import telnetlib
 
 import mirror
 from data import genMirrors
 import twistedGalil
-import TclActor
     
 UserPort = 1025
 ControllerAddr = 'localhost'
@@ -85,7 +83,6 @@ class ActorTests(unittest.TestCase):
         connections to ports, etc.
         """
         global isOK
-        global Iter
         isOK = 1
         # start up the fake galil
         tGal = multiprocessing.Process(target=twistedGalil.main, args=())
@@ -107,10 +104,7 @@ class ActorTests(unittest.TestCase):
         # start up the actor instance
         root.mainloop()
         tGal.terminate()
-        print isOK
         self.assertEqual(1, isOK, 'failed on cmd %s' % cmdStrs[Iter])
-
-
 
 
 if __name__ == '__main__':
