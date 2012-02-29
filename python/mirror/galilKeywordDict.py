@@ -16,7 +16,7 @@ KeysDictionary("galilactor", (1,1),
         help = "Elapsed time since a desired orientation was set."
     ),    
     Key("CmdMount",
-        Float(invalid = "nan")*(nAct,),
+        Float(invalid = "nan")*nAct,
         help = "Commanded mount positions."
     ),
     Key("Cmd", String(invalid = "?"), help = "The current command (verb) executing."),
@@ -38,44 +38,48 @@ KeysDictionary("galilactor", (1,1),
         Float(invalid = "nan", help = "Rotation about Z", units = "arcseconds"),
         help = "The measured mirror orientation."
     ),
-    Key("ActMount", Float(invalid = "nan"), help = "The measured actuator mount positions")*(nAct,),
+    Key("ActMount", Float(invalid = "nan"), help = "The measured actuator mount positions")*nAct,
     Key("Iter", Int(invalid = "nan"), help = "Current move iteration."),
-    Key("AxisHomed", Bool(0, 1, invalid = "?"), help = "Axes that are homed.")*(nAct,),
-    Key("Status", Bits("Stop Code:8", 
-                        "not used",
-                        "Home switch activated",
-                        "Reverse limit switch activated",
-                        "Forward limit switch activated",
-                        "undefined",
-                        "Motor on",
-                        "not used",
-                        "Axis in motion",
-                        "
-                        )
-    )*(nAct,]),
-    Key("MaxIter" = int
-Homing = int[nAct]
-UnparsedReply = str[, str]
-BadGalilReply = str, str
-GParSoftwareVersion = int
-GParNAXES = int
-GParDOAUX = int
-GParMOFF = int
-GParNCORR = int
-GParWTIME = Float
-GParENCTIME = Float
-GParLSTIME = Float
-GPar_RNGxdiv2 = int[nAct]
-# these look equal but opposite, get rid of one?
-GParRNGxdiv2 = int[nAct]
-GParSPDx = int[nAct]
-GParHMSPDx = int[nAct]
-GParACCx = int[nAct]
-GParMINCORRx = int[nAct]
-GParMAXCORRx = int[nAct]
-GParST_FSx = int[nAct]
-GParMARGx = int[nAct]
-GParINDSEP = int[nAct]
-GParENCRESx = Float[nAct]
-
+    Key("AxisHomed", Bool(0, 1, invalid = "?"), help = "Axes that are homed.")*nAct,
+    Key("Status", 
+        Bits("stopcode:8", 
+            "unused",
+            "home_switch_on",
+            "rev_lim_switch_on",
+            "fwrd_lim_switch_on",
+            "undefined",
+            "motor_on",
+            "unused",
+            "axis_moving",
+            "not_on_fullstep_err",
+            "amplif_fault",
+            "unused",
+            "unused:12"
+            )*nAct,
+            help = "http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html#StatusWord"
+        ),
+    Key("MaxIter", Int(invalid = "nan"), help = "Max number of allowed iterations for a move."),
+    Key("Homing", Bool(0, 1, invalid="?")*nAct),
+    Key("UnparsedReply", String()*(1,2), help = "Display an ignored raw Galil reply"),
+    Key("BadGalilReply", String()*(1,2), help = "Parsed Galil reply that confused the actor"),
+    Key("GParSoftwareVersion", Float(), help = "Software Version, Galil Param"),
+    Key("GParNAXES", Int(), help = "Number of axes (1-6), Galil Param"),
+    Key("GParDOAUX", Int(), help = "If nonzero, status info emitted from aux serial port, http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html#InterfaceAuxPortStatus, Galil Param)"),
+    Key("GParMOFF", Int(), help = "Turn off all motors after each move, if nonzero"),
+    Key("GParNCORR", Int(), help = "Number of encoder-based corrections after each move"),
+    Key("GParWTIME", Float(units = "seconds"), help = "Settling time after a move"),
+    Key("GParENCTIME", Float(units = "seconds"), help = "Settling time after a move and after WTIME, before encoders are read"),
+    Key("GParLSTIME", Float(units = "seconds"), help = "Max time required to back out of a limit at low speed"),
+    Key("GPar_RNGxdiv2", Int(units = "microsteps")*nAct, help = "Half the negative range in microsteps"),
+    # these look equal but opposite, get rid of one?
+    Key("GParRNGxdiv2", Int(units = "microsteps")*nAct, help = "Half the positive range in microsteps"),
+    Key("GParSPDx", Int(units = "microsteps/second")*nAct, help = "Max speed, in microsteps/sec"),
+    Key("GParHMSPDx", Int(units = "microsteps/second")*nAct, help = "Max speed for finding home switch, in microsteps/sec"),
+    Key("GParACCx", Int(units = "microsteps/second^2")*nAct, help = "Acceleration and deceleration of each axis, in microsteps/sec^2"),
+    Key("GParMINCORRx", Int()*nAct, help = "The min error that will be corrected, 0 means correct any error."),
+    Key("GParMAXCORRx", Int()*nAct, help = "The max error that will be corrected at the end of a move. Set to 0 if no encoder or no correction is desired"),
+    Key("GParST_FSx", Int()*nAct, help = "Step resolution, in microsteps per full step. 1 for servo motor"),
+    Key("GParMARGx", Int(units = "microsteps")*nAct, help = "Margin between the hard and soft reverse limits, in microsteps"),
+    Key("GParINDSEP", Int()*nAct, help = "If this axis has an index pulse encoder and it is used for homing, then set to the separation between index pulses in microsteps."),
+    Key("GParENCRESx", Float(units = "ticks/microstep")*nAct, help = "Resolution of encremental auxiliary encoder in ticks per microstep, 0 if no encoder")
 )
