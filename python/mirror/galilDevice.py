@@ -99,7 +99,7 @@ class GalilStatus(object):
         self.Iter = numpy.nan
         self.MaxIter = MaxIter if self.mirror.hasEncoders else 1
         self.Status = [numpy.nan]*self.nAct
-#         self.homing = ["?"]*self.nAct
+        self.Homing = ["?"]*self.nAct
         self.AxisHomed = ["?"]*self.nAct
 
     def _getKeyValStr(self, keywords):
@@ -511,9 +511,9 @@ class GalilDevice(TclActor.TCPDevice):
             "DesOrient",
             "DesOrientAge",
             "Iter",
-            "MaxIter"#,
-#            "homing",
-#            "axesHomed",
+            "MaxIter",
+            "Homing",
+            "AxisHomed",
             ])
             self.actor.writeToUsers("i", statusStr, cmd=userCmd)
             userCmd.setState("done")
@@ -548,17 +548,17 @@ class GalilDevice(TclActor.TCPDevice):
         self.status.Cmd = userCmd
         if not axisList:
             axisList = self.validAxisList
-        self.actor.writeToUsers(">", "Homing=%s" % (", ".join(str(v) for v in axisList)), cmd = userCmd)
-        # format Galil command
-        axisList, cmdMoveStr = self._galCmdForHome(axisList)
-        self.newCmd(cmdMoveStr, callFunc=self._userCmdCallback)
-        # send homing axes to status.
+        self.actor.writeToUsers(">", "Text = Homing Actuators: %s" % (", ".join(str(v) for v in axisList)), cmd = userCmd)
         homeStatus = numpy.zeros(self.nAct)
         for axis in axisList:
             ind = self.validAxisList.index(axis) # which one is homing?
             homeStatus[ind] = 1  # set it to 1
-        self.status.homing = homeStatus
-        # when move is done, check orientation from encoders
+        self.status.Homing = homeStatus
+        updateStr = self.status._getKeyValStr(["Homing"])
+        self.actor.writeToUsers("i", updateStr, cmd=userCmd)
+        # format Galil command
+        axisList, cmdMoveStr = self._galCmdForHome(axisList)
+        self.newCmd(cmdMoveStr, callFunc=self._userCmdCallback)
         
     def _actOnMove(self):
         """Called after a move command.  This method tests if all went well with the move, 
