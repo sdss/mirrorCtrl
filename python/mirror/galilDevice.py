@@ -447,9 +447,9 @@ class GalilDevice(TclActor.TCPDevice):
         """Prints out all (raw) replies received from Galil since startup.
         """
         for line in self.replyLog:
-            msgStr = 'GalilReply=%s' % (quoteStr(line),)
-            self.actor.writeToUsers("i", msgStr, cmd=Cmd)
-        Cmd.setState("done")
+            msgStr = 'Text=%s' % (quoteStr(line),)
+            self.actor.writeToUsers("i", msgStr, cmd=userCmd)
+        userCmd.setState("done")
     
     def cmdMove(self, orient, userCmd):
         """Accepts an orientation then commands the move.
