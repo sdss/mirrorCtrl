@@ -106,7 +106,10 @@ class GalilActor(TclActor.Actor):
     def cmd_status(self, cmd):
         """Show status of Galil mirror controller
         """
+        # TclActor status
+        TclActor.Actor.cmd_status(self, cmd)
         try:
+            # additional status from Galil
             self.galilDev.cmdStatus(cmd)
         except Exception, e:
             raise TclActor.Command.CommandError(str(e))
