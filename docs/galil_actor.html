@@ -58,8 +58,9 @@ responsible for moving the mirror.
 <h3><a name="cmd_move">move <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a></h3>
 
 <p> Move the mirror to the desired orientation.  Units are um for lengths and arcseconds for angles. 
-Arguments must appear in the exact order.  If fewer than 5 axes are specified, remaining axes are assumed to be 0. 
-At least 1 axis (piston) must be specified.
+Arguments may only appear in the exact order listed above. If fewer than 5 axes are specified, the remaining non-specified
+axes are assumed to be zero. At least 1 axis (piston) must be specified for a valid command.
+<p>
 Once a move command is received, a desired 6-axis orientation is determined based on constrained axes 
 (eg an anti-rotation link). So rotation about the Z axis may never be directly commanded, but it may 
 manifest as an induced effect. 
@@ -145,7 +146,7 @@ Sends a stop command. Any running commands will stop, and the status of the Gali
 <h3><a name="key_DesOrient"></a>DesOrient=float,float,float,float,float,float</h3>
 <p>
 The desired mirror orientation: piston (um), tiltX (arcsec), tiltY (arcsec), 
-transX (um), transY (um), rotZ (arcsec) in um and arcseconds.
+transX (um), transY (um), rotZ (arcsec).
 </p>
 <h3><a name="key_DesOrientAge"></a>DesOrientAge=float</h3>
 <p>
@@ -202,7 +203,7 @@ transX (um), transY (um), rotZ (arcsec) in um and arcseconds.
 <p>Number of axes (1-6), Galil Param
 </p>
 <h3><a name="key_GParDOAUX"></a>GParDOAUX=int</h3>
-<p>If nonzero, status info emitted from aux serial port, http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html#InterfaceAuxPortStatus, Galil Param.
+<p>If nonzero, status info emitted from aux serial port, Galil Param.
 </p>
 <h3><a name="key_GParMOFF"></a>GParMOFF=int</h3>
 <p>Turn off all motors after each move, if nonzero.
