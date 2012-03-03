@@ -8,14 +8,8 @@ http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.ht
 
 To Do:
 add mirror-specific galil replies
-format reply to user output - ints, floats (how many decimals?)
 ConstRMS keyword - how close the mirror can get to commanded orientation?
-user CmdDTime?
 
-Questions:
-Do we want to compute error in orientation, or error in actuator position when determining 
-what adjustments to send to actuators?  I need to think more about this...it is relevant for
-piezo adjustments too.
 
 Notes:
 Update Galil Code Constants:
@@ -447,9 +441,9 @@ class GalilDevice(TclActor.TCPDevice):
         """Prints out all (raw) replies received from Galil since startup.
         """
         for line in self.replyLog:
-            msgStr = 'GalilReply=%s' % (quoteStr(line),)
-            self.actor.writeToUsers("i", msgStr, cmd=Cmd)
-        Cmd.setState("done")
+            msgStr = 'Text=%s' % (quoteStr(line),)
+            self.actor.writeToUsers("i", msgStr, cmd=userCmd)
+        userCmd.setState("done")
     
     def cmdMove(self, orient, userCmd):
         """Accepts an orientation then commands the move.
@@ -474,7 +468,7 @@ class GalilDevice(TclActor.TCPDevice):
         # format Galil command
         cmdMoveStr = self._galCmdFromMount(mount)
         self.status.DesOrientAge.startTimer()
-        updateStr = self.status._getKeyValStr(["DesOrient", "DesOrientAge", "CmdMount"])
+        updateStr = self.status._getKeyValStr(["DesOrient", "DesOrientAge", "CmdMount", "MaxIter"])
         self.actor.writeToUsers(">", updateStr, cmd=userCmd)
         self.newCmd(cmdMoveStr, callFunc=self._moveCallback)
     
@@ -504,7 +498,6 @@ class GalilDevice(TclActor.TCPDevice):
             "Cmd",
             "MaxDuration",
             "Duration",
-#            "remainExecTime",
             "ActMount",
             "CmdMount",
             "Orient",
@@ -643,12 +636,11 @@ class GalilDevice(TclActor.TCPDevice):
             "Cmd",
             "MaxDuration",
             "Duration",
-#            "remainExecTime",
             "Iter",
             "MaxIter",
             "DesOrient",
-            "DesOrientAge"#,
- #           "homing",
+            "DesOrientAge",
+            "Homing",
             ]
         statusStr = self.status._getKeyValStr(getThese)
         self.actor.writeToUsers("i", statusStr, cmd = self.status.Cmd)
@@ -675,7 +667,7 @@ class GalilDevice(TclActor.TCPDevice):
         if not self.currDevCmd.isDone():
             # failsafe, cmd should always be done at this point.
             self.currDevCmd.setState("failed")
-#        self.status.homing = [0]*self.nAct
+        self.status.Homing = [0]*self.nAct
         self.status.MaxDuration = numpy.nan
         self.status.Duration.reset()
 
@@ -766,7 +758,8 @@ class GalilDevice25M2(GalilDevice):
             'number of steps of piezo position',
             'resolution (microsteps/piezo ctrl bit)'
             ])
-            
+ 
+# uncomment method below if piezoStatusWord should be it's own keyword.
 #     def actOnKey(self, key, data):
 #         """An overwritten version from the base class to incorporate 2.5m Specific Keywords.
 #         Takes a key parsed from self.parseLine, and chooses what to do with the data

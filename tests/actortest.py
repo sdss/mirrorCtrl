@@ -15,4 +15,4 @@ ControllerPort = 8000 # must match in twistedGalil.py for testing
 Mir = genMirrors.Sec25().makeMirror(name='Tert') # this matches hard coded (faked) replies from twistedGalil
 
 if __name__ == "__main__":
-    mirror.runGalil(Mir, UserPort, ControllerAddr, ControllerPort)
+    mirror.runGalil(Mir, mirror.GalilDevice35M3, UserPort, ControllerAddr, ControllerPort)

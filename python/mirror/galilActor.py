@@ -7,7 +7,7 @@ import Tkinter
 import numpy
 import TclActor
 
-from .galilDevice import GalilDevice, GalilDevice35M3
+#from .galilDevice import GalilDevice, GalilDevice35M3, GalilDevice25M2
 
 MMPerMicron = 1 / 1000.0        # millimeters per micron
 RadPerDeg  = math.pi / 180.0    # radians per degree
@@ -106,7 +106,10 @@ class GalilActor(TclActor.Actor):
     def cmd_status(self, cmd):
         """Show status of Galil mirror controller
         """
+        # TclActor status
+        TclActor.Actor.cmd_status(self, cmd)
         try:
+            # additional status from Galil
             self.galilDev.cmdStatus(cmd)
         except Exception, e:
             raise TclActor.Command.CommandError(str(e))
@@ -130,11 +133,18 @@ class GalilActor(TclActor.Actor):
             raise TclActor.Command.CommandError(str(e))        
         return True
         
-def runGalil(mir, userPort, controllerAddr, controllerPort):
+def runGalil(mir, device, userPort, controllerAddr, controllerPort):
+    """Start up an actor event loop
+    Inputs:
+    mir = a mirror object (see mirror.mirror)
+    device = a TclActor-based Galil Device (see mirror.galilDevice)
+    userPort
+    controllerAddr
+    controllerPort
+    """
     root = Tkinter.Tk()
     print "Galil actor is starting up on port %s" % (userPort,)
     galilActor = None
-    device = GalilDevice35M3
     galilActor = GalilActor(device, mir=mir, userPort=userPort, controllerAddr=controllerAddr, controllerPort = controllerPort)
     print "Galil ICC is running on port %s" % (userPort,)
     root.mainloop()
