@@ -1,0 +1,1262 @@
+NO: Basic mirror Galil code
+
+NO: This code has been developed for ROM revision 2.0g.
+
+NO: History:
+NO: 1.5b1-3: R.O.
+NO:     Changed so any axis already moving continues moving after a #MOVE
+NO:     that doesn't affect that axis. Improved error handling with #CMDERR.
+NO:     Added #LMINIT & #LMSTOP routines.
+NO:     Reordered local subroutines with #LCMPVAR first.
+NO:     Added #END as a starting place for test routines.
+NO: 1.5b4: R.O.
+NO:     #HOME requires setting A, B, C...non-MAXINT before calling.
+NO:     HOMED replaced by HOMEDx. Changed #MINIT to eliminate PR* = 0
+NO:     and only enable axes that are being moved (x <> MAXINT).
+NO:     Added #MSTOP, changed so #HOME and #GOPOS call #MINIT rather than
+NO:     #GORLIM, #GOIND or #GOFS. Eliminated #DEFIN.
+NO: 1.5b9: R.O.
+NO:     Added input #13 as a second fault input.
+NO:     #ISONFS ignores servo motors.
+NO: 1.5b10 R.O. 3/99:
+NO:     Changed all input variables to microsteps, dumping lots of variables.
+NO:     Changed HASINDx to INDSEPx and modified #SHOWPAR output accordingly.
+NO:     Added #LMSTIME and time output to #LMINIT.
+NO: 1.5b11 R.O. 3/99:
+NO:		Dumped #MV (use #MOVE instead).
+NO:		Changed ST_FS to ST_FSx to support servos better.
+NO:		Added #MAX and changed #MVTIME to not compute maximum move time.
+NO:		Changed #ONFS to #ISONFS.
+NO: 1.5b12 R.O. 4/99:
+NO:		Changed #GOPOS to not spawn #WAITEND and not wait for move to end
+NO:		Added #GOFGND and #GOBKGND to be like #GOPOS but wait or spawn a waiter
+NO:		Added #MVCORR to correct errors after move if encoder avail.
+NO: 1.5b13 R.O. 4/99:
+NO:    Changed #MVCORR to reset motor position.
+NO:    Added #MVOK and #GETEP (though am not using #GETEP yet).
+NO: 1.5b14 R.O. 4/99:
+NO:    Bug fix: DPRND was not rounding DESPOSx to nearest int if MOFF false.
+NO:    Eliminated background moves entirely.
+NO:    Changed #MVCORR to #GOCORR.
+NO:    Eliminated #WAITEND, #GOBKGND and #LMSTIME.
+NO:    Changed GETPE and GETEP to round output to nearest integer.
+NO: 1.5b15 R.O. 4/99:
+NO:    #GOCORR changed to report full move time initially and no other times,
+NO:    also corrects error after final move & reports final actual position.
+NO:    Added #CORRPOS to correct position.
+NO:    Dumped #GETEP.
+NO:    Home now finishes computing and setting stuff before running #MSTOP,
+NO:    so homing succeeds even if shutdown fails.
+NO:    Bug fix: #MVOK was not testing properly.
+NO: 1.5b16 R.O. 4/25/99:
+NO:    Tweaked end-of-move sequence for #GOCORR.
+NO:    Replaced #MVOK with #CHKMV (which does more).
+NO: 1.5b17 R.O. 4/99:
+NO:	   Moved ISSTEPx computations to COMPVAR. 
+NO: 1.5 R.O. 10/99:
+NO:    Labelled 1.5b17 as the release version.
+NO: 1.6b1 R.O. 10/99:
+NO:    Combined #GO and #MINIT into #GO, so auto-inits on #GO
+NO:    Modified #DONE to call #MSTOP, so auto-stops at final exit
+NO:    Renamed #LMINIT to #LGO.
+NO:    Renamed #LMITIME to LMVTIME.
+NO:    These changes allow local initialization to determine if an axis is
+NO:    actually going to move (by testing _PRx <> 0). However, this is
+NO:    a bit fragile: users must set PRx or PAx before calling #GO.
+NO:    One nice side effect: #GOFS, #GOIND, #GORLIM, etc. now work even if
+NO:    the motors are off to begin with.
+NO: 1.6b2 R.O. 11/99:
+NO:    Changed #DONE to call #MSTOP and to never return
+NO:    Created #CLEANUP to handle the non-stopping part of #DONE
+NO:    Changed #MSTOP to halt motion, if any, before doing anything else
+NO:    Termination in #MSTOP or #LMSTOP must be handled by #CLEANUP, not #DONE
+NO:    Changed #MYERR to stop motion (but still doesn't call #MSTOP or #LMSTOP)
+NO: 1.6b3 R.O. 1/00:
+NO:    Changed #TESTMV so TESTNI is # of cycles, not moves
+NO:    Renamed global variable for testing ITER to TESTST
+NO:    Fixed bug in #TESTMV (WAIT instead of WT) and shortened g time
+NO:    Fixed error in #GOTEST due to calling outdated #GOPOS
+NO:    Fixed error in #GOPOS header (claimed to start a move, not complete one)
+NO:    Fixed VERS (was still being set to 1.5)
+NO: 1.6b4 R.O. 1/00:
+NO:    Changed #GORLIM to only hit limit (and to quit if not all axes
+NO:    halt due to hitting the reverse limit switch)
+NO:    Changed #HOME to try to hit reverse limits again if switches not
+NO:    still depressed after the first time
+NO:    Created #HMSET to do homing data reporting and position setting
+NO: 1.6b5 R.O. 1/00:
+NO:    Mod. to work with 1-4 axis Galils (amp fault test modified).
+NO: 1.6b6 R.O. 1/00:
+NO:    Removed a bit of extraneous code (that could not be executed).
+NO: 1.6b7 R.O. 1/00:
+NO:    #SHOWPAR displays MARGx and HMSPDx, and displays ENCRESx with
+NO:    three digits past the decimal instead of zero
+NO: 1.6b8 R.O. 1/00:
+NO:   bug fix: #GORLIM would fail if axis already in limit switch
+NO:   increased #SHOWPAR ENCRESx display to 4 digits past decimal
+NO: 1.6b9 R.O. 1/00:
+NO:   added #GETACTP, get actual position (using encoder, if present)
+NO:   renamed #GETCP to #GETCMDP and reports commanded position _RPx
+NO:   renamed #GETPE to #GETPERR and reports servo motor enc-cmd if no aux enc
+NO:   renamed #GETTP to #GETTGTP
+NO:   changed #HMSET so reported position error is actual position - RLIMx
+NO:   changed #GOPOS and #CHKMV to report commanded and actual position
+NO: 1.6b10 R.O. 1/00
+NO:   added "Finding full step" to #GOFS, since it can take awhile
+NO:   made #CORRPOS only output one error message when correction too large
+NO: 1.6 R.O. 2/17/00
+NO:   released 1.6b10 as 1.6 final
+NO:   with minor additions to #LMSTIME and #LMVTIME comments
+NO: 1.7b1 R.O. 2/00
+NO:   added AUXSTAT and AUXOUT to spit data out the auxiliary serial port
+NO: 1.7b2 R.O. 2/00
+NO:   modified AUXSTAT to run as fast as possible (no wait)
+NO:   and to use digits for labels (0=commanded position, 1=current position)
+NO:   modified AUXOUT to output line length to start 
+NO: 1.7b3 R.O. 2/00
+NO:   modified AUXSTAT to output 10 actual for every one commanded position.
+NO: 1.7b4 R.O. 2/00
+NO:   modified AUXOUT output to include a code for which axes are homed.
+NO: 1.7b5 R.O. 5/00
+NO:   modified AUXOUT output to include time (seconds since startup).
+NO:   added DOAUX parameter to control aux status output
+NO: 1.7 R.O. 8/15/00
+NO:   released 1.7b5 as 1.7.
+NO: 1.8 R.O. 2/8/01
+NO:   added call from #CLEANUP to #LCLNUP
+NO:   removed unused code after #DONE (code that had been moved to CLEANUP)
+NO: 1.9 R.O. 8/28/01
+NO:   Added second amplifier fault input as 19th status bit.
+NO:   Changed the "on full step" status bit so 1 means a problem
+NO:   (not on full step and ought to be, i.e. is a stepper motor).
+NO:   Changed COMPVAR to set DESPOSx, making sure it is defined.
+NO: 1.10 R.O. 2002-04-17
+NO:   Moved #COMPVAR first, so a simple XQ doesn't mess things up.
+NO: Skipped version 1.11 to synch with CVS tag number.
+NO: 1.12 R.O. 2004-04-28
+NO:   Added #LAUXOUT subroutine and AUXLEN and AUXTYPE variables.
+NO:   AUXSTAT now quits after one iteration if DOAUX=0 (in addition to
+NO:   an existing test that stops #CLEANUP from restarting AUXSTAT)
+NO: 2.0 R.O. 2005-09-08
+NO:   Added NCORR, ENCTIME and AUXMIN parameters.
+NO:   Renamed #GOCORR to #GOPOS, which now always corrects.
+NO:   Modified #STOP to stop as quickly as possible.
+NO:   Modified so halting axes does not halt background processes.
+NO:   Modified SHOWPAR to display NCORR, ENCTIME, DOAUX, etc.
+NO:   Modified to output commanded position whenever starting a new move.
+NO:   Improved computation of predicted move time.
+NO: 2.1 R.O. 2006-10-27
+NO:   Added support for MINCORRx
+NO:   Assume MAXCORRx, INDESPx and ENCRESx are set for all axes
+NO:   (which is now true due to the use of DefConstants).
+NO:   Fix PR 296: Galil reports 0 seconds for move if NCORR=0.
+
+NO: Be sure to update VERS in #COMPVAR when changing version numbers
+
+ST;  NO: kill aux status and any motion
+
+DL
+EN; NO: prevents a simple XQ from causing trouble
+#COMPVAR
+NO: Compute variables needed for operation
+NO: You must run this after changing any constant
+NO: Kill all background processes since they rely on these variables
+HX1; HX2; HX3
+NO: Set variables
+VERS = 2.1;             NO: software version
+WTIMEMS = WTIME * 1000;  NO: wait time after a move, in ms
+MAXINT = 2147483647;     NO: maximum integer value
+NO: Length of auxiliary port status output
+NO: Len + axis data + homed + output type + time + optional extras
+NO: If there are optional extras then LCOMPVAR must increase AUXLEN
+AUXLEN = 4 + (NAXES * 14) + 5 + 3 + 16
+NO: Make sure DESPOSx is defined
+DESPOSA=0; DESPOSB=0; DESPOSC=0; DESPOSD=0; DESPOSE=0; DESPOSF=0
+NO: ISSTEPx is true for stepper motors, false for servo motors
+ISSTEPA = (@ABS[_MTA]>1); ISSTEPB = (@ABS[_MTB]>1); ISSTEPC = (@ABS[_MTC]>1)
+ISSTEPD = (@ABS[_MTD]>1); ISSTEPE = (@ABS[_MTE]>1); ISSTEPF = (@ABS[_MTF]>1)
+NO: Define and null basic input variables for missing axes
+JP #G2COMPV, NAXES >= 6; MARGF = 0; SPDF = 1; HMSPDF = 0; ACCF = 0
+JP #G2COMPV, NAXES >= 5; MARGE = 0; SPDE = 1; HMSPDE = 0; ACCE = 0
+JP #G2COMPV, NAXES >= 4; MARGD = 0; SPDD = 1; HMSPDD = 0; ACCD = 0
+JP #G2COMPV, NAXES >= 3; MARGC = 0; SPDC = 1; HMSPDC = 0; ACCC = 0
+JP #G2COMPV, NAXES >= 2; MARGB = 0; SPDB = 1; HMSPDB = 0; ACCB = 0
+JP #G2COMPV, NAXES >= 1; MARGA = 0; SPDA = 1; HMSPDA = 0; ACCA = 0
+#G2COMPV
+NO: Compute FLIM and RLIM, forward and reverse limits
+NO: rounded to the nearest full step, 0 if no axis
+FLIMA = 0; FLIMB = 0; FLIMC = 0; FLIMD = 0; FLIME = 0; FLIMF = 0
+JP #G4COMPV, NAXES < 1; FLIMA = @RND[RNGA * 0.5 / ST_FSA] * ST_FSA
+JP #G4COMPV, NAXES < 2; FLIMB = @RND[RNGB * 0.5 / ST_FSB] * ST_FSB
+JP #G4COMPV, NAXES < 3; FLIMC = @RND[RNGC * 0.5 / ST_FSC] * ST_FSC
+JP #G4COMPV, NAXES < 4; FLIMD = @RND[RNGD * 0.5 / ST_FSD] * ST_FSD
+JP #G4COMPV, NAXES < 5; FLIME = @RND[RNGE * 0.5 / ST_FSE] * ST_FSE
+JP #G4COMPV, NAXES < 6; FLIMF = @RND[RNGF * 0.5 / ST_FSF] * ST_FSF
+#G4COMPV
+RLIMA = - FLIMA; RLIMB = - FLIMB; RLIMC = - FLIMC
+RLIMD = - FLIMD; RLIME = - FLIME; RLIMF = - FLIMF
+NO: Compute variables needed for local additions to the code
+JS #LCMPVAR
+JP #DONE, _ZS0 = 0; EN
+
+#ABCOK
+NO: Check x variables, make sure only those for existing axes are set
+RESA = (NAXES < 1) & (A <> MAXINT)
+RESB = (NAXES < 2) & (B <> MAXINT)
+RESC = (NAXES < 3) & (C <> MAXINT)
+RESD = (NAXES < 4) & (D <> MAXINT)
+RESE = (NAXES < 5) & (E <> MAXINT)
+RESF = (NAXES < 6) & (F <> MAXINT)
+ISBAD = (RESA | RESB | RESC | RESD | RESE | RESF)
+JP #DONE, _ZS0 = 0; EN
+
+#AUTO
+NO: Runs automatically at power on
+HOMEDA = 0; HOMEDB = 0; HOMEDC = 0; HOMEDD = 0; HOMEDE = 0; HOMEDF = 0
+JS #COMPVAR
+MG "Mirror controller version ", VERS, " started"
+JP #DONE, _ZS0 = 0; EN
+
+#AUXOUT
+NO: Sends AUXx to the auxiliary port
+NO: Intended to be called by AUXSTAT from a background thread
+NO: Only uses subroutines and variables unique to AUX routines
+MG {P2}{F3.0} AUXLEN {N}
+JP #G2AUXOU, NAXES < 1; MG {P2}{F9.1}{N} ", ", AUXA
+JP #G2AUXOU, NAXES < 2; MG {P2}{F9.1}{N} ", ", AUXB
+JP #G2AUXOU, NAXES < 3; MG {P2}{F9.1}{N} ", ", AUXC
+JP #G2AUXOU, NAXES < 4; MG {P2}{F9.1}{N} ", ", AUXD
+JP #G2AUXOU, NAXES < 5; MG {P2}{F9.1}{N} ", ", AUXE
+JP #G2AUXOU, NAXES < 6; MG {P2}{F9.1}{N} ", ", AUXF
+#G2AUXOU
+NO: Output homed word, AUXTYPE and time
+AUXHOMED = HOMEDA+(2*HOMEDB)+(4*HOMEDC)+(8*HOMEDD)+(16*HOMEDE)+(32*HOMEDF)
+MG {P2}{F2.0}{N} ", ", AUXHOMED, ", ", {F1.0} AUXTYPE, ", ", {F9.2} TIME/1024
+NO: Append any optional output and then a return
+JS #LAUXOUT; MG {P2}
+EN
+
+#AUXSTAT
+NO: Spits status out the auxiliary port
+NO: Intended to be run as a background process in thread 1
+NO: Only uses subroutines and variables unique to AUX routines
+NO:
+NO: Output a <CR> to terminate any partial line
+MG {P2} ""
+NO: Initialize repetitions counter to a value so large
+NO: that the first iteration will record aux and output it
+AUXITNUM = AUXMAXN
+NO: Start output loop
+#G2AUXST
+AUXITNUM = AUXITNUM + 1
+AUXA = _RPA; AUXB = _RPB; AUXC = _RPC; AUXD = _RPD; AUXE = _RPE; AUXF = _RPF
+NO: If enough time has passed, record and output commanded position
+JP #G4AUXST, AUXITNUM > AUXMAXN
+NO: If commanded position has changed, record and output it
+AUXNOCH =           (AUXA = AUXRA) & (AUXB = AUXRB) & (AUXC = AUXRC)
+AUXNOCH = AUXNOCH & (AUXD = AUXRD) & (AUXE = AUXRE) & (AUXF = AUXRF)
+JP #G6AUXST, AUXNOCH
+#G4AUXST
+NO: Record and report commanded position (auxtype = 0) and reset AUXITNUM
+AUXRA=AUXA; AUXRB=AUXB; AUXRC=AUXC; AUXRD=AUXD; AUXRE=AUXE; AUXRF=AUXF
+AUXTYPE = 0; JS #AUXOUT
+AUXITNUM = 1
+#G6AUXST
+NO: Report current position (auxtype = 1)
+NO: For servos, read the aux encoder preferentially, then the motor encoder
+NO: First handle axes with optional encoders (ENCRES<>0)
+AUXA =     @RND[((_TPA * ISSTEPA) + (_TDA * (ISSTEPA = 0))) * ENCRESA]
+AUXB =     @RND[((_TPB * ISSTEPB) + (_TDB * (ISSTEPB = 0))) * ENCRESB]
+AUXC =     @RND[((_TPC * ISSTEPC) + (_TDC * (ISSTEPC = 0))) * ENCRESC]
+AUXD =     @RND[((_TPD * ISSTEPD) + (_TDD * (ISSTEPD = 0))) * ENCRESD]
+AUXE =     @RND[((_TPE * ISSTEPE) + (_TDE * (ISSTEPE = 0))) * ENCRESE]
+AUXF =     @RND[((_TPF * ISSTEPF) + (_TDF * (ISSTEPF = 0))) * ENCRESF]
+NO: Now handle axes without optional encoders
+AUXA = (AUXA + (((_RPA * ISSTEPA) + (_TPA * (ISSTEPA = 0))) * (ENCRESA = 0)))
+AUXB = (AUXB + (((_RPB * ISSTEPB) + (_TPB * (ISSTEPB = 0))) * (ENCRESB = 0)))
+AUXC = (AUXC + (((_RPC * ISSTEPC) + (_TPC * (ISSTEPC = 0))) * (ENCRESC = 0)))
+AUXD = (AUXD + (((_RPD * ISSTEPD) + (_TPD * (ISSTEPD = 0))) * (ENCRESD = 0)))
+AUXE = (AUXE + (((_RPE * ISSTEPE) + (_TPE * (ISSTEPE = 0))) * (ENCRESE = 0)))
+AUXF = (AUXF + (((_RPF * ISSTEPF) + (_TPF * (ISSTEPF = 0))) * (ENCRESF = 0)))
+AUXTYPE = 1; JS #AUXOUT
+JP #G2AUXST, DOAUX<>0
+EN
+
+#AXERR
+NO: Does all MYERR does, but first reports axes
+SHOWVF = 1.0; JS #SHOWRES; MG
+JP #MYERR
+
+#AXESTR
+NO: creates strings RES1 and RES2 for SH, BG, etc. based on x <> MAXINT
+NO: if no axes for a given string, RESx is set to 0 and should not be used
+NO: The reason for creating two strings is that commands such as SH, BG, etc.
+NO: only pay attention to the first 4 characters of the string.
+RES2 =                 ((("F") - (" ")) * (F <> MAXINT)) + (" ")
+RES2 = (RES2 / $100) + ((("E") - (" ")) * (E <> MAXINT)) + (" ")
+RES1 =                 ((("D") - (" ")) * (D <> MAXINT)) + (" ")
+RES1 = (RES1 / $100) + ((("C") - (" ")) * (C <> MAXINT)) + (" ")
+RES1 = (RES1 / $100) + ((("B") - (" ")) * (B <> MAXINT)) + (" ")
+RES1 = (RES1 / $100) + ((("A") - (" ")) * (A <> MAXINT)) + (" ")
+NO: check that axes exist and complain if not
+RESA = (NAXES < 1) & (A <> MAXINT)
+RESB = (NAXES < 2) & (B <> MAXINT)
+RESC = (NAXES < 3) & (C <> MAXINT)
+RESD = (NAXES < 4) & (D <> MAXINT)
+RESE = (NAXES < 5) & (E <> MAXINT)
+RESF = (NAXES < 6) & (F <> MAXINT)
+ISBAD = (RESA | RESB | RESC | RESD | RESE | RESF)
+JP #E2AXEST, ISBAD
+NO: set RESx to 0 if no axes (easier to test than blank)
+RES1 = RES1 * (RES1 <> ("    "))
+RES2 = RES2 * (RES2 <> ("  "))
+JP #DONE, _ZS0 = 0; EN
+#E2AXEST
+MG "?AXESTR motion requested for nonexistent axes. " {N}
+MG "Axes = '", {S} RES1, RES2, "', NAXES = ", {F1.0} NAXES
+JP #MYERR
+
+#CHKMV
+NO: Verifies that the stop code = CHKMV for each axis that was moved
+NO: Reports final motor position and stop code and quits if not as desired
+NO: Axes must be halted before calling for this routine to work correctly.
+CHKMVA = _SCA * (A <> MAXINT)
+CHKMVB = _SCB * (B <> MAXINT)
+CHKMVC = _SCC * (C <> MAXINT)
+CHKMVD = _SCD * (D <> MAXINT)
+CHKMVE = _SCE * (E <> MAXINT)
+CHKMVF = _SCF * (F <> MAXINT)
+JP #E2CHKMV, (CHKMVA <> CHKMV) & (A <> MAXINT)
+JP #E2CHKMV, (CHKMVB <> CHKMV) & (B <> MAXINT)
+JP #E2CHKMV, (CHKMVC <> CHKMV) & (C <> MAXINT)
+JP #E2CHKMV, (CHKMVD <> CHKMV) & (D <> MAXINT)
+JP #E2CHKMV, (CHKMVE <> CHKMV) & (E <> MAXINT)
+JP #E2CHKMV, (CHKMVF <> CHKMV) & (F <> MAXINT)
+JP #DONE, _ZS0 = 0; EN
+#E2CHKMV
+JS #GETACTP; JS #SETMAX; SHOWVF = 9.0; JS #SHOWRES; MG " actual position"
+RESA = CHKMVA; RESB = CHKMVB; RESC = CHKMVC
+RESD = CHKMVD; RESE = CHKMVE; RESF = CHKMVF
+MG {F3.0} "?CHKMV one or more axes didn't make it (SC<>", CHKMV, "). " {N}
+MG "SC, or 0 if not moved: " {N}
+SHOWVF = 3.0; JS #SHOWRES; MG
+JP #MYERR
+
+#CMDERR
+MG "?Command error " {N}
+TC 1
+JP #MYERR
+
+#CORRPOS
+NO: Computes the position error, based on encoder readings
+NO: and corrects commanded position for axes being moved.
+NO: All motion must be halted before calling!
+NO: Returns RESx = position error corrected, hence 0 if not corrected
+NO: make sure motion is halted
+RESA = _BGA; RESB = _BGB; RESC = _BGC; RESD = _BGD; RESE = _BGE; RESF = _BGF
+JP #E4CORRP, (RESA | RESB | RESC | RESD | RESE | RESF)
+NO: get current position and save
+JS #GETCMDP
+CORRPA=RESA; CORRPB=RESB; CORRPC=RESC; CORRPD=RESD; CORRPE=RESE; CORRPF=RESF
+NO: RESx = position error, or zero for axes not being corrected or moved
+JS #GETPERR
+NO: zero error if no corrections wanted (MAXCORRx zero) or axis not moved
+RESA = RESA * (MAXCORRA > 0) * (A <> MAXINT)
+RESB = RESB * (MAXCORRB > 0) * (B <> MAXINT)
+RESC = RESC * (MAXCORRC > 0) * (C <> MAXINT)
+RESD = RESD * (MAXCORRD > 0) * (D <> MAXINT)
+RESE = RESE * (MAXCORRE > 0) * (E <> MAXINT)
+RESF = RESF * (MAXCORRF > 0) * (F <> MAXINT)
+NO: round errors to nearest full step if MOFF true
+JP #E2CORRP, MOFF = 0
+RESA = (@RND[RESA / ST_FSA] * ST_FSA)
+RESB = (@RND[RESB / ST_FSB] * ST_FSB)
+RESC = (@RND[RESC / ST_FSC] * ST_FSC)
+RESD = (@RND[RESD / ST_FSD] * ST_FSD)
+RESE = (@RND[RESE / ST_FSE] * ST_FSE)
+RESF = (@RND[RESF / ST_FSF] * ST_FSF)
+#E2CORRP
+NO: zero error if error < MINCORRx
+RESA = RESA * (@ABS[RESA] >= MINCORRA)
+RESB = RESB * (@ABS[RESB] >= MINCORRB)
+RESC = RESC * (@ABS[RESC] >= MINCORRC)
+RESD = RESD * (@ABS[RESD] >= MINCORRD)
+RESE = RESE * (@ABS[RESE] >= MINCORRE)
+RESF = RESF * (@ABS[RESF] >= MINCORRF)
+NO: if error too large, give up
+TEMPA = (@ABS[RESA] > MAXCORRA)
+TEMPB = (@ABS[RESB] > MAXCORRB)
+TEMPC = (@ABS[RESC] > MAXCORRC)
+TEMPD = (@ABS[RESD] > MAXCORRD)
+TEMPE = (@ABS[RESE] > MAXCORRE)
+TEMPF = (@ABS[RESF] > MAXCORRF)
+JP #E6CORRP, (TEMPA | TEMPB | TEMPC | TEMPD | TEMPE | TEMPF)
+NO: correct the commanded position
+NO: RESx = position error and CORRPx = current position
+         JP #BCORRP, RESA = 0; DPA = CORRPA + RESA
+#BCORRP; JP #CCORRP, RESB = 0; DPB = CORRPB + RESB
+#CCORRP; JP #DCORRP, RESC = 0; DPC = CORRPC + RESC
+#DCORRP; JP #ECORRP, RESD = 0; DPD = CORRPD + RESD
+#ECORRP; JP #FCORRP, RESE = 0; DPE = CORRPE + RESE
+#FCORRP; JP #GCORRP, RESF = 0; DPF = CORRPF + RESF
+#GCORRP
+JP #DONE, _ZS0 = 0; EN
+#E4CORRP
+MG "?CORRPOS one or more axes is moving: " {N}
+JP #AXERR
+#E6CORRP
+MG "?CORRPOS pos. error " {N}; SHOWVF = 9.0; JS #SHOWRES
+MG " too large for axes: " {N}
+RESA=TEMPA; RESB=TEMPB; RESC=TEMPC; RESD=TEMPD; RESE=TEMPE; RESF=TEMPF
+JP #AXERR
+
+#CLEANUP
+NO: Cleans up and reports done. Never returns to the caller.
+NO: Subroutines should end with: JP #DONE, _ZS0 = 0; EN
+NO: #MSTOP and #LMSTOP should end with:  JP #CLEANUP, _ZS0 = 0; EN
+NO: Error reporting should end with: JP #MYERR
+NO: run local cleanup
+JS #LCLNUP
+NO: Clear all inputs.
+A = MAXINT; B = MAXINT; C = MAXINT; D = MAXINT; E = MAXINT; F = MAXINT
+NO: Restart aux output if wanted and halted
+JP #G2CLEAN, (DOAUX = 0) | (_HX1 > 0); XQ #AUXSTAT,1
+#G2CLEAN
+NO: Report Done
+MG "OK"
+ZS; NO: ZS prevents return to caller
+EN
+
+#DONE
+NO: Halt motors, cleans up and reports done. Never returns to the caller.
+NO: Subroutines should end with: JP #DONE, _ZS0 = 0; EN
+NO: #MSTOP and #LMSTOP should end with:  JP #CLEANUP, _ZS0 = 0; EN
+NO: Error reporting should end with: JP #MYERR
+JS #MSTOP
+JP #CLEANUP
+
+#DPINLIM
+NO: Asserts that the desired position is within normal limits
+RESA = ((DESPOSA < RLIMA) | (DESPOSA > FLIMA)) & (A <> MAXINT)
+RESB = ((DESPOSB < RLIMB) | (DESPOSB > FLIMB)) & (B <> MAXINT)
+RESC = ((DESPOSC < RLIMC) | (DESPOSC > FLIMC)) & (C <> MAXINT)
+RESD = ((DESPOSD < RLIMD) | (DESPOSD > FLIMD)) & (D <> MAXINT)
+RESE = ((DESPOSE < RLIME) | (DESPOSE > FLIME)) & (E <> MAXINT)
+RESF = ((DESPOSF < RLIMF) | (DESPOSF > FLIMF)) & (F <> MAXINT)
+ISBAD = (RESA | RESB | RESC | RESD | RESE | RESF)
+JP #DONE, _ZS0 = 0; EN
+
+#DPRND
+NO: Rounds the desired position, including for nonexistent axes:
+NO: - to the nearest integer microstep if MOFF false
+NO: - to the nearest full step if MOFF true
+JP #G2DPRND, MOFF = 0
+DESPOSA = @RND[DESPOSA / ST_FSA] * ST_FSA
+DESPOSB = @RND[DESPOSB / ST_FSB] * ST_FSB
+DESPOSC = @RND[DESPOSC / ST_FSC] * ST_FSC
+DESPOSD = @RND[DESPOSD / ST_FSD] * ST_FSD
+DESPOSE = @RND[DESPOSE / ST_FSE] * ST_FSE
+DESPOSF = @RND[DESPOSF / ST_FSF] * ST_FSF
+JP #DONE, _ZS0 = 0; EN
+#G2DPRND
+DESPOSA = @RND[DESPOSA]
+DESPOSB = @RND[DESPOSB]
+DESPOSC = @RND[DESPOSC]
+DESPOSD = @RND[DESPOSD]
+DESPOSE = @RND[DESPOSE]
+DESPOSF = @RND[DESPOSF]
+JP #DONE, _ZS0 = 0; EN
+
+#GETACTP
+NO: Returns the current actual position, 0 for nonexistent axes
+NO: Steppers: encoder position, or commanded position if no encoder
+NO: Servos: dual encoder position, or motor encoder if no dual encoder
+NO: First handle axes with optional encoders (ENCRES<>0)
+RESA = @RND[((_TPA*ISSTEPA) + (_TDA*(ISSTEPA=0))) * ENCRESA]
+RESB = @RND[((_TPB*ISSTEPB) + (_TDB*(ISSTEPB=0))) * ENCRESB]
+RESC = @RND[((_TPC*ISSTEPC) + (_TDC*(ISSTEPC=0))) * ENCRESC]
+RESD = @RND[((_TPD*ISSTEPD) + (_TDD*(ISSTEPD=0))) * ENCRESD]
+RESE = @RND[((_TPE*ISSTEPE) + (_TDE*(ISSTEPE=0))) * ENCRESE]
+RESF = @RND[((_TPF*ISSTEPF) + (_TDF*(ISSTEPF=0))) * ENCRESF]
+NO: Now handle axes without optional encoders
+RESA = (RESA + (((_RPA*ISSTEPA) + (_TPA*(ISSTEPA=0)))*(ENCRESA=0)))*(NAXES>=1)
+RESB = (RESB + (((_RPB*ISSTEPB) + (_TPB*(ISSTEPB=0)))*(ENCRESB=0)))*(NAXES>=2)
+RESC = (RESC + (((_RPC*ISSTEPC) + (_TPC*(ISSTEPC=0)))*(ENCRESC=0)))*(NAXES>=3)
+RESD = (RESD + (((_RPD*ISSTEPD) + (_TPD*(ISSTEPD=0)))*(ENCRESD=0)))*(NAXES>=4)
+RESE = (RESE + (((_RPE*ISSTEPE) + (_TPE*(ISSTEPE=0)))*(ENCRESE=0)))*(NAXES>=5)
+RESF = (RESF + (((_RPF*ISSTEPF) + (_TPF*(ISSTEPF=0)))*(ENCRESF=0)))*(NAXES>=6)
+JP #DONE, _ZS0 = 0; EN
+
+#GETCMDP
+NO: Returns the current commanded position, 0 for nonexistent axes
+RESA = _RPA * (NAXES >= 1)
+RESB = _RPB * (NAXES >= 2)
+RESC = _RPC * (NAXES >= 3)
+RESD = _RPD * (NAXES >= 4)
+RESE = _RPE * (NAXES >= 5)
+RESF = _RPF * (NAXES >= 6)
+JP #DONE, _ZS0 = 0; EN
+
+#GETPERR
+NO: Returns current position error, 0 if no encoder or no axis
+NO: Steppers: encoder - commanded position, 0 if no encoder
+NO: Servos: auxiliary encoder - commanded position, if aux encoder
+NO:         motor encoder - commanded position, if no aux encoder
+NO:
+NO: _TPx = encoder for steppers, _TDx = aux encoder for servos
+NO: ENCRESx is zero if no encoder or no axis
+NO: First handle motors with optional encoders (ENCRESA <> 0)
+RESA = @RND[(((_TPA*ISSTEPA)+(_TDA*(ISSTEPA=0)))*ENCRESA)-_RPA] * (ENCRESA<>0)
+RESB = @RND[(((_TPB*ISSTEPB)+(_TDB*(ISSTEPB=0)))*ENCRESB)-_RPB] * (ENCRESB<>0)
+RESC = @RND[(((_TPC*ISSTEPC)+(_TDC*(ISSTEPC=0)))*ENCRESC)-_RPC] * (ENCRESC<>0)
+RESD = @RND[(((_TPD*ISSTEPD)+(_TDD*(ISSTEPD=0)))*ENCRESD)-_RPD] * (ENCRESD<>0)
+RESE = @RND[(((_TPE*ISSTEPE)+(_TDE*(ISSTEPE=0)))*ENCRESE)-_RPE] * (ENCRESE<>0)
+RESF = @RND[(((_TPF*ISSTEPF)+(_TDF*(ISSTEPF=0)))*ENCRESF)-_RPF] * (ENCRESF<>0)
+NO: Now handle servo motors with no aux encoders
+NO: _TEx = motor encoder - commanded position for servos, 0 for steppers
+RESA = RESA + (_TEA*(ENCRESA=0))
+RESB = RESB + (_TEB*(ENCRESB=0))
+RESC = RESC + (_TEC*(ENCRESC=0))
+RESD = RESD + (_TED*(ENCRESD=0))
+RESE = RESE + (_TEE*(ENCRESE=0))
+RESF = RESF + (_TEF*(ENCRESF=0))
+JP #DONE, _ZS0 = 0; EN
+
+#GETTGTP
+NO: Returns the target position
+RESA = (_PAA + _PRA) * (NAXES >= 1)
+RESB = (_PAB + _PRB) * (NAXES >= 2)
+RESC = (_PAC + _PRC) * (NAXES >= 3)
+RESD = (_PAD + _PRD) * (NAXES >= 4)
+RESE = (_PAE + _PRE) * (NAXES >= 5)
+RESF = (_PAF + _PRF) * (NAXES >= 6)
+JP #DONE, _ZS0 = 0; EN
+
+#GO
+NO: Halt motion, enable the motors and begin a motion.
+NO: Halts all axes but only enables and starts axes for which x <> MAXINT
+NO: Be sure to specify PRx or PAx for each axis to be moved
+NO: even if you want a different kind of move. FE, FI and JG are
+NO: all compatible with PRx and PAx (which simply limit the motion).
+NO: Failure to do this cause trouble for #LGO, e.g. latches not releasing
+NO: Checks for amplifier fault (if fault: disables motors, complains and exits)
+NO:
+NO: Halt all axes and wait for motion to stop
+JS #STOP
+NO: Test fault inputs: #5 and (if more than 4 axes) #13
+JS #E2GO, ((@IN[5] = 0) | ((NAXES > 4) & (@IN[13] = 0)))
+NO: Call local pre-start routine
+JS #LGO
+NO: Enable motors for axes to be moved
+JS #AXESTR
+       JP #G6GO, RES1 = 0; SH RES1
+#G6GO; JP #G8GO, RES2 = 0; SH RES2
+#G8GO
+NO: Begin motion
+       JP #G2GO, RES1 = 0; BG RES1
+#G2GO; JP #G4GO, RES2 = 0; BG RES2
+#G4GO
+JP #DONE, _ZS0 = 0; EN
+#E2GO
+MG "?GO: one or more motor amplifiers is reporting a fault"
+JP #MYERR
+
+#GOEDGE
+NO: Find transition in home switch at homing speed.
+NO: Note: use CN to change polarity of home switch to change search direction
+NO:
+NO: Set relative move as upper limit.
+PR* = 0
+         JP #BGOEDG, A = MAXINT; PRA = (_SPA * LSTIME); FE A
+#BGOEDG; JP #CGOEDG, B = MAXINT; PRB = (_SPB * LSTIME); FE B
+#CGOEDG; JP #DGOEDG, C = MAXINT; PRC = (_SPC * LSTIME); FE C
+#DGOEDG; JP #EGOEDG, D = MAXINT; PRD = (_SPD * LSTIME); FE D
+#EGOEDG; JP #FGOEDG, E = MAXINT; PRE = (_SPE * LSTIME); FE E
+#FGOEDG; JP #GGOEDG, F = MAXINT; PRF = (_SPF * LSTIME); FE F
+#GGOEDG
+NO: Set limits appropriate to move and set homing speed.
+JS #MINLIM; JS #HMSPD
+NO: report max time and find home/reverse switch transition
+JS #MVTIME; SHOWVF = 4.1; JS #SHOWRES; MG " max sec to find home switch"
+NO: start move, wait for end and check stop code (should be 9)
+JS #GO; AM; WT WTIMEMS; CHKMV = 9; JS #CHKMV
+JP #DONE, _ZS0 = 0; EN
+
+#GOFS
+NO: Move in a positive direction until each axis is on a full step
+MG "Finding next full step"
+JS #REGLIM
+NO: MAXGOFS = max iterations allowed = max of all ST_FSx
+RESA = ST_FSA; RESB = ST_FSB; RESC = ST_FSC
+RESD = ST_FSD; RESE = ST_FSE; RESF = ST_FSF
+JS #MAX; MAXGOFS = RES
+NSTGOFS = 0; NO: number of steps taken
+DTGOFS = TIME; NO: elapsed time
+#G2GOFS; NO: jump here to move not-on-fs axes one step
+NO: Check if all axes being moved are on full step
+NO: ISBAD = 0 if all axes on full step, RESx = 1 if axis not on full step
+JS #ISONFS
+JP #G4GOFS, ISBAD = 0; NO all axes on full step so we're done
+NO: If too many tries, give up
+JP #E2GOFS, NSTGOFS >= MAXGOFS
+NO: Move any axes not yet there one step and try again
+PR RESA, RESB, RESC, RESD, RESE, RESF
+JS #GO; AM
+NSTGOFS = NSTGOFS + 1
+JP #G2GOFS
+#G4GOFS; NO: jump here when all axes are on full step
+DTGOFS = (TIME - DTGOFS)
+NO: do a final check that all are on full step
+WT WTIMEMS; NO: paranoia
+JS #ISONFS
+JP #E4GOFS, ISBAD
+PR* = 0; NO: we're here
+MG {F3.0} NSTGOFS, ", ", {F3.1} DTGOFS/1000 {N}
+MG " microsteps, sec to find full step"
+JP #DONE, _ZS0 = 0; EN
+#E2GOFS
+NO: failed to find full step in MAXGOFS iterations
+MG "?GOFS failed to find full step for axes: " {N}
+JP #AXERR
+#E4GOFS
+MG "?GOFS final on-step verification failed for axes: " {N}
+JP #AXERR
+
+#GOIND
+NO: Find index pulse at low speed.
+NO: set relative move of 1.1 * INDSEPx to limit search
+PR* = 0
+         JP #BGOIND, INDSEPA = 0; PRA = INDSEPA * 1.1; JGA = _SPA; FIA
+#BGOIND; JP #CGOIND, INDSEPB = 0; PRB = INDSEPB * 1.1; JGB = _SPB; FIB
+#CGOIND; JP #DGOIND, INDSEPC = 0; PRC = INDSEPC * 1.1; JGC = _SPC; FIC
+#DGOIND; JP #EGOIND, INDSEPD = 0; PRD = INDSEPD * 1.1; JGD = _SPD; FID
+#EGOIND; JP #FGOIND, INDSEPE = 0; PRE = INDSEPE * 1.1; JGE = _SPE; FIE
+#FGOIND; JP #GGOIND, INDSEPF = 0; PRF = INDSEPF * 1.1; JGF = _SPF; FIF
+#GGOIND
+NO: Set limits appropriate to move and set homing speed.
+JS #MINLIM; JS #HMSPD
+NO: report move time and start move
+JS #MVTIME; SHOWVF = 4.1; JS #SHOWRES; MG " max sec to find index"
+NO: find index pulse
+JS #GO; AM; WT WTIMEMS
+PR* = 0; NO: clear out extra FI and JG commands
+NO: check move, normal find index stop code is 10
+RESA = (_SCA <> 10) * (INDSEPA <> 0) * (A <> MAXINT)
+RESB = (_SCB <> 10) * (INDSEPB <> 0) * (B <> MAXINT)
+RESC = (_SCC <> 10) * (INDSEPC <> 0) * (C <> MAXINT)
+RESD = (_SCD <> 10) * (INDSEPD <> 0) * (D <> MAXINT)
+RESE = (_SCE <> 10) * (INDSEPE <> 0) * (E <> MAXINT)
+RESF = (_SCF <> 10) * (INDSEPF <> 0) * (F <> MAXINT)
+ISBAD = (RESA | RESB | RESC | RESD | RESE | RESF)
+JP #E2GOIND, ISBAD
+JP #DONE, _ZS0 = 0; EN
+#E2GOIND
+PR* = 0; NO: clear out extra FI and JG commands
+MG "failed to find index pulse for axes: " {N}
+JP #AXERR
+
+#GOPOS
+NO: Moves to the absolute position specified in DESPOSx
+NO: All axes for which A, B, C... <> MAXINT are moved
+NO: After the initial motion, NCORR corrections are applied.
+NO: Position is rounded to nearest full step if MOFF true
+NO:
+NO: Halt existing motion, if any.
+NO: Then clear move and set normal position limits and speed
+JS #STOP; PR* = 0; JS #REGLIM; JS #REGSPD
+NO: Round position to nearest micron or full step, as necessary
+NO: and make sure position is in range
+JS #DPRND; JS #DPINLIM; JP #E4GOPOS, ISBAD
+NO: Set up move
+          JP #BGOPOS2, A = MAXINT; PAA = DESPOSA
+#BGOPOS2; JP #CGOPOS2, B = MAXINT; PAB = DESPOSB
+#CGOPOS2; JP #DGOPOS2, C = MAXINT; PAC = DESPOSC
+#DGOPOS2; JP #EGOPOS2, D = MAXINT; PAD = DESPOSD
+#EGOPOS2; JP #FGOPOS2, E = MAXINT; PAE = DESPOSE
+#FGOPOS2; JP #GGOPOS2, F = MAXINT; PAF = DESPOSF
+#GGOPOS2
+NO: Compute move time, excluding time for encoder corrections
+JS #MVTIME;  NO: time for basic move
+NO: Initialize correction counter CORI
+NO: and compute max additional time for corrective moves.
+CORI = NCORR; ADDT = WTIME + ENCTIME
+RESA=(ADDT+(((MAXCORRA/_SPA)+(_SPA/_ACA))*(MAXCORRA>0)))*(A<>MAXINT)*CORI+RESA
+RESB=(ADDT+(((MAXCORRB/_SPB)+(_SPB/_ACB))*(MAXCORRB>0)))*(B<>MAXINT)*CORI+RESB
+RESC=(ADDT+(((MAXCORRC/_SPC)+(_SPC/_ACC))*(MAXCORRC>0)))*(C<>MAXINT)*CORI+RESC
+RESD=(ADDT+(((MAXCORRD/_SPD)+(_SPD/_ACD))*(MAXCORRD>0)))*(D<>MAXINT)*CORI+RESD
+RESE=(ADDT+(((MAXCORRE/_SPE)+(_SPE/_ACE))*(MAXCORRE>0)))*(E<>MAXINT)*CORI+RESE
+RESF=(ADDT+(((MAXCORRF/_SPF)+(_SPF/_ACF))*(MAXCORRF>0)))*(F<>MAXINT)*CORI+RESF
+JS #LMSTIME; NO: additional time to shut down due to local mods
+SHOWVF = 4.1; JS #SHOWRES; MG " max sec for move"
+NO: Report target position
+JS #GETTGTP; SHOWVF = 9.0; JS #SHOWRES; MG " target position"
+NO: Start the move, wait for it to end and make sure it ended correctly
+JS #GO; AM; WT WTIMEMS; CHKMV = 1; JS #CHKMV
+#G2GOPOS
+JP #G6GOPOS, CORI <= 0
+NO: If MOFF and ENCTIME>0 turn off motors while waiting for ENCTIME
+JP #G4GOPOS, (MOFF = 0) | (ENCTIME <= 0); MO
+#G4GOPOS
+NO: Wait for ENCTIME, then read and correct position error
+WT ENCTIME * 1000; JS #CORRPOS
+NO: If any error, try the move again
+          JP #BGOPOS4, RESA = 0; PAA = DESPOSA
+#BGOPOS4; JP #CGOPOS4, RESB = 0; PAB = DESPOSB
+#CGOPOS4; JP #DGOPOS4, RESC = 0; PAC = DESPOSC
+#DGOPOS4; JP #EGOPOS4, RESD = 0; PAD = DESPOSD
+#EGOPOS4; JP #FGOPOS4, RESE = 0; PAE = DESPOSE
+#FGOPOS4; JP #GGOPOS4, RESF = 0; PAF = DESPOSF
+#GGOPOS4
+NO: Start the move, wait for it to end and make sure it ended correctly
+JS #GO; AM; WT WTIMEMS; CHKMV = 1; JS #CHKMV; JS #MSTOP
+NO: decrement correction counter and repeat correction if wanted
+CORI = CORI - 1; JP #G2GOPOS
+#G6GOPOS
+NO: report final position
+JS #GETACTP; JS #SETMAX; SHOWVF = 9.0; JS #SHOWRES; MG " final position"
+NO: if MOFF true, make sure ended on full step (not serious, so left for last)
+ISBAD = 0; JS #ISONFS, MOFF; JP #E6GOPOS, ISBAD
+JP #DONE, _ZS0 = 0; EN
+#E4GOPOS
+MG "?GOPOS desired position out of bounds for axes: " {N}
+JP #AXERR
+#E6GOPOS
+MG "?GOPOS one or more axes did not end on a full step: " {N}
+JP #AXERR
+
+#GORLIM
+NO: Runs into the reverse limit switch
+NO:
+NO: For any axes not already in the reverse limit switch
+NO: do a relative move of - 1.25 times normal range
+NO: (increasing the soft reverse limit to permit this)
+NO: This makes sure the axes will reach the limit switches no matter
+NO: how confused the controller is about their initial position
+NO: (all we know is that the actuators are somewhere in the normal range).
+PRA = -1.25 * (FLIMA - RLIMA) * (_TSA & 4 = 4) * (A <> MAXINT)
+PRB = -1.25 * (FLIMB - RLIMB) * (_TSB & 4 = 4) * (B <> MAXINT)
+PRC = -1.25 * (FLIMC - RLIMC) * (_TSC & 4 = 4) * (C <> MAXINT)
+PRD = -1.25 * (FLIMD - RLIMD) * (_TSD & 4 = 4) * (D <> MAXINT)
+PRE = -1.25 * (FLIME - RLIME) * (_TSE & 4 = 4) * (E <> MAXINT)
+PRF = -1.25 * (FLIMF - RLIMF) * (_TSF & 4 = 4) * (F <> MAXINT)
+NO: Set minimum limits appropriate to move and set normal speed
+JS #MINLIM; JS #REGSPD
+JS #MVTIME; SHOWVF = 4.1; JS #SHOWRES
+MG " max sec to find reverse limit switch"
+JS #GO; AM; WT WTIMEMS
+NO: Make sure all axes being moved stopped due to reverse limit
+NO: Stop code 3 means hit reverse soft limit or limit switch
+NO: Also test position to be sure it was the switch, not the soft limit
+NO: Do not simply test the current switch position because
+NO: other actuators may drive one back out again
+RESA = ((_SCA <> 3) | (_RPA < _BLA)) & (_TSA & 4 = 4) & (A <> MAXINT)
+RESB = ((_SCB <> 3) | (_RPB < _BLB)) & (_TSB & 4 = 4) & (B <> MAXINT)
+RESC = ((_SCC <> 3) | (_RPC < _BLC)) & (_TSC & 4 = 4) & (C <> MAXINT)
+RESD = ((_SCD <> 3) | (_RPD < _BLD)) & (_TSD & 4 = 4) & (D <> MAXINT)
+RESE = ((_SCE <> 3) | (_RPE < _BLE)) & (_TSE & 4 = 4) & (E <> MAXINT)
+RESF = ((_SCF <> 3) | (_RPF < _BLF)) & (_TSF & 4 = 4) & (F <> MAXINT)
+JP #E2GORLI, (RESA | RESB | RESC | RESD | RESE | RESF)
+JP #DONE, _ZS0 = 0; EN
+#E2GORLI
+MG "?GORLIM one or more axes did not hit reverse limit: " {N}
+JP #AXERR
+
+#HMERR
+NO: Does all MYERR does, but first complains that axes not homed
+MG "?HMERR: some axes to be moved have not been homed: " {N}
+JP #AXERR
+
+#HMSET
+NO: Sets home position and reports data (must be home before calling!)
+NO:
+NO: Report position error for newly homed axes that were already homed
+NO: report MAXINT for all other axes
+NO: Position error = actual position - normal reverse limit
+JS #GETACTP
+RESA = ((RESA - RLIMA) * (A <> MAXINT)) + (MAXINT * (A = MAXINT))
+RESB = ((RESB - RLIMB) * (B <> MAXINT)) + (MAXINT * (B = MAXINT))
+RESC = ((RESC - RLIMC) * (C <> MAXINT)) + (MAXINT * (C = MAXINT))
+RESD = ((RESD - RLIMD) * (D <> MAXINT)) + (MAXINT * (D = MAXINT))
+RESE = ((RESE - RLIME) * (E <> MAXINT)) + (MAXINT * (E = MAXINT))
+RESF = ((RESF - RLIMF) * (F <> MAXINT)) + (MAXINT * (F = MAXINT))
+JS #SETMAX; NO: set error to MAXINT if axis not already homed
+SHOWVF = 9.0; JS #SHOWRES; MG " position error"
+NO: Set current pos to reverse limit and target=current for newly homed axes
+         JP #BHMSET, A = MAXINT; DPA = RLIMA; PRA = 0
+#BHMSET; JP #CHMSET, B = MAXINT; DPB = RLIMB; PRB = 0
+#CHMSET; JP #DHMSET, C = MAXINT; DPC = RLIMC; PRC = 0
+#DHMSET; JP #EHMSET, D = MAXINT; DPD = RLIMD; PRD = 0
+#EHMSET; JP #FHMSET, E = MAXINT; DPE = RLIME; PRE = 0
+#FHMSET; JP #GHMSET, F = MAXINT; DPF = RLIMF; PRF = 0
+#GHMSET
+NO: Set optional encoder pos for newly homed axes
+NO: note: ENCRESx = 0 if no optional encoder or no axis
+          JP #BHMSET2, ((A = MAXINT) | (ENCRESA = 0)); DEA = RLIMA / ENCRESA
+#BHMSET2; JP #CHMSET2, ((B = MAXINT) | (ENCRESB = 0)); DEB = RLIMB / ENCRESB
+#CHMSET2; JP #DHMSET2, ((C = MAXINT) | (ENCRESC = 0)); DEC = RLIMC / ENCRESC
+#DHMSET2; JP #EHMSET2, ((D = MAXINT) | (ENCRESD = 0)); DED = RLIMD / ENCRESD
+#EHMSET2; JP #FHMSET2, ((E = MAXINT) | (ENCRESE = 0)); DEE = RLIME / ENCRESE
+#FHMSET2; JP #GHMSET2, ((F = MAXINT) | (ENCRESF = 0)); DEF = RLIMF / ENCRESF
+#GHMSET2
+NO: set HOMEDx = 1 (true) for newly homed axes
+HOMEDA = (A <> MAXINT) + (HOMEDA * (A = MAXINT))
+HOMEDB = (B <> MAXINT) + (HOMEDB * (B = MAXINT))
+HOMEDC = (C <> MAXINT) + (HOMEDC * (C = MAXINT))
+HOMEDD = (D <> MAXINT) + (HOMEDD * (D = MAXINT))
+HOMEDE = (E <> MAXINT) + (HOMEDE * (E = MAXINT))
+HOMEDF = (F <> MAXINT) + (HOMEDF * (F = MAXINT))
+NO: Report homed, current position and basic parameters
+RESA = HOMEDA; RESB = HOMEDB; RESC = HOMEDC
+RESD = HOMEDD; RESE = HOMEDE; RESF = HOMEDF
+SHOWVF =  1.0; JS #SHOWRES; MG " axis homed"
+JS #GETCMDP; JS #SETMAX; SHOWVF = 9.0; JS #SHOWRES; MG " commanded position"
+JS #GETACTP; JS #SETMAX; SHOWVF = 9.0; JS #SHOWRES; MG " actual position"
+JS #SHOWPAR
+RESA = 0; RESB = 0; RESC = 0; RESD = 0; RESE = 0; RESF = 0
+JS #LMSTIME; SHOWVF = 4.1; JS #SHOWRES; MG " sec to finish move"
+JP #DONE, _ZS0 = 0; EN
+
+#HMSPD
+NO: Sets homing speed (and normal acceleration)
+SP HMSPDA, HMSPDB, HMSPDC, HMSPDD, HMSPDE, HMSPDF
+AC ACCA, ACCB, ACCC, ACCD, ACCE, ACCF
+DC ACCA, ACCB, ACCC, ACCD, ACCE, ACCF
+JP #DONE, _ZS0 = 0; EN
+
+#HOME
+NO: Find the home position (reverse limit switch)
+NO: and set the current position and encoder counts accordingly.
+NO: Position error is reported, but only if the Galil has already been homed.
+NO: Before calling, define A, B, C... <> MAXINT for each axis to be homed
+NO:
+NO: If position out of bounds, reset to be at zero and clear HOMEDx
+RESA = ((_RPA < RLIMA) | (_RPA > FLIMA)) & (A <> MAXINT)
+RESB = ((_RPB < RLIMB) | (_RPB > FLIMB)) & (B <> MAXINT)
+RESC = ((_RPC < RLIMC) | (_RPC > FLIMC)) & (C <> MAXINT)
+RESD = ((_RPD < RLIMD) | (_RPD > FLIMD)) & (D <> MAXINT)
+RESE = ((_RPE < RLIME) | (_RPE > FLIME)) & (E <> MAXINT)
+RESF = ((_RPF < RLIMF) | (_RPF > FLIMF)) & (F <> MAXINT)
+        JP #BHOME, RESA = 0; HOMEDA = 0, DPA = 0; DEA = 0
+#BHOME; JP #CHOME, RESB = 0; HOMEDB = 0, DPB = 0; DEB = 0
+#CHOME; JP #DHOME, RESC = 0; HOMEDC = 0, DPC = 0; DEC = 0
+#DHOME; JP #EHOME, RESD = 0; HOMEDD = 0, DPD = 0; DED = 0
+#EHOME; JP #FHOME, RESE = 0; HOMEDE = 0, DPE = 0; DEE = 0
+#FHOME; JP #GHOME, RESF = 0; HOMEDF = 0, DPF = 0; DEF = 0
+#GHOME
+NO: Run into reverse limit/home switch
+JS #GORLIM
+NO: If not all reverse limit switches depressed, try again
+JS #ISINRL
+JP #G2HOME, ISBAD = 0
+MG "Reverse limit switch not depressed for axes: " {N}
+SHOWVF = 1.0; JS #SHOWRES; MG " - trying again"
+JS #GORLIM
+#G2HOME
+NO: Now all axes MUST be at reverse limit switch
+JS #ISINRL
+JP #E2HOME, ISBAD
+NO: Make sure no existing axes are at forward limit switch
+JS #NOTINFL
+JP #E4HOME, ISBAD
+NO: Slowly move out of limit/home switch, just to the transition
+JS #GOEDGE
+NO: Move away from limit switch by the margin
+PRA = MARGA * (A <> MAXINT)
+PRB = MARGB * (B <> MAXINT)
+PRC = MARGC * (C <> MAXINT)
+PRD = MARGD * (D <> MAXINT)
+PRE = MARGE * (E <> MAXINT)
+PRF = MARGF * (F <> MAXINT)
+NO: Set minimum limits appropriate to move and set normal speed
+JS #MINLIM; JS #REGSPD
+JS #MVTIME; SHOWVF = 4.1; JS #SHOWRES; MG " sec to move away from home switch"
+JS #GO; AM; WT WTIMEMS
+NO: Make sure no existing axes are at reverse limit switch
+JS #NOTINRL; JP #E6HOME, ISBAD
+NO: Make sure move completed successfully
+CHKMV = 1; JS #CHKMV
+NO: Go to encoder index, if any index encoders are present
+JS #GOIND, INDSEPA | INDSEPB | INDSEPC | INDSEPD | INDSEPE | INDSEPF
+NO: Go to full step, if MOFF true
+JS #GOFS, MOFF
+NO: Report position error, etc., and set home position
+JS #HMSET
+JP #DONE, _ZS0 = 0; EN
+#E2HOME
+MG "?HOME Reverse limit switch still not depressed for axes: " {N}
+JP #AXERR
+#E4HOME
+MG "?HOME forward limit switch seems to be stuck on for axes: " {N}
+JP #AXERR
+#E6HOME
+MG "?HOME failed to leave reverse limit switch for axes: " {N}
+JP #AXERR
+
+#ISHALT
+NO: Asserts that all axes are halted
+RESA = (_BGA <> 0)
+RESB = (_BGB <> 0)
+RESC = (_BGC <> 0)
+RESD = (_BGD <> 0)
+RESE = (_BGE <> 0)
+RESF = (_BGF <> 0)
+ISBAD = (RESA | RESB | RESC | RESD | RESE | RESF)
+JP #DONE, _ZS0 = 0; EN
+
+#ISHOMED
+NO: Asserts that all axes for which A, B, C... <> MAXINT are homed
+RESA = (HOMEDA = 0) * (A <> MAXINT) & (NAXES >= 1)
+RESB = (HOMEDB = 0) * (B <> MAXINT) & (NAXES >= 2)
+RESC = (HOMEDC = 0) * (C <> MAXINT) & (NAXES >= 3)
+RESD = (HOMEDD = 0) * (D <> MAXINT) & (NAXES >= 4)
+RESE = (HOMEDE = 0) * (E <> MAXINT) & (NAXES >= 5)
+RESF = (HOMEDF = 0) * (F <> MAXINT) & (NAXES >= 6)
+ISBAD = (RESA | RESB | RESC | RESD | RESE | RESF)
+JP #DONE, _ZS0 = 0; EN
+
+#ISINRL
+NO: Checks if axes are in the reverse limit switch
+RESA = (_TSA & 4 = 4) & (A <> MAXINT) & (NAXES >= 1)
+RESB = (_TSB & 4 = 4) & (B <> MAXINT) & (NAXES >= 2)
+RESC = (_TSC & 4 = 4) & (C <> MAXINT) & (NAXES >= 3)
+RESD = (_TSD & 4 = 4) & (D <> MAXINT) & (NAXES >= 4)
+RESE = (_TSE & 4 = 4) & (E <> MAXINT) & (NAXES >= 5)
+RESF = (_TSF & 4 = 4) & (F <> MAXINT) & (NAXES >= 6)
+ISBAD = (RESA | RESB | RESC | RESD | RESE | RESF)
+JP #DONE, _ZS0 = 0; EN
+
+#ISONFS
+NO: Asserts that all axes being moved are on a full step
+NO: RESx = 1 if not on a full step, is a stepper motor and is being moved
+WT 10; NO: Give the inputs time to settle before reading them
+NO: IN[x] = 0 at full step (but note discontinuity in input numbering)
+RESA = @IN[ 1] & ISSTEPA & (A <> MAXINT) & (NAXES >= 1)
+RESB = @IN[ 2] & ISSTEPB & (B <> MAXINT) & (NAXES >= 2)
+RESC = @IN[ 3] & ISSTEPC & (C <> MAXINT) & (NAXES >= 3)
+RESD = @IN[ 4] & ISSTEPD & (D <> MAXINT) & (NAXES >= 4)
+RESE = @IN[ 9] & ISSTEPE & (E <> MAXINT) & (NAXES >= 5)
+RESF = @IN[10] & ISSTEPF & (F <> MAXINT) & (NAXES >= 6)
+ISBAD = (RESA | RESB | RESC | RESD | RESE | RESF)
+JP #DONE, _ZS0 = 0; EN
+
+#MAX
+NO: Sets RES to the max of RESA, RESB,...
+                             RES = RESA
+       JP #CMAX, RES > RESB; RES = RESB
+#CMAX; JP #DMAX, RES > RESC; RES = RESC
+#DMAX; JP #EMAX, RES > RESD; RES = RESD
+#EMAX; JP #FMAX, RES > RESE; RES = RESE
+#FMAX; JP #GMAX, RES > RESF; RES = RESF
+#GMAX
+JP #DONE, _ZS0 = 0; EN
+
+#MINLIM
+NO: Sets soft limits based on currently scheduled move (set via PR and PA)
+NO: useful during homing to limit motion of commands such as FE and FI
+NO: Warning: do not use while axes are moving, results may be unpredictable
+FLA = _PAA + 1 + (_PRA * (_PRA > 0)); BLA = _PAA - 1 + (_PRA * (_PRA < 0))
+FLB = _PAB + 1 + (_PRB * (_PRB > 0)); BLB = _PAB - 1 + (_PRB * (_PRB < 0))
+FLC = _PAC + 1 + (_PRC * (_PRC > 0)); BLC = _PAC - 1 + (_PRC * (_PRC < 0))
+FLD = _PAD + 1 + (_PRD * (_PRD > 0)); BLD = _PAD - 1 + (_PRD * (_PRD < 0))
+FLE = _PAE + 1 + (_PRE * (_PRE > 0)); BLE = _PAE - 1 + (_PRE * (_PRE < 0))
+FLF = _PAF + 1 + (_PRF * (_PRF > 0)); BLF = _PAF - 1 + (_PRF * (_PRF < 0))
+JP #DONE, _ZS0 = 0; EN
+
+#MOVE
+NO: Moves to an absolute position
+NO: Set A, B... to the desired position before calling, omit for no change
+NO: Die if any axis to be moved has not been homed
+JS #ISHOMED
+JP #HMERR, ISBAD
+NO: Set DESPOSx to desired absolute position for ALL axes
+JS #GETTGTP; NO: set RESx to current target position
+DESPOSA = (A * (A <> MAXINT)) + (RESA * (A = MAXINT))
+DESPOSB = (B * (B <> MAXINT)) + (RESB * (B = MAXINT))
+DESPOSC = (C * (C <> MAXINT)) + (RESC * (C = MAXINT))
+DESPOSD = (D * (D <> MAXINT)) + (RESD * (D = MAXINT))
+DESPOSE = (E * (E <> MAXINT)) + (RESE * (E = MAXINT))
+DESPOSF = (F * (F <> MAXINT)) + (RESF * (F = MAXINT))
+NO: execute move
+JS #GOPOS
+JP #DONE, _ZS0 = 0; EN
+
+#MOVEREL
+NO: Moves by a relative amount (i.e. offset)
+NO: Set A, B... to the desired offset before calling, omit for no change
+NO: Die if any axis to be moved has not been homed
+JS #ISHOMED
+JP #HMERR, ISBAD
+NO: Set DESPOSx to desired absolute position for ALL axes
+JS #GETTGTP; NO: set RESx to current target position
+DESPOSA = (A * (A <> MAXINT)) + RESA
+DESPOSB = (B * (B <> MAXINT)) + RESB
+DESPOSC = (C * (C <> MAXINT)) + RESC
+DESPOSD = (D * (D <> MAXINT)) + RESD
+DESPOSE = (E * (E <> MAXINT)) + RESE
+DESPOSF = (F * (F <> MAXINT)) + RESF
+NO: execute move
+JS #GOPOS
+JP #DONE, _ZS0 = 0; EN
+
+#MSTOP
+NO: Halt motion, if any, run LMSTOP and turn off motors if MOFF true
+JS #STOP
+JS #LMSTOP
+JP #G4MSTOP, MOFF = 0; MO
+#G4MSTOP
+JP #CLEANUP, _ZS0 = 0; EN
+
+#MVTIME
+NO: Computes (in RESx) approx. time for each axis to perform
+NO: the current move. Display does not end with a <CR>.
+RESA = ((@ABS[_PRA] / _SPA) + (_SPA / _ACA) + WTIME) * (A <> MAXINT)
+RESB = ((@ABS[_PRB] / _SPB) + (_SPB / _ACB) + WTIME) * (B <> MAXINT)
+RESC = ((@ABS[_PRC] / _SPC) + (_SPC / _ACC) + WTIME) * (C <> MAXINT)
+RESD = ((@ABS[_PRD] / _SPD) + (_SPD / _ACD) + WTIME) * (D <> MAXINT)
+RESE = ((@ABS[_PRE] / _SPE) + (_SPE / _ACE) + WTIME) * (E <> MAXINT)
+RESF = ((@ABS[_PRF] / _SPF) + (_SPF / _ACF) + WTIME) * (F <> MAXINT)
+JS #LMVTIME
+JP #DONE, _ZS0 = 0; EN
+
+#MYERR
+NO: Halts motion (if any) and background processes,
+NO: turns off motors if MOFF=1, cleans up & reports done
+NO: Similar to #DONE except does NOT run #MSTOP or #LMSTOP
+NO: and halts background processes (because there's no
+NO: really safe and simple way to just halt the axes).
+ST; AM
+JP #G4MYERR, MOFF = 0; MO
+#G4MYERR
+JP #CLEANUP
+
+#NOTINFL
+NO: Asserts that no axes being moved are at the forward limit switch
+RESA = (_TSA & 8 = 0) & (A <> MAXINT) & (NAXES >= 1)
+RESB = (_TSB & 8 = 0) & (B <> MAXINT) & (NAXES >= 2)
+RESC = (_TSC & 8 = 0) & (C <> MAXINT) & (NAXES >= 3)
+RESD = (_TSD & 8 = 0) & (D <> MAXINT) & (NAXES >= 4)
+RESE = (_TSE & 8 = 0) & (E <> MAXINT) & (NAXES >= 5)
+RESF = (_TSF & 8 = 0) & (F <> MAXINT) & (NAXES >= 6)
+ISBAD = (RESA | RESB | RESC | RESD | RESE | RESF)
+JP #DONE, _ZS0 = 0; EN
+
+#NOTINRL
+NO: Asserts that no axes being moved are at the reverse limit switch
+RESA = (_TSA & 4 = 0) & (A <> MAXINT) & (NAXES >= 1)
+RESB = (_TSB & 4 = 0) & (B <> MAXINT) & (NAXES >= 2)
+RESC = (_TSC & 4 = 0) & (C <> MAXINT) & (NAXES >= 3)
+RESD = (_TSD & 4 = 0) & (D <> MAXINT) & (NAXES >= 4)
+RESE = (_TSE & 4 = 0) & (E <> MAXINT) & (NAXES >= 5)
+RESF = (_TSF & 4 = 0) & (F <> MAXINT) & (NAXES >= 6)
+ISBAD = (RESA | RESB | RESC | RESD | RESE | RESF)
+JP #DONE, _ZS0 = 0; EN
+
+#REGLIM
+NO: Set regular soft limits
+NO: +1 works around a bug: motion to a limit may cause out-of-limit error
+FL FLIMA + 1, FLIMB + 1, FLIMC + 1, FLIMD + 1, FLIME + 1, FLIMF + 1
+BL RLIMA - 1, RLIMB - 1, RLIMC - 1, RLIMD - 1, RLIME - 1, RLIMF - 1
+JP #DONE, _ZS0 = 0; EN
+
+#REGSPD
+NO: Set regular speed and acceleration
+SP SPDA, SPDB, SPDC, SPDD, SPDE, SPDF
+AC ACCA, ACCB, ACCC, ACCD, ACCE, ACCF
+DC ACCA, ACCB, ACCC, ACCD, ACCE, ACCF
+JP #DONE, _ZS0 = 0; EN
+
+#SETMAX
+NO: Sets RESx = MAXINT if axis not homed
+RESA = (RESA * (HOMEDA <> 0)) + (MAXINT * (HOMEDA = 0))
+RESB = (RESB * (HOMEDB <> 0)) + (MAXINT * (HOMEDB = 0))
+RESC = (RESC * (HOMEDC <> 0)) + (MAXINT * (HOMEDC = 0))
+RESD = (RESD * (HOMEDD <> 0)) + (MAXINT * (HOMEDD = 0))
+RESE = (RESE * (HOMEDE <> 0)) + (MAXINT * (HOMEDE = 0))
+RESF = (RESF * (HOMEDF <> 0)) + (MAXINT * (HOMEDF = 0))
+JP #DONE, _ZS0 = 0; EN
+
+#SHOWPAR
+NO: Show normal values for limits, speed, resolution, etc.
+NO: Start with scalar values
+MG {F2.2} VERS, ",", {F1.0} NAXES, " software version, NAXES number of axes"
+MG {F1} DOAUX, ",", MOFF, ",", {F2} NCORR, " DOAUX aux status? " {N}
+MG "MOFF motors off when idle? NCORR # corrections"
+MG {F2.2} WTIME, ",", ENCTIME, ",", LSTIME, " WTIME, ENCTIME, LSTIME"
+NO: Display axis-specific information
+NO: Garbage values are computed but not displayed for nonexistent axes
+SHOWVF = 9.0
+RESA=RLIMA; RESB=RLIMB; RESC=RLIMC; RESD=RLIMD; RESE=RLIME; RESF=RLIMF
+JS #SHOWRES; MG " -RNGx/2 reverse limits"
+RESA=FLIMA; RESB=FLIMB; RESC=FLIMC; RESD=FLIMD; RESE=FLIME; RESF=FLIMF
+JS #SHOWRES; MG " RNGx/2 forward limits"
+RESA = SPDA; RESB = SPDB; RESC = SPDC; RESD = SPDD; RESE = SPDE; RESF = SPDF
+JS #SHOWRES; MG " SPDx speed"
+RESA=HMSPDA; RESB=HMSPDB; RESC=HMSPDC; RESD=HMSPDD; RESE=HMSPDE; RESF=HMSPDF
+JS #SHOWRES; MG " HMSPDx homing speed"
+RESA = ACCA; RESB = ACCB; RESC = ACCC; RESD = ACCD; RESE = ACCE; RESF = ACCF
+JS #SHOWRES; MG " ACCx acceleration"
+RESA = MINCORRA; RESB = MINCORRB; RESC = MINCORRC
+RESD = MINCORRD; RESE = MINCORRE; RESF = MINCORRF
+JS #SHOWRES; MG " MINCORRx min correction"
+RESA = MAXCORRA; RESB = MAXCORRB; RESC = MAXCORRC
+RESD = MAXCORRD; RESE = MAXCORRE; RESF = MAXCORRF
+JS #SHOWRES; MG " MAXCORRx max correction"
+RESA=ST_FSA; RESB=ST_FSB; RESC=ST_FSC; RESD=ST_FSD; RESE=ST_FSE; RESF=ST_FSF
+JS #SHOWRES; MG " ST_FSx microsteps/full step"
+RESA=MARGA; RESB=MARGB; RESC=MARGC; RESD=MARGD; RESE=MARGE; RESF=MARGF
+JS #SHOWRES; MG " MARGx dist betw hard & soft rev lim"
+RESA=INDSEPA;RESB=INDSEPB;RESC=INDSEPC;RESD=INDSEPD;RESE=INDSEPE;RESF=INDSEPF
+JS #SHOWRES; MG " INDSEP index encoder pulse separation"
+SHOWVF = 4.4
+RESA=ENCRESA;RESB=ENCRESB;RESC=ENCRESC;RESD=ENCRESD;RESE=ENCRESE;RESF=ENCRESF
+JS #SHOWRES; MG " ENCRESx encoder resolution (microsteps/tick)"
+JS #LSHWPAR; NO: show parameters for local modifications, if any
+JP #DONE, _ZS0 = 0; EN
+
+#SHOWRES
+NO: shows results for existing axes only. Before calling, set
+NO: RESx to the values
+NO: SHOWVF to the floating-point variable format
+SHOWRES1 = _VF; VF SHOWVF
+JP #XSHOWRE, NAXES < 1; MG       RESA {N}
+JP #XSHOWRE, NAXES < 2; MG ", ", RESB {N}
+JP #XSHOWRE, NAXES < 3; MG ", ", RESC {N}
+JP #XSHOWRE, NAXES < 4; MG ", ", RESD {N}
+JP #XSHOWRE, NAXES < 5; MG ", ", RESE {N}
+JP #XSHOWRE, NAXES < 6; MG ", ", RESF {N}
+#XSHOWRE
+VF SHOWRES1
+JP #DONE, _ZS0 = 0; EN
+
+#STATUS
+NO: Reports current position and status bits for each axis
+NO: For position and position error, display MAXINT if not homed
+RESA = HOMEDA; RESB = HOMEDB; RESC = HOMEDC
+RESD = HOMEDD; RESE = HOMEDE; RESF = HOMEDF
+SHOWVF =  1.0; JS #SHOWRES; MG " axis homed"
+JS #GETCMDP; JS #SETMAX; SHOWVF = 9.0; JS #SHOWRES; MG " commanded position"
+JS #GETACTP; JS #SETMAX; SHOWVF = 9.0; JS #SHOWRES; MG " actual position"
+NO: generate and display status words
+NO: get ONFS bits
+JS #ISONFS
+NO: TEMPA bits 3-0 = fault input 13, fault input 5, 0
+NO: fault input 13 is only valid if there are more than 4 axes
+NO: the 0 is for use by a different bit (on full step)
+TEMP = 2 * ((1 - @IN[5]) + (2 * (NAXES > 4) * (1 - @IN[13])))
+RESA = _SCA + (256*(_TSA + (256*((@IN[ 1] & ISSTEPA & (MOFF <> 0)) + TEMP))))
+RESB = _SCB + (256*(_TSB + (256*((@IN[ 2] & ISSTEPB & (MOFF <> 0)) + TEMP))))
+RESC = _SCC + (256*(_TSC + (256*((@IN[ 3] & ISSTEPC & (MOFF <> 0)) + TEMP))))
+RESD = _SCD + (256*(_TSD + (256*((@IN[ 4] & ISSTEPD & (MOFF <> 0)) + TEMP))))
+RESE = _SCE + (256*(_TSE + (256*((@IN[ 9] & ISSTEPE & (MOFF <> 0)) + TEMP))))
+RESF = _SCF + (256*(_TSF + (256*((@IN[10] & ISSTEPF & (MOFF <> 0)) + TEMP))))
+NO: invert desired bits, so 0 means OK, 1 means problems
+NO: MASK specifies which bits are to be flipped
+MASK = $002F00
+RESA = ((@COM[RESA] & MASK) + (RESA & @COM[MASK]))
+RESB = ((@COM[RESB] & MASK) + (RESB & @COM[MASK]))
+RESC = ((@COM[RESC] & MASK) + (RESC & @COM[MASK]))
+RESD = ((@COM[RESD] & MASK) + (RESD & @COM[MASK]))
+RESE = ((@COM[RESE] & MASK) + (RESE & @COM[MASK]))
+RESF = ((@COM[RESF] & MASK) + (RESF & @COM[MASK]))
+SHOWVF = 8.0; JS #SHOWRES; MG " status word"
+JS #LSTATUS
+JP #DONE, _ZS0 = 0; EN
+
+#STOP
+NO: Halts the axes.
+NO: Waits for WTIME if any motor was running.
+NO: Does not power off the motors if called as a subroutine.
+NO:
+NO: Takes a paranoid approach of always commanding a halt
+NO: but only waiting WTIME if it thinks a motor was moving.
+NO: Note that ST rejects axes that don't exist, so be careful
+TEMP = WTIMEMS * (_BGA | _BGB | _BGC | _BGD | _BGE | _BGF)
+         JP #G2STOP, NAXES < 6; ST ABCDEF; JP #G6STOP
+#G2STOP; JP #G4STOP, NAXES < 5; ST ABCDE;  JP #G6STOP
+#G4STOP;                        ST ABCD
+#G6STOP; AM; WT TEMP
+JP #DONE, _ZS0 = 0; EN
+
+NO ********************************************************************
+
+NO: Append local (device-specific) mods here, replacing all subroutines below
+NO: Start your additions file with
+NO: ST; NO: to kill aux status and any motion
+NO: DL #LCLNUP
+NO: followed immediately by the first line of #LCLNUP, excluding #LCLNUP itself
+NO: followed by the rest of the code for ALL local subroutines
+NO: even if you have not made any changes to them
+
+#LCLNUP
+NO: Local addition to #CLEANUP, run as any command ends.
+NO: Do not call #DONE or #CLEANUP at the end, to avoid infinite loops.
+NO: Typical use is to make sure outputs and extra hardware
+NO: are in some desired state
+EN
+
+#LAUXOUT
+NO: Local addition to AUXOUT
+NO: To use this you must:
+NO: - increase AUXLEN accordingly in #LCMPVAR
+NO: - use only AUX-specific subroutines and variables
+NO: - end with a simple EN (do not call #DONE or #CLEANUP)
+EN
+
+#LCMPVAR
+NO: Local addition to #COMPVAR, run at power on and after reset.
+NO: Must at least define LVERS, the version of the local mods.
+LVERS = 0
+JP #DONE, _ZS0 = 0; EN
+
+#LGO
+NO: Called as a move begins (before turning on the motors if MOFF true)
+NO: x <> MAXINT if axis is about to be moved
+NO: _PRx <> 0 if move is non-null (it is safest not to rely on this
+NO: but the docs for #GO give instructions to make sure it'll work)
+NO: If starting is a multi-step process, make sure your code can
+NO: execute from any step (in case the process is interrupted and restarted)
+JP #G2LMINI, 1; NO: exit early if nothing to do (your test here!)
+NO: your code here
+#G2LMINI
+JP #DONE, _ZS0 = 0; EN
+
+#LMSTIME
+NO: Increases RESx by the time required to execute #LMSTOP (in sec)
+NO: Called before a motion begins: X <> MAXINT and _PRx <> 0 if x will be moved
+NO: or after a move ends: X <> MAXINT if x was moved
+JP #DONE, _ZS0 = 0; EN
+
+#LMSTOP
+NO: Called as a move ends (before turning off the motors if MOFF true)
+NO: x <> MAXINT if axis is was moved
+NO: If halting is a multi-step process, make sure your code can
+NO: execute from any step (in case the process is interrupted and restarted).
+NO: End success with JP #CLEANUP, _ZS0 = 0; EN, errors with JP #CLEANUP.
+NO: Do NOT call #DONE to avoid infinite loops.
+JP #G2LMSTO, 1; NO: exit early if nothing to do (your test here!)
+NO: your code here
+#G2LMSTO
+JP #CLEANUP, _ZS0 = 0; EN
+
+#LMVTIME
+NO: Increases RESx by the time required to set up the current move,
+NO: i.e. the time to execute #LGO (in sec)
+NO: Called before a motion begins: X <> MAXINT and _PRx <> 0 if x will be moved
+JP #DONE, _ZS0 = 0; EN
+
+#LSHWPAR
+NO: Additional information to be displayed by #SHOWPAR, if any.
+NO: MG {F2.2} LVERS, " version of ??-specific additions"
+JP #DONE, _ZS0 = 0; EN
+
+#LSTATUS
+NO: Additional information to be displayed by #STATUS, if any.
+JP #DONE, _ZS0 = 0; EN
+
+#END; NO: Append test routines here
+\
+                    
+                    
+NO: update computed variables
+XQ #COMPVAR
+NO: once tested, save program to flash memory with BP

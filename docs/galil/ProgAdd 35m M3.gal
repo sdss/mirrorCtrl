@@ -1,0 +1,366 @@
+NO: Addtional Galil code for the 3.5m tertiary
+
+NO: This code has been developed for ROM revision 2.0g.
+
+NO: History (be sure to also update LVERS in #LCMPVAR)
+NO: 1.0b1 R. Owen  3/18/99
+NO: 1.0b2 fixed #LGETSLT (clear, not set, bit 1 to read). R.O. 4/99
+NO: 1.0b3 fixed in slot wait (was waiting ms, not sec)
+NO:	and #LMSTOP error output (there were no messages). R.O. 4/99
+NO: 1.0b4 turns off steppers if jaw fails to close. R.O. 4/99
+NO: 1.0b5 modified for program 1.5b15
+NO:	modified #LGETSLT to use new circuitry. R.O. 4/99
+NO: 1.0 released 1.0b5 and corrected LVERS from 1.1. R.O. 10/99
+NO: 1.1 R.O. 2000-02-17
+NO:	Modified for main program version 1.6:
+NO:	- renamed #LMINIT to #LGO
+NO:	- renamed #LMITIME to #LMVTIME
+NO:	- changed #LMSTOP to call #CLEANUP instead of #DONE
+NO:	- updated comments on various subroutines
+NO:	Changed #LMSTOP to close clamp only if clamp is open
+NO: 1.2 R.O. 2000-08-15
+NO:	Modified for new simplified clamp control:
+NO:	- output 2 = on for close, 1 or open
+NO:	- output 3 is no longer used.
+NO: 1.3 R.O. 2001-04-26
+NO:	Added control of primary mirror covers and eyelids.
+NO: 1.4 R.O. 2001-05-08
+NO:	Changed LCLEYE to close the specified eyelid, or all if none specified
+NO:	Renamed LOPEYEA to LOPEYE
+NO:	Added eyelid requested state to LSTATUS
+NO:	Changed LOPEYE, LCLEYE and LDOCOV to tell what is going to move
+NO:	just before it occurs and and show local status at the end of the move
+NO:	Changed LDOCOV to stop as soon as the covers arrive (by polling)
+NO: 1.5 R.O. 2001-06-06
+NO:	The mirror covers may not have fully moved when the switches fire,
+NO:	so changed to run covers for awhile after the switches fire
+NO:	and to always move the covers even if switches are fired.
+NO:	Renamed LCOVTIME to LCVMAXT.
+NO:	Added LCVADDT, LCVPOLLT.
+NO: 1.6 R.O. 2001-10-11
+NO:    Moved all variables to "Constants SDSS M1.gal"
+NO:    so all can be burned at once.
+NO: 1.7 R.O. 2004-04-28
+NO:    Added empty #LAUXOUT for main code version 1.12.
+NO: 1.8 R.O. 2007-06-27
+NO:    Added tertiary rotation to STATUS output.
+NO: 1.9 R.O. 2007-07-25
+NO:    Added servo error for axis E (tertiary rotation) to aux output.
+NO:    Added off-on-error and error limit for axis E to #SHOWPAR output.
+NO: 2.0 R.O. 2007-11-16
+NO:    Modified to turn off axis E (tertiary rotation) after a successful move
+NO:    even if MOFF = 1.
+
+NO: Be sure to update LVERS in #LCMPVAR when changing version numbers
+
+NO: TO DO:
+NO: - modify to only unclamp if not moving. This is a challenge
+NO: because #GOCORR will try to make a small correction even if E is
+NO: already in the desired slot
+NO: - modify mirror cover clamp/unclamp to stop when the appropriate switch
+NO: is seen, but also to time out if it takes too long. This sounds extremely
+NO: tricky and so probably not worth the effort, complexity and additional code.
+
+NO: What this does:
+NO: 1: Adds support for tertiary rotation
+NO: Before a Move of Axis E:
+NO: - turn motor on
+NO: - unclamp
+NO: - wait for unclamping to take place
+NO: - verify both jaws out and unclamped (clutch engaged)
+NO: After a Move of Axis E:
+NO: - turn on LED and wait for signal to stabilize
+NO: - look for in-slot signal
+NO: - turn off LED
+NO: - close clamp
+NO: - wait for clamping to take place
+NO: - verify clamped (clutch disengaged) and neither jaw out
+NO:
+NO: 2: Adds support for opening and closing of mirror covers and eyelids
+
+NO: New computed variables (leave alone):
+NO: LATSLOT at slot
+NO: LLJOPEN, LRJOPEN left, right jaw open
+NO: LENGAGED clutch engaged
+NO: LCOVOP string version of mirror cover open command
+NO: LCOVCL string version of mirror cover close command
+
+ST;  NO: kill background processes and any motion
+
+DL #LCLNUP
+NO: Local addition to #CLEANUP, run as any command ends.
+NO: Do not call #DONE or #CLEANUP at the end, to avoid infinite loops.
+NO: Typical use is to make sure outputs and extra hardware
+NO: are in some desired state
+NO: Reset output related to mirror cover and eyelid motion
+JS #LRSOUT
+NO: set LCOVACT to an invalid value
+LCOVACT = "none"
+EN
+
+#LAUXOUT
+NO: Local addition to AUXOUT
+NO: To use this you must:
+NO: - increase AUXLEN accordingly in $LCMPVAR
+NO: - use only AUX-specific subroutines and variables
+NO: - end with a simple EN (do not call #DONE or #CLEANUP)
+MG {P2}{F9.0}{N} ", ", _TEE
+EN
+
+#LCMPVAR
+NO: Local addition to #COMPVAR, run at power on and after reset.
+NO: Must at least define LVERS, the version of the local mods.
+LVERS = 2.0
+AUXLEN = AUXLEN + 12
+NO: internal variables, do not mess with these
+NO: the following are needed because one cannot test string equality
+LCOVOP = "open"; NO: value of action variable when opening mirror covers
+LCOVCL = "close"; NO: value of action variable when closing mirror covers
+JP #DONE, _ZS0 = 0; EN
+
+#LRSOUT
+NO: Reset outputs related to mirror covers and eyelids
+CB 4; CB 5; CB 6; CB 7; CB 8
+JP #DONE, _ZS0 = 0; EN
+
+#LOPEYE
+NO: Open eyelid A, where A is in range [1, 7]
+NO: if A out of range, fail
+JP #E2LOPEY, (A < 1) | (A > 7)
+MG {F1.0} "opening eyelid", A
+SB A + 8
+WT LEYETIME * 1000; JS #LSTATUS
+NO: if all eyelids closed (input 14 low), fail
+JP #E4LOPEY, @IN[14] = 0
+JP #DONE, _ZS0 = 0; EN
+#E2LOPEY
+MG {F2.0} "?LOPEYE there is no eyelid #", A
+JP #MYERR
+#E4LOPEY
+MG {F2.0} "?LOPEYE eyelid", A, " did not open, all eyelids still closed"
+JP #MYERR
+
+#LCLEYE
+NO: Close eyelid A, where A is in range [1, 7]
+NO: Close all eyelids if A is not set or is out of range
+JP #G2LCLEY, (A >= 1) & (A <= 7)
+NO: close all eyelids -- clear bits 9-15
+MG "closing all eyelids"
+OP (_OP & $80FF)
+WT LEYETIME * 1000; JS #LSTATUS
+NO: if all eyelids not closed (input 14 high), fail
+JP #E2CLPEY, @IN[14]
+JP #DONE, _ZS0 = 0; EN
+#G2LCLEY
+NO: close a specific eyelid
+MG {F1.0} "closing eyelid", A
+CB A + 8
+WT LEYETIME * 1000; JS #LSTATUS
+NO: if all eyelids should be closed (input 14 low) but are not, fail
+JP #E2CLPEY, (_OP & $7F00) & (@IN[14] = 0)
+JP #DONE, _ZS0 = 0; EN
+#E2CLPEY
+MG {F2.0} "?LCLEYE one or more eyelids not fully closed"
+JP #MYERR
+
+#LOPCOV
+NO: open all mirror covers
+LCOVACT = "open"; A=1; JS #LDOCOV
+LCOVACT = "open"; A=2; JS #LDOCOV; JS #LSTATUS
+JP #DONE, _ZS0 = 0; EN
+
+#LCLCOV
+NO: open all mirror covers
+LCOVACT = "close"; A=2; JS #LDOCOV
+LCOVACT = "close"; A=1; JS #LDOCOV; JS #LSTATUS
+JP #DONE, _ZS0 = 0; EN
+
+#LDOCOV
+NO: open or close a group of mirror covers
+NO: before calling, set:
+NO: set LCOVACT = "open" or "close" to open or close
+NO: set A = 1 or 2 for group 1 or 2
+NO:
+NO: check LCOVACT
+JP #E2LDOCV, (LCOVACT <> LCOVOP) & (LCOVACT <> LCOVCL)
+NO: check group number
+JP #E3LDOCV, (A <> 1) & (A <> 2)
+MG {S} LCOVACT, " mirror cover", {F1.0} A
+NO: moving group 1 is an error if group 2 is not fully closed
+JP #E4LDOCV, (A = 1)  & @IN[11]
+NO: moving group 2 is an error if group 1 is not fully open
+JP #E5LDOCV, (A <> 1) & @IN[ 9]
+NO: if all eyelids not closed, fail
+JP #E6LDOCV, @IN[14]
+NO: compute which bit should be set to move the desired covers
+NO: in the desired direction
+LBIT =         (LCOVACT= LCOVOP) * ((5*(A=1)) + (6*(A<>1)))
+LBIT = LBIT + ((LCOVACT<>LCOVOP) * ((8*(A=1)) + (7*(A<>1))))
+NO: reset outputs and start the mirror covers moving
+JS #LRSOUT; SB LBIT; SB 4; TEMP = 0
+NO: poll every LCVPOLLT seconds until the motion is complete
+#G2LDOCV
+TEMP = TEMP + 1; WT LCVPOLLT * 1000
+NO: if mirror cover group A fully moved, exit the polling loop
+JP #G4LDOCV, (LCOVACT = LCOVOP) & (((A=1)&(@IN[ 9]=0)) | ((A<>1)&(@IN[10]=0)))
+JP #G4LDOCV, (LCOVACT = LCOVCL) & (((A=1)&(@IN[12]=0)) | ((A<>1)&(@IN[11]=0)))
+NO: if there's still time, repeat the polling loop
+JP #G2LDOCV, TEMP * LCVPOLLT <= LCVMAXT
+NO: too much time has elapsed, kill motion and fail
+JS #LRSOUT
+MG "?LDOCOV group", {F2.0} A, " mirror covers did not fully "{N}; MG {S}LCOVACT
+JP #MYERR
+NO: the switches say the motion is complete
+NO: run for LCVADDT seconds longer, stop motion and perform tests
+#G4LDOCV
+WT LCVADDT * 1000
+JS #LRSOUT
+NO: if either group in both states, fail (bad switch)
+JP #E9LDOCV, ((@IN[9]=0) & (@IN[12]=0)) | ((@IN[10]=0) & (@IN[11]=0))
+JP #DONE, _ZS0 = 0; EN
+#E2LDOCV
+MG "?LDOCOV must specify LCOVACT = open or close: LCOVACT = ", {S} LCOVACT
+JP #MYERR
+#E3LDOCV
+MG "?LDOCOV must specify mirror cover group A = 1 or 2: A =", {F2.0} A
+JP #MYERR
+#E4LDOCV
+MG "?LDOCOV cannot ", {S} LCOVACT, " group 1: group 2 covers not fully closed"
+JP #MYERR
+#E5LDOCV
+MG "?LDOCOV cannot ", {S} LCOVACT, " group 2: group 1 covers not fully open"
+JP #MYERR
+#E6LDOCV
+MG "?LDOCOV cannot move mirror covers: one or more eyelids open"
+JP #MYERR
+#E9LDOCV
+MG "?LDOCOV sensors claim some mirror covers are both open and closed"
+JP #MYERR
+
+#LGETSLT
+NO: LATSLOT = at slot
+CB 1
+WT LSLTIME * 1000
+LATSLOT = 1 - @IN[4]
+LATSLOT = 1; NO: remove this line to re-enable the at slot sensor
+SB 1
+JP #DONE, _ZS0 = 0; EN
+
+#LGETJAW
+NO: LLJOPEN = left jaw open, LRJOPEN = right jaw open
+NO: LENGAGED = clutch engaged
+LLJOPEN = 1 - @IN[6]
+LRJOPEN = 1 - @IN[7]
+LENGAGED = @IN[8]
+JP #DONE, _ZS0 = 0; EN
+
+#LGO
+NO: Called as a move begins (before turning on the motors if MOFF=1)
+NO: Unclamp tertiary if moving E (tertiary rotation) and not already unclamped
+JP #E2LMINI, (D <> MAXINT); NO: error if D moving (there is no D)
+JP #G2LMINI, (E = MAXINT); NO: do nothing if E not going to move
+NO: Do nothing if already fully unclamped
+JS #LGETJAW
+JP #G2LMINI, (LLJOPEN & LRJOPEN & LENGAGED)
+NO: turn the motor on
+SH E
+NO: open clamp and wait for clamp to open
+CB 2
+WT LOPTIME * 1000
+NO: make sure both jaws are open and clutch engaged
+JS #LGETJAW
+JP #E4LMINI, (LLJOPEN & LRJOPEN & LENGAGED) = 0
+#G2LMINI
+JP #DONE, _ZS0 = 0; EN
+#E2LMINI
+MG "?LMINIT motion requested for axis D but there is no axis D"
+JP #MYERR
+#E4LMINI
+MG "?LMINIT clamp failed to fully open"
+MG {F1.0} LLJOPEN, LRJOPEN, LENGAGED, " left, right jaw open, clutch engaged"
+JP #MYERR
+
+#LMSTIME
+NO: Increases RESx by the time required to execute #LMSTOP (in sec)
+NO: Called before a motion begins; X <> MAXINT and _PRx <> 0 if x will be moved
+NO: or after a move ends; X <> MAXINT if x was moved
+RESE = RESE + ((LSLTIME + LCLTIME) * (E <> MAXINT))
+JP #DONE, _ZS0 = 0; EN
+
+#LMSTOP
+NO: Called as a move ends (before turning off the motors if MOFF true)
+NO: x <> MAXINT if axis is was moved
+NO: If halting is a multi-step process, make sure your code can
+NO: execute from any step (in case the process is interrupted and restarted).
+NO: End success with JP #CLEANUP, _ZS0 = 0; EN, errors with JP #CLEANUP.
+NO: Do NOT call #DONE to avoid infinite loops.
+JP #G2LMSTO, (E = MAXINT); NO: do nothing if E not moved
+NO: do nothing if jaws fully closed
+JS #LGETSLT
+JP #G2LMSTO, (LLJOPEN | LRJOPEN | LENGAGED) = 0
+NO: make sure the tertiary clamp is at a slot
+JS #LGETSLT
+JP #E2LMSTO, LATSLOT = 0
+NO: close clamp and wait for clamp to close
+SB 2
+WT LCLTIME * 1000
+NO: verify that clamp has closed
+JS #LGETJAW
+JP #E4LMSTO, (LLJOPEN | LRJOPEN | LENGAGED)
+#G2LMSTO
+NO: force tertiary rotation motor E off even if MOFF=0
+MO E
+JP #CLEANUP, _ZS0 = 0; EN
+#E2LMSTO
+MG "?LMSTOP not at slot"
+JP #E9LMSTO
+#E4LMSTO
+MG "?LMSTOP clamp failed to fully close"
+MG {F1.0} LLJOPEN, LRJOPEN, LENGAGED, " left, right jaw open, clutch engaged"
+JP #E9LMSTO
+#E9LMSTO; NO: final error exit
+NO: on error, open the jaws and leave the motor on (by quitting)
+NO: but turn off stepper motors
+MO ABC
+CB 2
+JP #CLEANUP
+
+#LMVTIME
+NO: Increases RESx by the time required to execute LMINIT (in sec)
+NO: Called before a motion begins; X <> MAXINT and _PRx <> 0 if x will be moved
+RESE = RESE + (LOPTIME * (E <> MAXINT))
+JP #DONE, _ZS0 = 0; EN
+
+#LSTATUS
+NO: Additional information to be displayed by #STATUS, if any.
+MG {F9.0} _RPE, " ", @RND[_TDE * ENCRESE] {N}
+MG " commanded, measured tertiary rotation"
+JS #LGETSLT
+JS #LGETJAW
+MG {F1.0} LATSLOT, LLJOPEN, LRJOPEN, LENGAGED {N}
+MG " at slot (disabled), left, right jaw open, clutch engaged"
+MG {F1.0} 1-@IN[9], 1-@IN[10], 1-@IN[11], 1-@IN[12] {N}
+MG " mirror cover group 1 open, 2 open, 2 closed, 1 closed"
+MG {F1.0} (_OP&$100>0), (_OP&$200>0), (_OP&$400>0), (_OP&$800>0), {N}
+MG {F1.0} (_OP&$1000>0), (_OP&$2000>0), (_OP&$4000>0), 1-@IN[14] {N}
+MG {F1.0}, " eyelids 1-7 asked to open, all eyelids closed"
+JP #DONE, _ZS0 = 0; EN
+
+#LSHWPAR
+NO: Additional information to be displayed by #SHOWPAR.
+MG {F2.2} LVERS, " version of M3-specific additions"
+MG {F2.0} _OEE, {F9.0} _ERE, {N}
+MG " off-on-error?, error limit for tertiary rotation"
+MG {F2.1} LCLTIME, LOPTIME, LSLTIME {N}
+MG " time to close rotation clamp, open clamp, turn on at-slot sensor (sec)"
+MG {F2.1} LCVMAXT, LCVPOLLT, LCVADDT {N}
+MG " max time, poll time, addtl run time for primary mirror cover motion (sec)"
+MG {F2.1} LEYETIME {N}
+MG " time for primary mirror eyelid motion (sec)"
+JP #DONE, _ZS0 = 0; EN
+\
+                                                 
+                                                 
+NO: update computed variables
+XQ #COMPVAR
+NO: once tested, save the program to flash memory with BP

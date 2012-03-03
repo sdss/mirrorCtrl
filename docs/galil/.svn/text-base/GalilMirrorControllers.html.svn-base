@@ -1,0 +1,2036 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<html>
+<head>
+   <title>Galil Mirror Controller</title>
+</head>
+<body>
+<h1>Galil Mirror Controllers</h1>
+
+<p>By Russell Owen
+
+<h2><a name="Contents"></a>Contents</h2>
+
+<ul>
+	<li><a href="#Introduction">Introduction</a>
+	<li><a href="#Commands">Commands</a>
+	<li><a href="#DeviceSpecificModifications">Device-Specific Modifications</a>
+	<li><a href="#Internals">Internals</a>
+	<li><a href="#ConstantsAndParameters">Constants and Parameters</a>
+	<li><a href="#StatusWord">Status Word</a>
+	<li><a href="#DetailsOfTheInterface">Details of the Interface</a>
+	<ul>
+	   	<li><a href="#InterfaceCommandInput">Command Input</a>
+	   	<li><a href="#InterfaceReplies">Replies</a>
+	   	<li><a href="#InterfaceErrorMessages">Error Messages</a>
+	   	<li><a href="#InterfaceAuxPortStatus">Auxiliary Port Status</a>
+	</ul>
+	<li><a href="#Wiring">Wiring</a>
+	<li><a href="#DeviceSpecific">Device-Specific Information</a>
+	<ul>
+		<li><a href="#35mSecondary">3.5m Secondary</a>
+		<li><a href="#35mTertiary">3.5m Tertiary</a>
+		<li><a href="#SDSSPrimary">SDSS Primary</a>
+		<li><a href="#SDSSSecondary">SDSS Secondary</a>
+	</ul>
+	<li><a href="#InstallingAGalil">Installing A Galil</a>
+	<ul>
+	   	<li><a href="#UploadCode">Upload Code</a>
+	   	<li><a href="#TestTheSystem">Test The System</a>
+	</ul>
+	<li><a href="#Troubleshooting">Troubleshooting</a>
+	<ul>
+	   	<li><a href="#OnFullStepError">On Full Step Error</a>
+	   	<li><a href="#AmplifierFault">Amplifier Fault</a>
+	   	<li><a href="#GalilErrorLight">Galil Error Light</a>
+	</ul>
+   
+	<li><a href="GalilMirrorControllerVersionHistory.html">Version History</a>
+</ul>
+
+<h2><a name="Introduction"></a>Introduction</h2>
+
+<p>This manual describes motion controllers used to control various
+mirrors and other devices at Apache Point Observatory. The manual
+describes the basic software and wiring common to all devices. It
+also describes most or all of the controlled devices, including
+software and wiring additions. (At the time of this writing, the SDSS
+engineering camera is not described.)
+
+<p>Each motion controller consists of a Galil DMC-15x0 motion
+controller, added software described in this manual, and a mixture of
+stepper motor and servo motor drivers. The stepper motor drivers must
+include an "on full step" output if you wish to power down the motors
+after a move (as we do in most cases, so reduce generated heat). One
+such driver is the Intelligent Motion Systems IMS-483.
+
+<p>These motion controllers take as input the length of each
+actuator, in microsteps. There is no attempt to deal with "natural"
+units, such as &#181;m, nor with a "natural" frame of reference, such
+as piston, tilt and translation of a mirror. This decision was made
+because the Galil motor controller's built-in programming language is
+primitive and the number representation has very limited
+precision.
+
+<p>There are also documentation from Galil which describe the built
+in command set, wiring and electrical specifications. The newer Galil
+documentation is divided into two manuals, one for commands, the
+other for everything else. The older documentation combines
+everything in one fat manual. The built in Galil command set is not
+used for normal motion, because the added software provides a higher
+level of command. But the built in language is worth knowing about,
+as it can be very handy for engineering.
+
+<h2><a name="Commands"></a>Commands</h2>
+
+<p>The following commands are intended to be used interactively. The
+behavior of these commands may be altered by device-specific
+modifications (described elsewhere in this manual). There are
+additional commands in the Galil that are only not documented here,
+as they are intended for internal use. For a complete list, see the
+source code (preferably the text files, as the code in the Galil
+lacks comments).
+
+<ul>
+	<li><a href="#COMPVAR">COMPVAR</a>
+   
+	<li><a href="#HOME">HOME</a>
+   
+	<li><a href="#MOVE">MOVE</a>
+   
+	<li><a href="#MOVEREL">MOVEREL</a>
+   
+	<li><a href="#SHOWPAR">SHOWPAR</a>
+   
+	<li><a href="#STATUS">STATUS</a>
+   
+	<li><a href="#STOP">STOP</a>
+   
+	<li><a href="#EngineeringCommands">Engineering Commands</a>
+   
+   <ul>
+   	<li><a href="#GOFS">GOFS</a>
+      
+   	<li><a href="#GOIND">GOIND</a>
+      
+   	<li><a href="#GORLIM">GORLIM</a>
+      
+   	<li><a href="#TESTHM">TESTHM</a>
+      
+   	<li><a href="#TESTMV">TESTMV</a>
+   </ul>
+   
+</ul>
+
+<h3><a name="AxisVariables"></a>Axis Variables A, B, C, D...</h3>
+
+<p>Motion commands require a position or other parameter for each
+axis. To execute these commands, first set variables A, B, C, D... to
+the desired position or other value (see the command for details),
+then execute the command. To leave an axis unchanged, leave the
+variable alone. If you set a variable and want to clear it, set it to
+MAXINT. To clear all variables at once, simply execute any non-motion
+command, such as <a href="#STATUS">STATUS</a>.
+
+<h3><a name="COMPVAR"></a>XQ #COMPVAR</h3>
+
+<p>Computes variables needed for operation, based on <a href="#UserSpecifiedConstants">user-specified
+constants</a>. As such, it should be executed whenever you change any
+<a href="#UserSpecifiedConstants">user-specified constant</a>. It is
+also executed automatically at power up.
+
+<p>It is a grave mistake to change any user-specified constants
+without then executing COMPVAR. At best your changes will be ignored,
+but you might put the Galil into an inconsistent state resulting in
+very strange behavior.
+
+<p><B>Warning</B>: If you change any constants dealing with range of
+motion, you should also <a href="#HOME">home</a> the system after
+running COMPVAR.
+
+<h3><a name="HOME"></a>XQ #HOME</h3>
+
+<p>Homes all axes using the algorithm described <a href="#HomingAlgorithm">below</a>.
+Before calling, set <a href="#AxisVariables">axis variables A, B,
+C...</a> to any value other than MAXINT (the default) for the axes
+you wish homed. Homing is prohibited if <B>any</B> axis is moving. An
+axis must be homed before it can be moved using <a href="#MOVE">MOVE</a>
+or <a href="#MOVEREL">MOVEREL</a>.
+
+<p>If the controller has been homed at least once since last power
+up, the position error (change from last home position) is reported.
+This error may be due to lost steps or an actual change in the home
+position due to inaccuracy in the home switch or positioning
+mechanism.
+
+<p>Caveats:
+
+<ul>
+	<li>Don't forget to specify the axes you want homed!
+   
+	<li>The homing sequence can be important. Details for homing each
+   mirror at Apache Point Observatory are given in the <a href="-/TCC/OperatorsManual.html">TCC
+   Operator's Manual</a> section <a href="-/TCC/OperatorsManual.html#HomingMirrors">Homing
+   Mirrors</a>. More generally:
+   
+   <ul>
+   	<li>In a system with axial and transverse actuators it is
+      usually best to home the transverse actuators first, then
+      center the transverse position, then home the axial
+      actuators.
+      
+   	<li>Depending on the design of the support system, there may be
+      crosstalk between axes, so that homing one axis without homing
+      related axes (e.g. all axials at the same time) could produce
+      incorrect results.
+   </ul>
+   
+   
+	<li>Homing can take quite a long time, depending on the speed of
+   the actuators and the distance from home. To assist in automatic
+   homing, maximum times are returned for the longer operations, such
+   as initially running into the reverse limit. These times allow the
+   controlling computer to set reasonable time limits for the
+   operation to complete.
+   
+	<li>Home is near the negative limit switch, so the first motion
+   after homing may take quite awhile.
+   
+	<li>Homing sometimes fails for the SDSS M2 actuator system. This
+   is because the M2 axial actuators are not strictly monotonic at
+   the home switch. The only known solution is to repeatedly home
+   failed axes until homing succeeds. At present all, all other
+   systems should home correctly the first time and failure may
+   indicate a problem.
+</ul>
+
+<h3><a name="MOVE"></a>XQ #MOVE</h3>
+
+<p>Moves to the given absolute position, in microsteps. Before
+calling, set <a href="#AxisVariables">axis variables A, B, C...</a>
+to the desired position. Example, moving only axes B and C (all
+spaces are optional):
+
+<BLOCKQUOTE><pre><CODE>B = -5623
+C = 25
+XQ #MOVE</CODE></pre></BLOCKQUOTE>
+
+<p>This command prints the duration of the move for each axis, the
+target position and, when finished, the actual end position. The
+command does not return until motion finishes and is verified to have
+completed successfully.
+
+<p>If correction is enabled, then at the end of the move the encoders are read and a corrective move is made of all eligible actuators.
+<ul>
+	<li>To enable or disable correction for all axes, set <a href="#NCORR">NCORR</a> to 0 or 1.
+	<li>To disable correction for a particular axis, set <a href="#MAXCORRx">MAXCORRx</a> to 0.
+	<li>If the error is too large (as set by <a href="#MAXCORRx">MAXCORRx</a>), an error is reported and no correction is made.
+	<li>An actuator is eligible for correction if it has an <a href="#AuxiliaryEncoder">auxiliary encoder</a>.
+	<li>See also <a href="#ENCTIME">ENCTIME</a> and <a href="#ENCRESx">ENCRESx</a>.
+</ul>
+
+<p>If <a href="#MOFF">MOFF</a> = 1 then the motion will be rounded to
+the nearest full step, and the motors powered down <a href="#WTIME">WTIME</a>
+seconds after the move completes. If <a href="#MOFF">MOFF</a> = 0
+then the motion will be to the nearest microstep and the motor
+current will be left on (motor current may automatically be reduced
+after a short time by the motor drivers, but the Galil motion
+controller has nothing to do with such current reduction).
+
+<h3><a name="MOVEREL"></a>XQ #MOVEREL</h3>
+
+<p>Like <a href="#MOVE">MOVE</a> except the specified position is an
+offset, relative to the target position. The default offset is
+zero.
+
+<h3><a name="SHOWPAR"></a>XQ #SHOWPAR</h3>
+
+<p>Displays constant (but settable) parameters. If the system
+includes additional device-specific enhancements then additional
+lines showing device-specific parameters may be appended.
+
+<p>Sample output for a 4-axis system with no device-specific
+enhancements. A leading colon has been removed:
+
+<pre>XQ#SHOWPAR
+ 02.01, 4 software version, NAXES number of axes
+ 0, 1, 00 DOAUX aux status? MOFF motors off when idle? NCORR # corrections
+ 00.10, 00.00, 30.00 WTIME, ENCTIME, LSTIME
+-000500000, -000500000, -000500000, -000500000 -RNGx/2 reverse limits
+ 000500000,  000500000,  000500000,  000500000 RNGx/2 forward limits
+ 000050000,  000050000,  000050000,  000050000 SPDx speed
+ 000005000,  000005000,  000005000,  000005000 HMSPDx homing speed
+ 000500000,  000500000,  000500000,  000500000 ACCx acceleration
+ 000000000,  000000000,  000000000,  000000000 MINCORRx min correction
+ 000000000,  000000000,  000000000,  000000000 MAXCORRx max correction
+ 000000050,  000000050,  000000050,  000000050 ST_FSx microsteps/full step
+ 000005000,  000005000,  000005000,  000005000 MARGx dist betw hard &amp; soft rev lim
+ 000000000,  000000000,  000000000,  000000000 INDSEP index encoder pulse separation
+ 0000.0000,  0000.0000,  0000.0000,  0000.0000 ENCRESx encoder resolution (microsteps/tick)
+OK
+</pre>
+
+<h3><a name="STATUS"></a>XQ #STATUS</h3>
+
+<p>Displays the current status of the controller, including whether
+axes have been homed, the commanded position, <a href="#CurrentPosition">current
+position</a> and a <a href="#StatusWord">status word</a> for each
+axis. If an axis has not been homed, the position information for
+that axis is invalid and will be displayed as all 9s. If the system
+includes additional device-specific hardware that has to be managed
+for motion to begin and end (e.g. brakes or clamps) then additional
+lines of status showing the status of that hardware will be
+appended.
+
+<p><a name="CurrentPosition"></a>The meaning of current position
+depends on whether the axis is a stepper or servo motor, and whether
+or not it has an auxiliary (optional) encoder:
+
+<table border=1>
+   <tr><td></td><td>No Aux. Encoder</td><td>Aux. Encoder</td></tr>
+   <tr><td>Stepper Motor</td><td>commanded position</td><td>aux. encoder position</td></tr>
+   <tr><td>Servo Motor</td><td>motor encoder pos.</td><td>aux. encoder position</td></tr>
+</table>
+
+
+<p>Sample output for a 3-axis system with no device-specific
+enhancements. A few leading colons have been removed:
+
+<pre>XQ#STATUS
+-001497400, -000767250, -001199000 commanded position
+-001497400, -000767250, -001199000 actual position
+ 00065537,  00065540,  00065540 status word
+OK
+</pre>
+
+<h3><a name="STOP"></a>XQ #STOP</h3>
+
+<p>Halts the axes and (if MOFF = 1) powers down the motors. Warning: may not halt the motors on a full step.
+
+<h3><a name="EngineeringCommands"></a>Engineering Commands</h3>
+
+<p>Engineering commands are not intended for use by the TCC. They are more likely to change over time than commands used by the TCC. They may not return OK when finished.
+
+<h4><a name="GOFS"></a>XQ #GOFS</h4>
+
+<p>Moves slowly forward to the next full step (as reported by the stepper motor drivers). Before calling, set <a href="#AxisVariables">axis variables A, B, C...</a> to any non-MAXINT value for the axes you wish to move. Axes with servo motors are not moved; no warning is given.
+
+<h4><a name="GOIND"></a>XQ #GOIND</h4>
+
+<p>Moves forward at speed HMSPDx to the next index pulse. Before calling, set <a href="#AxisVariables">axis variables A, B, C...</a> to any non-MAXINT value for the axes you wish to move. Axes without an index pulse encoder (INSEPx=0) are not moved; no warning is given.
+
+<h4><a name="GORLIM"></a>XQ #GORLIM</h4>
+
+<p>Runs into the reverse limit switch at full speed. Before calling, set <a href="#AxisVariables">axis variables A, B, C...</a> to any non-MAXINT value for the axes you wish to move.
+
+<p>Warnings:
+
+<ul>
+	<li>Motion is limited to roughly 1.25 times the full range RNGx,
+   to detect a stalled actuator. If the actuator starts well forward
+   of its normal range (as can happen if the software range is
+   significantly smaller than the range between limit switches) the
+   actuator may not make it all the way to the limit switch the first
+   time. If this happens, inspect the actuator to make sure it is
+   moving safely and reissue the command.
+   
+	<li>The actuators being moved may not all end up with their limit
+   switches compressed. This can happen for various reasons including
+   the limit switches not being right on the actuators (so motion in
+   one actuator affects another) or in the case of the SDSS M2
+   actuators, slightly irregular motion at the limit switches.
+</ul>
+
+<h2><a name="ErrorMessages"></a>Error Messages</h2>
+
+<p>&nbsp;
+
+<h2><a name="DeviceSpecificModifications"></a>Device-Specific
+Modifications</h2>
+
+<p>Galil motion controllers may be modified to support special needs
+for specific devices. Local modifications consist of several
+parts:
+
+<p>The following subroutines must be replaced. This can be done by
+starting your file with DL #LCMPVAR and including all of the other
+subroutines listed, ending with a backslash on its own line. See
+existing local modification files for examples of how this is done.
+In addition to the required routines below, you may add any
+subroutines you wish, preferably beginning with the letter L to avoid
+confusion with built-in routines.
+
+<h4>#LCMPVAR</h4>
+
+<p>Additions to #COMPVAR, which computes variables at power up and
+reset. You must define #LVERS to the current version of your local
+modifications. This is also a good place to define any constants or
+initialize any variables needed by your local modifications. All
+constant or variable names should begin with "L".
+
+<h4>#LGO (was #LMINIT in version 1.5)</h4>
+
+<p>Actions to perform just before each motion begins (just before the
+motors are turned on if MOFF=1). Test for A, B, C... &lt;&gt; MAXINT
+to see which axes are about to move. Test _PRA &lt;&gt; 0,
+_PRB&lt;&gt;0... to see if the specified axis is actually being
+commanded to go anywhere new. The value of _PRx is either the amount
+of the commanded move or in some cases (such as finding the reverse
+limit switches) an upper limit. It is important that this code be
+"restartable"; if #LMINIT is interrupted (e.g. due to a power
+failure) then a subsequent call to #LMINIT should finish the
+initialization sequence.
+
+<p>If initialization takes significant time then you should be smart
+and only initialize if it has not already been done. If you fail to
+do this you will not only waste time but you will also make the
+reported time for a #MOVE or #MOVEREL incorrect (because the time
+estimate only takes into account one initialization, whereas the move
+calls #LGO twice).
+
+<h4>#LSTATUS</h4>
+
+<p>Additions to #STATUS, the status display. Display the state of any
+interesting hardware you've added.
+
+<h4>#LSHWPAR</h4>
+
+<p>Additions to #SHOWPAR, the show parameters display. Display the
+value of any interesting constants you've added.
+
+<h4>#LMSTIME</h4>
+
+<p>Add the time needed to perform the actions in #LMSTOP for each
+axis to RESx, in seconds. This allows an accurate reporting of the
+motion end time. Test for A, B, C... &lt;&gt; MAXINT to see which
+axes are about to move, and don't increase RESx unless the axis is
+going to be moved (or, more precisely, extra time is required to stop
+that axis for whatever reason).
+
+<h4>#LMSTOP</h4>
+
+<p>Actions to perform after a move completes (just before the motors
+are turned off, if MOFF = 1). It is important that this code be
+"restartable"; if #LMSTOP is interrupted (e.g. due to a power
+failure) then a subsequent call to #LMSTOP should finish the
+end-of-motion sequence.
+
+<h4>#LMVTIME (was #LMITIME in version 1.5)</h4>
+
+<p>Add the time needed to perform the actions in #LGO for each axis
+to RESx, in seconds. This allows an accurate reporting of the total
+motion time. Test for A, B, C... &lt;&gt; MAXINT to see which axes
+are about to move, and don't increase RESx unless the axis is going
+to be moved (or, more precisely, extra time is required to initialize
+that axis for whatever reason). If LGO is smart about only
+initializing when not already initialized then you should also make
+#LMVTIME smart in the same way.
+
+<h4>#END</h4>
+
+<p>This is a placeholder for the end of code. Test routines are
+appended from this label, overwriting anything that follows. Hence
+nothing should follow!
+
+<h2><a name="Internals"></a>Internals</h2>
+
+<h3>Basics</h3>
+
+<p>The controller represents numbers using 6 bytes of integer
+followed by 2 bytes of fraction, for a range of:
+
+	<blockquote><p><code>-2147483647.9999 to 2147483647.9999</code></blockquote>
+
+<p>The Galil keeps track of positions in microsteps, or in the case of servo motors, in motor shaft encoder ticks. I use the term "microstep" for both cases. For stepper motors, the number of microsteps in a full step is determined by the stepper motor driver, and the corresponding value must be set in <a href="#ST_FSx">ST_FSx</a>. A <a name="FullStep"></a>full step is defined as a magnetic detent on the stepper motor; it is also where the motor will go if only one coil is energized. For servo motors there is no concept akin to a "full step" and <a href="#ST_FSx">ST_FSx</a> should be set to 1.
+
+	<blockquote><p>I had some trouble determining if a typical 200 step motor had 200 magnetic detents. Most motor manufacturers said yes, but a few claimed that 200 step motors had only 50 magnetic detents. I then tested several different stepper motors (including one 400 step motor) and found that all "n" step motors I tested had "n" magnetic detents.
+	</blockquote>
+
+<p><a name="AuxiliaryEncoder"></a>Each axis may have an optional "auxiliary" encoder. For stepper motors, this is any encoder (since stepper motors are often run with no encoder). For servo motors, this is in addition to the required motor shaft encoder and is used in a situation where there may be slippage between the motor and the actuated part.
+
+<p>This controller can be made to turn off motors on a full step by setting <a href="#MOFF">MOFF</a> = 1, in which case motions will always be rounded to the nearest full step. This is useful for reducing overall power dissipation and noise, while leaving a stepper motor with some (not very much) holding torque. If heat is less of an issue and you need stronger holding torque or higher resolution, you may prefer to keep the motor energized all the time. Most stepper motor drivers (including the IMS-483) will automatically reduce
+current to the motor after a certain period of inactivity.
+
+<p>The following assumptions were made in coding the Galil motion controller:
+
+<ul>
+	<li>All axes are either left on after a move or else moves are
+   made to the nearest full step and all motors then powered off.
+   This property can only be set for the entire controller (all
+   axes), it cannot be set individually for each axis. This would be
+   difficult to change.
+   
+	<li>The reverse limit switch is also the home switch for each
+   axis, so you cannot use the forward limit switch for homing. This
+   is an unpleasant limitation, but one that is very difficult to
+   code around.
+   
+	<li>The range of motion is set by <a href="#RNGx">RNGx</a>. The
+   forward and reverse soft limits are set at +/-RNGx / 2 rounded to
+   the nearest full step. Hence zero is always the center of travel.
+   If you set RNGx too large, you will find yourself running into the
+   positive limit switch (or hard limit if there is no switch) before
+   you reach the software limit. Setting RNGx too small needlessly
+   constrains motion and may also cause HOME to fail on the first
+   attempt (see <a href="#HomingAlgorithm">Homing Algorithm</a>), in
+   which case executing HOME again should do the trick.
+   
+	<li>Motion of the actuators is strictly monotonic; motion in a
+   given direction at the motor should always produce motion in a
+   given direction at the actuator. If this is not true near the home
+   switch, homing may fail. This is, unfortunately, a common problem
+   with the SDSS Secondary axial actuators.
+</ul>
+
+<h3><a name="HomingAlgorithm"></a>Homing Algorithm</h3>
+
+<p>Axes are homed as follows:
+
+<ul>
+	<li>Run into the reverse hard limit at full speed (using <a href="#GORLIM">GORLIM</a>)
+   and come to a controlled stop (hence no counts are lost; this is
+   always how stops are made when hitting limits). Soft limits are
+   set to 25% above the full range specified by <a href="#RNGx">RNGx</a>;
+   if the travel between limit switches is greater than this, homing
+   may fail the first time, and need to be repeated.
+   
+	<li>If any reverse limit switches are not depressed (i.e. the
+   switch was contacted, but continuing motion in some other axis
+   then disengaged the switch), try <a href="#GORLIM">GORLIM</a>
+   again. At this point all reverse limit switches must be engaged or
+   the process halts with an error message.
+   
+	<li>Move forward slowly until the reverse limit disengages. The
+   reverse limit switch is ganged to the home switch input and the
+   <CODE>FE</CODE> command is used to find the transition in the home
+   switch. A time limit determined by <a href="#LSTIME">LSTIME</a>
+   prevents <CODE>FE</CODE> from running forever. (This is actually
+   implemented as a motion limit, but the limit is computed from
+   LSTIME).
+   
+	<li>Move forward a distance <a href="#MARGx">MARGx </a>to move out
+   of physical contact with the reverse limit switch.
+   
+	<li>For each axis with an index pulse encoder, move forward slowly
+   to the next index pulse, using <a href="#GOIND">GOIND</a>.
+   
+	<li>If the motors are to be powered off after a move (<a href="#MOFF">MOFF</a>
+   = 1), move forward very slowly until on a full step and then power
+   off the motors, using <a href="#GOFS">GOFS</a>.
+   
+	<li>This position is then defined to be the reverse soft limit.
+   The position is set to as -<a href="#RNGx">RNGx</a> / 2 rounded to
+   the nearest full step. Hence if the motor is now on a full step, 0
+   will also be on a full step. (This is only relevant if the motors
+   are to be powered off after each move, but is always done in any
+   case.)
+   
+	<li>If the unit has already been homed since last time it was
+   powered on, the new value for the reverse software limit is
+   compared to the old value and reported as a position error.
+   
+	<li>Finally, the forward soft limit is set to the negative of the
+   reverse limit. Note that no checking is done to see if the forward
+   limit switch is outside this range, or if such a switch even
+   exists. It is the user's responsibility to set <a href="#RNGx">RNGx</a>
+   correctly.
+</ul>
+
+<h3><a name="Coding Standards"></a>Coding Standards</h3>
+
+<p>The Galil's programming language is very primitive. All variables
+are global, all math is fixed point, subroutines do not accept
+arguments, parameters must be dealt with one at a time for each axis
+(there are arrays, but Galil does not use them to set or return
+information about the axes) there is no formal looping and there are
+no string variables (a numeric variable can be used to hold 6 bytes
+of string data). To make the job more tolerable, I developed the
+following standards:
+
+<ul>
+	<li>In variable names "ST" is used for steps (microsteps), FS is
+   full steps, RV is revolutions and ENC is encoder ticks. (MS is
+   milliseconds, as usual).
+   
+	<li>Subroutines that need statement labels (to which to jump) use
+   the following convention, where &lt;n&gt; is a unique number
+   (generally I count up by 2) and &lt;name&gt; is the name of the
+   subroutine truncated so that the complete label name is no more
+   than 7 letters long.
+   
+   <ul>
+   	<li>#E&lt;n&gt;&lt;name&gt; (E for error) to jump to an error
+      handler
+      
+   	<li>#G&lt;n&gt;&lt;name&gt; to perform a normal jump (G for
+      good)
+      
+   	<li>#x&lt;name&gt; when a series of jumps is used for handling
+      a set of axes, where x is axis letter A-F
+   </ul>
+   
+   
+	<li>Subroutines return results in variables RESx (x is axis letter
+   A-F) and possibly ISBAD (0 if OK, 1 if error). The one exception
+   is #DP... subroutines, which act on the desired position variables
+   DESPOSx.
+   
+	<li>Assertion subroutines return RESx = 1 if the assertion failed
+   for axis x.
+   
+	<li>If a set of numbers are to be computed, one per axis, I insist
+   that the computation for each axis fit on one line. This makes
+   errors in the pattern show up very clearly. Sometimes this
+   requires multiple sets of statements (e.g. breaking the problem
+   down) and results in less efficient code. Nonetheless, my
+   experience has shown that the gain in readability is well worth
+   the cost. With more complex-but-efficient code it is much, much
+   harder to spot errors in a specific axis. It's hard enough as it
+   is; the lack of ability to deal with data for axes as arrays is
+   very frustrating.
+   
+	<li>I always work in microsteps, to reduce round-off errors
+   associated with the fixed-point arithmetic. Most user-set
+   constants are specified in revolutions, but none of them has a
+   critical effect on accurate positioning.
+   
+	<li>Temporary variables are either called TEMP or begin with the
+   name of the subroutine.
+   
+	<li>Background processes are not allowed to set RESx, ISBAD or any
+   other variable that might be used by some other subroutine. Hence
+   they cannot call most subroutines.
+   
+	<li>Background processes associated with movement (turning off the
+   motors is presently the only such process) must be executed in
+   thread 3.
+</ul>
+
+<h2><a name="ConstantsAndParameters"></a>Constants and Parameters</h2>
+
+<p>Various constants (actually variables that are set once and saved)
+are used to control aspects of motion such as velocity and range of
+motion. There are some computed constants whose values depend on
+these user-set constants, so whenever you change a user-specified
+constant, be sure to run <CODE>XQ #COMPVAR</CODE> to update all
+computed constants.
+
+<p>The safest way to change constants is to edit the file "M1
+Constants" or "M2 Constants" and upload the entire file to the Galil
+(e.g. via copy/paste in any terminal emulator). This assures that
+computed constants are correctly updated and that the values are
+saved (using <CODE>BV</CODE>).
+
+<p>In addition to these constants, the Galil has a few built-in
+"parameters" that must also be specified for proper option. The
+distinction between constants and parameters is purely internal to
+the Galil; parameters are saved differently (using <CODE>BN</CODE>)
+and some of them are write-only (which is very frustrating).
+Fortunately, there are only a few parameters and they should never
+need to be changed once they are set correctly and saved.
+
+<p>In addition to setting these constants and parameters, there are
+jumpers in the Galil that must be set appropriately to drive stepper
+motors (one jumper per axis). Galil motor controllers come from the
+factory configured to drive servo motors, not steppers.
+
+<h3><a name="UserSpecifiedConstants"></a>User-Specified Constants</h3>
+
+<p>User-specified constants are actually variables that the software
+does not touch (except in a few special cases noted below). Variables
+may be set manually, but the best way to make permanent changes is to
+find the appropriate file of constants for the mirror in question,
+edit it, and upload the file to the Galil. Doing this assures that a
+correct and current file of constants is always available to be
+examined. At the time of this writing there is no permanent archive
+for files of constants, please contact <a href="mailto:owen/astro.washington.edu">Russell
+Owen</a> to examine the files or to make permanent changes.
+
+<p>To examine the value of a variable use MG <I>name</I>. To change a
+value, use <I>name</I> = <I>value</I>. After you change a value you
+should propagate it using <a href="#COMPVAR"><CODE>XQ
+#COMPVAR</CODE></a>. <B>Warning</B>: after changing any
+user-specified constant you <B>must</B> update the computed constants
+using <a href="#COMPVAR"><CODE>XQ #COMPVAR</CODE></a>, else all sorts
+of strange and unpredictable behavior can result.
+
+<dl>
+	<dt><a name="AUXMAXN"></a>AUXMAXN</dt>
+	
+	<dd>The maximum number of actual positions output from the auxiliary port before a commanded position is output. ("Maximum" because commanded position is output more often if the axis is moving).
+
+	<dt><a name="DOAUX"></a>DOAUX</dt>
+	
+	<dd>If 1 (or nonzero) then status information is automatically emitted from the auxiliary serial port. See <a href="#InterfaceAuxPortStatus">Auxiliary Port Status</a> for details.</dd>
+
+	<dt><a name="ENCTIME"></a>ENCTIME</dt>
+	
+	<dd>Settling time (in seconds) after a move and after WTIME, before the encoders are read. Ignored if NCORR is zero. If ENCTIME > 0 and MOFF = 1 then the motors are turned off while waiting for ENCTIME.
+	See also NCORR, ENCRESx, MINCORRx and MAXCORRx.
+	</dd>
+	
+	<dt><a name="LSTIME"></a>LSTIME</dt>
+	
+	<dd>Maximum time required to back out of a limit at low speed. This is only used as a time limit, so please be generous.
+	</dd>
+	
+	<dt><a name="MOFF"></a>MOFF</dt>
+	
+	<dd>Turn off all motors after each move? 1 (or nonzero) = yes, 0 = no. If 1 (turn motors off) then stepper motor positions are rounded to the nearest full step, and the Galil verifies that each stepper motor driver is reporting "on full step".
+	</dd>
+	
+	<dt><a name="NAXES"></a>NAXES</dt>
+	
+	<dd>Number of axes. Valid values are in the range 1-6.</dd>
+	
+	<dt><a name="NCORR"></a>NCORR</dt>
+	
+	<dd>Determines how many encoder-based corrections are applied after a move. Correction is only made for actuators with an <a href="#AuxiliaryEncoder">auxiliary encoder</a> (ENCRESx nonzero) and for which MAXCORRx is nonzero.
+	See also ENCTIME, ENCRESx, MINCORRx and MAXCORRx.
+	</dd>
+	
+	<dt><a name="WTIME"></a>WTIME</dt>
+	
+	<dd>Settling time after a move, in seconds. If MOFF = 1 then the motors are left on for WTIME before being turned off. See also ENCTIME.
+	</dd>
+</dl>
+
+<h4>Axis-specific constants (x = A-F depending on the axis)</h4>
+
+<p>Unless otherwise noted, axes-specific constants must be &gt; 0 if the axis exists and are ignored (and possibly overwritten) if the axis does not exist.
+
+<dl>
+	<dt><a name="RNGx"></a>RNGx</dt>
+	
+	<dd>Full range of motion, in microsteps. This should be approximately 10% less than the range delimited by the limit switches. Homing is done with respect to the reverse limit switch, so test RNGx by first homing and then moving to the positive soft limit. If RNGx is too large the positive limit switch will be touched or even tripped. If RNGx is too small, the full range of motion will not be used. If RNGx is less than 0.8 of the range set by the limit switches, it is possible for homing to fail on the first attempt and require an additional iteration.
+	</dd>
+	
+	<dt><a name="MARGx"></a>MARGx</dt>
+	
+	<dd>Margin between the hard and soft reverse limits, in microsteps. Set this just large enough that the reverse limit switch is not touched when homing is finished. Setting this too large needlessly reduces the full range of travel available to the actuator. If MOFF = 1 and you are using a rotary index pulse encoder, you should adjust MARGx so that after the move by MARGx the actuator ends up roughly halfway between index pulses. This gives you the best odds of always ending on the same index pulse after homing. (If you cannot make this adjustment then you may wish to disable the index pulse encoder by setting <a href="#INDSEPx">INDSEPx</a> to 0.)
+	</dd>
+	
+	<dt><a name="SPDx"></a>SPDx</dt>
+	
+	<dd>Maximum speed, in microsteps/sec. Stepper motors have less torque the faster they go, and may also resonate at certain	speeds, so be conservative. Test your setting to be sure the motor moves reliably and sounds good both loaded and unloaded.
+	</dd>
+	
+	<dt><a name="HMSPDx"></a>HMSPDx</dt>
+	
+	<dd>Maximum speed for finding the home switch, in microsteps/sec. Intuitively it ought to improve accuracy to home at a lower than normal speed than normal (<a href="#SPDx">SPDx</a>). However, the Galil keeps track of counts as it decelerates, even if it hits a limit switch, so homing at a lower speed may not actually be important.
+	</dd>
+	
+	<dt><a name="ACCx"></a>ACCx</dt>
+	
+	<dd>Acceleration and deceleration of each axis, in microsteps/sec<SUP>2</SUP>. I'm not sure what sets the upper limit (besides resolution in the Galil), but in cases of low inertia, I suggest a value at least 10x the speed (SPDx). Stepper motors work better with fast acceleration.
+	</dd>
+	
+	<dt><a name="ST_FSx"></a>ST_FSx</dt>
+	
+	<dd>Step resolution, in microsteps per <a href="#FullStep">full step</a>; set to 1 for a servo motor. This value must match the resolution set in the stepper motor driver.
+	</dd>
+	
+	<dt><a name="INDSEPx"></a>INDSEPx</dt>
+	
+	<dd>If this axis has an index pulse encoder and it is used for homing, then set to the separation between index pulses in microsteps. Otherwise 0. Subtlety: if MOFF = 1, you may wish to adjust the position of the reverse limit/home switch position or the index pulse encoder so that during homing the number of microsteps taken to find the full step (after finding the index pulse) is approximately half a full step (on the average over a number of homings). This gives you the best odds of always ending on the same full step after homing.</dd>
+	
+	<dt><a name="ENCRESx"></a>ENCRESx</dt>
+	
+	<dd>Resolution of encremental <a href="#AuxiliaryEncoder">auxiliary encoder</a> in ticks per microstep; 0 if no <a href="#AuxiliaryEncoder">auxiliary encoder</a>. See also NCORR, ENCTIME, MINCORRx and MAXCORRx.</dd>
+	
+	<dt><a name="MINCORR"></a>MINCORRx</dt>
+	
+	<dd>The minimum error that will be corrected. 0 means correct any error, no matter how small. If MOFF=1 then this value is compared to position errors rounded to the nearest full step.
+	The error in question is measured by the <a href="#AuxiliaryEncoder">auxiliary encoder</a> at the end of the move.
+	See also NCORR, ENCTIME and ENCRESx and MAXCORRx.</dd>
+	
+	<dt><a name="MAXCORRx"></a>MAXCORRx</dt>
+	
+	<dd>The maximum error that will be corrected at the end of a move. Larger errors will cause an error message and no corrections will be applied. Set to 0 if no encoder or if there is an encoder but no correction is desired for that actuator. If MOFF=1 then this test is compared to position error rounded to the nearest full step. If MINCORRx > MAXCORRx then no correction is applied and no warning is given for errors &gt; MAXCORRx.
+	The error in question is measured by the <a href="#AuxiliaryEncoder">auxiliary encoder</a> at the end of the move.
+	See also NCORR, ENCTIME and ENCRESx and MINCORRx.</dd>
+</dl>
+
+<h3><a name="Computed Constants"></a>Computed Constants</h3>
+
+<p>There are a number of constants computed by <a href="#COMPVAR">COMPVAR</a>.
+<a href="#COMPVAR"><CODE>XQ #COMPVAR</CODE></a> should be run
+whenever you change any user-set constant. It also runs automatically
+whenever the Galil is powered up. Read the code for the #COMPVAR
+program (including comments) for more information.
+
+<h3><a name="Parameters"></a>Parameters</h3>
+
+<p>Parameters have an effect similar to constants, but they are
+implemented as commands built into the Galil rather than as
+variables. To make your changes permanent (restored at power up or by
+resetting with <CODE>RS</CODE>), save parameters to flash memory
+using <CODE>BN</CODE>. Note: <CODE>BN</CODE> also saves the state of
+the digital outputs; this can be very handy, but be sure the outputs
+are in the desired state before saving.
+
+<dl>
+	<dt>MT 2, 2, 2, 2, 2, 2</dt>
+	
+	<dd>Motor type. See the Galil manual for more information. Warning: changing this changes both the polarity of the step pulse (which is how I determined the value to use) and <B>also</B> the direction of motion of the motor. Please don't change this setting unless you are willing to also reverse the motor direction (by swapping the A/A-bar or the B/B-bar wires).
+	</dd>
+	
+	<dt>CN -1, -1, -1</dt>
+	
+	<dd>Configures the polarity of the limit switches. See the Galil manual for more information.
+	</dd>
+	
+	<dt>MO</dt>
+	
+	<dd>Makes sure all motors are off when the Galil first wakes up.
+	</dd>
+</dl>
+
+<h2><a name="StatusWord"></a>Status Word</h2>
+
+<p>The status word is part of the information returned by the
+<a href="#STATUS">STATUS</a> command. The status word always reports
+current conditions of the controller; unlike some hardware
+controllers, the bits are not sticky.
+
+<p>With one exception (see below), good status after a move is simply
+the stop code (details below). Reasonable stop codes are 1 and 4. 1
+is expected after a successful XQ motion command (such as XQ#MOVE,
+XQ#MOVEREL or XQ#HOME) that includes the axis in question. 4 is
+expected after a successful XQ motion command that does <B>not</B>
+include the axis in question (because all other axes are told to
+stop), or after such a command fails with an error message.
+
+<p>Exception: if MOFF=0 (meaning leave motors on after a move), then
+it is OK for the motors to be on (bit 14 set). However, as of this
+writing, MOFF=1 for all mirror controllers at APO.
+
+<p>The status word consists of two parts:
+
+<p>The lower 8 bits (1-8) are a numeric stop code from the Galil SC
+command:
+
+<table border=1 cellspacing=1>
+   <tr>
+      <TD COLSPAN=2>
+         <p><B>Stop Code<BR>
+         </B>(bits 1-8)</td><td><B>Meaning</B></td></tr>
+   <tr><td align=right>Hex</td><td align=right>Dec</td><td></td></tr>
+   <tr><td align=right>0</td><td align=right>0</td><td>Running in independent mode</td></tr>
+   <tr><td align=right>1</td><td align=right>1</td><td>Stopped at commanded position in independent mode. This is the expected stop code after a successful XQ#MOVE, XQ#MOVEREL or XQ#HOME involving this axis. See also code 4.</td></tr>
+   <tr><td align=right>2</td><td align=right>2</td><td>Stopping or stopped by forward software limit or switch</td></tr>
+   <tr><td align=right>3</td><td align=right>3</td><td>Stopping or stopped by reverse software limit or switch</td></tr>
+   <tr><td align=right>4</td><td align=right>4</td><td>Stopping or stopped by stop command (ST). This is the expected stop code after XQ#MOVE, XQ#MOVEREL or XQ#HOME involving other axes, but omitting this axis. It is also normal after any XQ motion command fails. See also code 1.</td></tr>
+   <tr><td align=right>6</td><td align=right>6</td><td>Stopped by abort input (not used)</td></tr>
+   <tr><td align=right>7</td><td align=right>7</td><td>Stopped by abort command (AB)</td></tr>
+   <tr><td align=right>8</td><td align=right>8</td><td>Servo error too large (only relevant to servomotors, e.g. 3.5m M3 rotation)</td></tr>
+   <tr><td align=right>9</td><td align=right>9</td><td>Stopped after finding transition in home switch (FE).</td></tr>
+   <tr><td align=right>10</td><td align=right>10</td><td>Stopped after homing (HM) or finding index pulse (FI). Despite appearances, this is not a normal stop code after XQ#HOME.</td></tr>
+   <tr><td align=right>32</td><td align=right>50</td><td>Running in contour mode (not used)</td></tr>
+   <tr><td align=right>33</td><td align=right>51</td><td>Stopped at commanded position in contour mode (not used)</td></tr>
+   <tr><td align=right>63</td><td align=right>99</td><td>MC timeout (MC and TW); axis not in position soon enough after motion sequence ended (not used)</td></tr>
+   <tr><td align=right>64</td><td align=right>100</td><td>Running in vector sequence mode (not used)</td></tr>
+   <tr><td align=right>65</td><td align=right>101</td><td>Stopped at commanded position in vector sequence mode (not used)</td></tr>
+</table>
+
+
+<p>Bits 9-32 of the status word report conditions represented by
+individual bits. Bits 9-16 are from the TS command, but some bits
+have been flipped to make them easier to understand
+
+<table border=1 cellspacing=1>
+   <tr><td align=right><B>Bit</B></td><td><B>Meaning</B></td></tr>
+   <tr><td align=right>9</td><td>Encoder position latch armed (not used)</td></tr>
+   <tr><td align=right>10</td><td>Home switch activated (ganged to reverse limit)</td></tr>
+   <tr><td align=right>11</td><td>Reverse limit switch activated</td></tr>
+   <tr><td align=right>12</td><td>Forward limit switch activated</td></tr>
+   <tr><td></td><td></td></tr>
+   <tr><td align=right>13</td><td>(undefined)</td></tr>
+   <tr><td align=right>14</td><td>Motor on, i.e. amplifier enabled (should be 0 if MOFF=1
+         and axis is halted)</td></tr>
+   <tr><td align=right>15</td><td>Error limit exceeded (not used)</td></tr>
+   <tr><td align=right>16</td><td>Axis in motion</td></tr>
+   <tr><td></td><td></td></tr>
+   <tr><td align=right>17</td><td><a href="#OnFullStepError">Not on full step error</a> (motor
+         should be on a full step, but is not).</td></tr>
+   <tr><td align=right>18</td><td><a href="#AmplifierFault">Amplifier fault</a>, e.g. short
+         circuit (note: all amplifiers <B>may</B> have this signal
+         ganged together).</td></tr>
+   <tr><td align=right>19</td><td><a href="#AmplifierFault">Amplifier fault</a> (alternate
+         input)</td></tr>
+   <tr><td align=right>20</td><td>(unused)</td></tr>
+   <tr><td></td><td></td></tr>
+   <tr><td align=right>21-32</td><td>(unused)</td></tr>
+</table>
+
+
+<p>Note: as of version 1.9 bit 17 means "On Full Step Error" and is
+always supposed to be <B>off</B> (though an on full step error is
+typically not serious). Before that, bit 17 meant something a bit
+different and was supposed to be on for most axes.
+
+<h2><a name="DetailsOfTheInterface"></a>Details of the Interface</h2>
+
+<h3><a name="InterfaceCommandInput"></a>Command Input</h3>
+
+<p>Every command must be typed in upper case. Commands must be
+terminated with &lt;cr&gt; or semicolon. The length of any one
+command must not exceed 80 characters. (There is no limit on the
+length of a line containing multiple commands separated by
+semicolons).
+
+<p>All positions are in microsteps and all times are in seconds
+(hence velocities are in microsteps/sec, etc.).
+
+<h3><a name="InterfaceReplies"></a>Replies</h3>
+
+<p>The Galil echoes commands, displaying &lt;cr&gt;&lt;lf&gt; for
+&lt;cr&gt;. Prompting is, unfortunately, a bit strange. In the
+general case (any Galil command except program editing):
+
+<ul>
+	<li>After you enter a valid command terminated with &lt;cr&gt; or
+   semicolon the Galil responds with a colon (:), indicating that the
+   command was correctly <a href="#CmdTermination">parsed</a>. The
+   command is then executed.
+   
+	<li>If there is an error (the Galil cannot parse your input or an
+   invalid program step is encountered) the Galil will return a one
+   line error message beginning with "?" (for more information see
+   <a href="#InterfaceErrorMessages">Error Messages</a> below).
+   
+	<li><a name="CmdTermination"></a>Note that for the built-in commands
+   you get no indication that a command has finished executing. This
+   makes sense when you consider that the Galil can multitask and
+   that you can talk to it while it is executing a program.
+   Nonetheless, it present a serious challenge to the controlling
+   computer. To ameliorate this problem, programs (<CODE>XQ
+   #<VAR>progname</VAR></CODE>) do include indication of completion,
+   as described next.
+</ul>
+
+<p>For programs (<CODE>XQ #<VAR>progname</VAR></CODE>), the following
+convention is also used:
+
+<ul>
+	<li>All programs terminate their output with
+   "OK&lt;cr&gt;&lt;lf&gt;". Any informative or error messages will
+   come before the OK.
+   
+	<li>In the case of programs that run in the background, such as
+   <a href="#MOVE">XQ #MOVE</a>, there will be an indication of the
+   length of time for the move (before the OK). In the case of
+   programs that run in the foreground, the OK indicates that the
+   command has completed.
+   
+	<li>If a program encounters an error condition, it will print one
+   or more error messages beginning with "?", which is consistent
+   with normal Galil behavior. In addition, any motion will be halted
+   and if the motors are normally turned off after a move then they
+   will be turned off (but not necessarily on a full step).
+</ul>
+
+<p>In summary:
+
+<ul>
+	<li>For programs (<CODE>XQ #<VAR>progname</VAR></CODE>) keep
+   reading replies until you see "OK".
+   
+	<li>For built-in commands there is no simple rule, but you can
+   keep reading until you see a "?" (error message) or the expected
+   number of replies, or a ":" if no replies are expected.
+</ul>
+
+<h3><a name="InterfaceErrorMessages"></a>Error Messages</h3>
+
+<p>Error messages all begin with a question mark. Most messages also
+have the name of a subroutine in upper case immediately following the
+question mark. The message then follows. Logical values are
+represented as 1=true, 0=false. If the error message refers to one or
+more axes, it will end with a string of 1s and 0s indicating which
+axes are at fault. Axes are listed in order (A, B, C...) and a 1
+indicates the axis is a problem, 0 indicates the axis is not a
+problem.
+
+<h3><a name="InterfaceAuxPortStatus"></a>Auxiliary Port Status</h3>
+
+<p>If constant <a href="#DOAUX">DOAUX</a> = 1, regular status updates are emitted from the auxiliary serial port just as fast as the Galil can output them. Each line of status has the following format (note: controllers may append data; see device-specific information for this information):
+
+<ul>
+	<LI>The number of characters on the line, excluding the terminating &lt;CR&gt; (but including device-specific extra data, if any). ignore it. You should check line length and ignore lines that are too short (they should never be too long).
+   
+	<li>The position of axes 1 through NAxes
+   
+	<li>Number showing which axes are homed; a decimal representation of a binary value. Axis A is the low order bit, B is next, etc. Hence 19 = binary 10011 means axes A, B and E are homed. C and D are not homed, nor is F if it exists.
+   
+	<li>A data type code: 0 for commanded position, 1 for current position
+   
+	<li>A time code: seconds since startup. Significant systematic rate error is likely. This number is supplied because terminal servers tend to combine multiple lines of status into one packet, thus losing time information. Note: the time code was added in software version 1.7b5.
+   
+	<li>Any device-specific data.
+   
+	<li>A terminating &lt;CR&gt;
+</ul>
+
+<p>Notes:
+
+<ul>
+	<li>Commanded position is the position to which the Galil has asked the motor to go. When the actuators are moved to a new target position, the commanded position follows as quickly as it can within the velocity and acceleration limits.
+
+	<li>Current position is defined as follows:
+	
+	<ul>
+		<li>For stepper motors: the encoder position if there is one, else the commanded position
+		  
+		<li>For servo motors: the <a href="#AuxiliaryEncoder">auxiliary encoder</a> if there is one, else the motor encoder position
+	</ul>
+   
+   
+	<li>For axes that have not been homed:
+   
+   <ul>
+   	<li>Commanded position should be completely ignored.
+
+   	<li>If the current position is based on an incremental encoder
+      then changes in current position may be trusted but the zero
+      point is unknown. If there is no encoder then the current
+      position should be completely ignored.
+   </ul>
+   
+	<li>Commanded position is only output when it changes. This gives the highest possible data
+   rate for measured position.
+   
+	<li>All positions are in microsteps. These are the natural units
+   for commanded position and servo motor position (where
+   "microsteps" actually mean motor encoder ticks). But auxiliary
+   encoder ticks are scaled, which may lead to minor quantization
+   errors.
+   
+	<li>Numeric values may have any of a leading space, leading + or
+   -, leading zeros and/or a decimal point. They will not, however,
+   have exponential notation.
+   
+	<li>Values are separated by a comma and zero or more spaces.
+</ul>
+
+<p>Example with NAXES = 3:
+
+<pre> 070,  000000000.0,  000000000.0,  000000000.0,  00, 0,  0001465051.23
+ 070,  000000000.0,  000000000.0,  000000000.0,  00, 1,  0001465051.83
+ 070,  000000000.0,  000000000.0,  000000000.0,  00, 1,  0001465052.43
+ 070,  000000000.0,  000000000.0,  000000000.0,  00, 1,  0001465053.03
+ 070,  000000000.0,  000000000.0,  000000000.0,  00, 1,  0001465053.63
+ 070,  000000000.0,  000000000.0,  000000000.0,  00, 1,  0001465054.23</pre>
+
+<p>Warnings:
+
+<ul>
+	<li>The auxiliary port process will halt (in mid-output) if an ST
+   or RS command is issued or the device is reset or power cycled. In
+   the case of ST the aux output will start up (from the beginning of
+   a new line) when the next XQ# command is issued. In the case of
+   power cycle/reset, startup happens when the Galil finished
+   resetting.
+   
+	<li>Because of this, please sanity check the data carefully. Use
+   the "number of characters in a line" parameter! However, I don't
+   recommend reading the data as fixed-width input unless you really
+   think this adds safety, because the field widths may change.
+</ul>
+
+<p>Configuring the auxiliary port:
+
+<ul>
+	<li>You may choose any serial port speed you wish. The faster you
+   run, the better the time resolution of the encoder positions.
+   
+	<li>The serial port be configured for <B>no handshaking</B>.
+   Otherwise the Galil main serial port/command interpreter will
+   freeze while waiting for somebody to read the auxiliary port,
+   which will completely mess up control of the mirror.
+</ul>
+
+<h2><a name="Wiring"></a>Wiring</h2>
+
+<p>The following inputs and outputs are used by the basic software
+for stepper motors. Slightly different predefined inputs and outputs
+are used for servo motors and the "on full step" inputs are ignored.
+Additional inputs and outputs may be used for device-specific
+modifications.
+
+<h3>Predefined Outputs</h3>
+
+<ul>
+	<li>Step
+   
+	<li>Direction
+   
+	<li>Amplifier Enable
+</ul>
+
+<p>Notes:
+
+<ul>
+	<li>The Galil cannot be configured to switch forward and reverse
+   motion, so the motor/driver wiring <B>must</B> have the correct
+   polarity.
+</ul>
+
+<h3>Predefined Inputs</h3>
+
+<ul>
+	<li>Forward Limit
+   
+	<li>Reverse Limit
+   
+	<li>Home: jumper to reverse limit switch
+   
+	<li>Encoders (if they exist)
+   
+	<li>Index Pulses (if they exist)
+</ul>
+
+<p>Notes:
+
+<ul>
+	<li>The home input must be jumpered to the reverse limit switch
+   for each axis.
+   
+	<li>If possible, the reverse direction should make the actuator
+   shorter. However, it is more important that the reverse limit
+   switch be highly accurate, so if only one limit switch is
+   accurate, that must define the reverse direction.
+   
+	<li>If possible, the encoders should have the same polarity as the
+   motors.
+</ul>
+
+<h3>General-Purpose Digital Inputs</h3>
+
+<ul>
+	<li>The following apply to any Galil:
+   
+   <ul>
+   	<li>1-4: A-D on full step. Pull low when on full step. Ignored
+      for servo motors.
+      
+   	<li>5: fault input. Typically the amplifier fault outputs are
+      wire-or'd to this inputs. But this assumes that the amplifier
+      fault outputs pull down; otherwise more sophisticated circuitry
+      is required. See also input 13.
+   </ul>
+   
+   
+	<li>The following only exist on a 5-8 axis Galil:
+   
+   <ul>
+   	<li>9-12: E-H on full step (G-H are in case we ever make an
+      8-axis version)
+      
+   	<li>13: a second fault input, like input 5. This input is
+      ignored if NAXES &lt;= 4, even if the Galil supports more axes.
+      (This restriction could easily be lifted if the program could
+      determine how many axes the Galil supports). It can be handy to
+      have a second fault input if, for instance, some motors use a
+      different ground (as in the 3.5m tertiary) or if one is using a
+      pair of standard breakout boards, one per set of connectors on
+      the Galil (one board for axes 1-4, the other for axes
+      5-6).
+   </ul>
+   
+</ul>
+
+<p>Notes:
+
+<ul>
+	<li>The "on full step" inputs for unused axes or servo motor axes
+   may be used for device-specific purposes.
+   
+	<li>The two fault inputs (5 and 13) must <B>only</B> be used for
+   fault detection.
+   
+	<li>The "on full step" inputs happen to use the latch inputs, but
+   we are not using the latching capability.
+</ul>
+
+<h2><a name="DeviceSpecific"></a>Device-Specific Information</h2>
+
+<h2><a name="35mSecondary"></a>3.5m Secondary</h2>
+
+<h3>Overview</h3>
+
+<p>The 3.5m secondary mirror controller includes three axial actuators (A, B and C) to tilt and piston the mirror and two transverse actuators (D and E). All actuators have an associated linear encoder that is slightly offset from the actuator.
+
+<p>There are no device-specific modifications or commands.
+
+<h3>Mechanical Information</h3>
+
+<p>Axes A, B, C (axial actuators)
+
+<ul>
+    <li>The axial actuators use a stepper motor that drives a screw through a harmonic drive reducer. This achieves a very high resolution with great strength.
+    <li>Drive resolution is 32e6 microsteps/inch
+	<li>Encoder resolution is 10.16e6 ticks/inch = -3.1496 microsteps/tick
+	<li>Actuator details:
+    <ul>
+        <li>Superior Electric Slo-Syn KML061F02E stepper motors
+        <li>40 threads/inch
+        <li>80:1 harmonic drive reducer
+        <li>200 full steps/revolution
+        <li>50 microsteps/full step
+    </ul>
+    <li>Encoders details:
+    <ul>
+        <li>Heidenhain MT2581 heads
+        <li>Heidenhain IBV660 interpolators
+        <li>2 um period (with 4 ticks/period)
+        <li>50x interpolation
+        <li>400 ticks/um
+    </ul>
+</ul>
+
+<p>Axes D, E (transverse actuators)
+
+<ul>
+    <li>The transverse acutators use a stepper "linear actuator": a motor with a hollow threaded shaft that drives a non-rotating screw in and out.
+	<li>Motor resolution is 0.8e6 microsteps/inch
+	<li>Encoder resolution is 0.5080e6 ticks/inch = 1.5748 microsteps/tick
+	<li>Actuator details:
+    <ul>
+        <li>Motors are Eastern Air Devices LA23ECKW-M100-6 stepper linear actuators.
+        <ul>
+            <li>The "W" is for "special thread" (80 tpi in our case).
+            <li>These have 4 leads
+            <li>Each phase is rated at an RMS of 5.6 VDC, 1.00 Amps, 5.6 Ohms, 25.6 mH
+        </ul>
+        <li>Encoders are Heidenhain MT2581 heads with Heidenhain IBV660 interpolators
+        <li>80 threads/inch
+        <li>200 full steps/revolution
+        <li>50 microsteps/full step
+    </ul>
+    <li>Encoder details:
+    <ul>
+        <li>Heidenhain MT2571 encoder (with built in interpolator)
+        <li>2 um period (with 4 ticks/period)
+        <li>2.5x interpolation
+        <li>20 ticks/um
+   </ul>
+</ul>
+
+
+<h2><a name="35mTertiary"></a>3.5m Tertiary</h2>
+
+<h3>Overview</h3>
+
+<p>The 3.5m tertiary mirror controller includes three axial actuators (A, B and C) to tilt and piston the mirror. Each consists of a stepper motor driving a screw through a harmonic drive reducer. A separate Heidenhain linear encoders is read, but at this time is not used for feedback because it is not sufficiently trustworthy (it is not temperature rated and it uses a spring to push the gauge's plunger against a paddle; the gauge sometimes sticks).
+
+<p>In addition there is a motor to rotate the tertiary mirror to point to various instrument ports (axis E).
+<blockquote>
+    <p>The tertiary mirror mount is rotated by DC servo motor and drive reduction gearbox driving a ring gear. The motor rotates the mirror to the approximate desired position, then the ring gear is clamped by a precision clamping mechanism (precision jaws engaging one of a set of precision slots) to accurately set the final mirror rotation angle. An electric clutch between the reduction gearbox and the drive gear is <a href="#ClutchDisengagedSensorNote">automatically released</a> as the mirror is clamped to avoid back-driving the drive reduction gearbox.
+
+    <p>The tertiary rotation motor has a rotary shaft encoder to close the servo feedback loop and provide initial position information. But the position information is inaccurate because of slop in the gearbox and because the motor shaft encoder is decoupled from the ring gear when the clutch is released. Hence an additional encoder driven by the ring gear provides final position information. This is used to correct the rotation angle before closing the clamp. In Galil parlance the motor shaft encoder is the main encoder and the position encoder is the <a href="#AuxiliaryEncoder">auxiliary encoder</a>.
+
+    <p>The rotator motor is axis E and there is no axis D. This was done to simplify wiring of the opto-isolated inputs; axes A-D are controlled by one bank of opto-isolated inputs, E-H by another.
+
+    <p><b>Warning:</b> the tertiary rotation home position is not at a slot. So after you home you will get an error reporting that the clamp failed to close. That is normal. We tried adjusting MARGE so that home was at the first slot, but this made motion to that slot unreliable.
+</blockquote>
+
+<p>Finally, the tertiary Galil can control the primary mirror covers and eyelids.
+
+<h3>Device-Specific Software</h3>
+
+<p>The 3.5m Tertiary is controlled by device-specific software version 1.4, May 8, 2001.
+
+<h4>Constants</h4>
+
+<dl>
+	<dt>LCLTIME</dt>
+	
+	<dd>Time to close the clamp (sec)</dd>
+	
+	<dt>LOPTIME</dt>
+	
+	<dd>Time to open the clamp (sec)</dd>
+	
+	<dt>LSLTIME</dt>
+	
+	<dd>Time for the at slot sensor to settle (sec)</dd>
+	
+	<dt>LEYETIME</dt>
+	
+	<dd>Time to open or close an eyelid (sec)</dd>
+	
+	<dt>LCVADDT</dt>
+	
+	<dd>Additional time to run the primary mirror covers after the switches have fired (sec)</dd>
+	
+	<dt>LCVPOLLT</dt>
+	
+	<dd>Polling interval for checking the mirror cover switches during mirror cover motion (sec)</dd>
+	
+	<dt>LCVMAXT</dt>
+	
+	<dd>Maximum time to move a group of primary mirror covers, before the switches fire (sec). The maximum time the mirror cover motors can run is LCVMAXT + LCVADDT + LCVPOLLT.</dd>
+</dl>
+
+<h4>XQ #LCLCOV</h4>
+
+<p>Close all mirror covers. This command will work unless any of the following is true, in which case it will complain and give up:
+
+<ul>
+	<li>Mirror cover group 1 is in an indeterminate state (neither fully open nor fully closed)
+   
+	<li>Any eyelids are open
+</ul>
+
+<p>See also #LOPCOV.
+
+<h4>XQ #LCLEYE</h4>
+
+<p>Close eyelid A, where A is in the range &#91;1, 7&#93;. Closes all eyelids if A is out of range or has not been set. See also #LOPEYE.
+
+<h4>XQ #LOPCOV</h4>
+
+<p>Open all mirror covers. This command will work unless any of the following is true, in which case it will complain and give up:
+
+<ul>
+	<li>Mirror cover group 2 is in an indeterminate state (neither fully open nor fully closed)
+   
+	<li>Any eyelids are open
+</ul>
+
+<p>See also #LCLCOV.
+
+<h4>XQ #LOPEYE</h4>
+
+<p>Open eyelid A, where A is in range &#91;1, 7&#93;. Unlike #LCLEYE, returns an error if A is out of range or has not been set. You may have more than one eyelid open at one time, but you must call this command once for each eyelid.
+
+<h4>XQ #STATUS</h4>
+
+<p>Displays two extra lines showing the state of various sensors via #LSTATUS. Example:
+
+<p>1 1 1 1 at slot, left, right jaw open, clutch engaged<BR>
+1 1 0 0 0 cover groups 1 open, 2 open, 1 closed, 2 closed; eyelids closed
+
+<p>(note: only the first line is present in the release version 1.2)
+
+<h4>Motion</h4>
+
+<p>For any move involving tertiary rotation (axis E), the following occurs:
+
+<p>Before the move, and only if the clamp is presently not fully unclamped:
+
+<ul>
+	<li>Turn axis E on.
+	<li>Open the clamp.
+	<li>Wait a fixed interval (see the code) for unclamping to finish.
+	<li>Verify that clamp is fully open: both "jaw open" signals on and the "clutch disengaged" signal off.
+	<li>On failure, leave the servo motor on, the clamp opening and return an error message.
+</ul>
+
+<p>After the move, and only if the clamp is not already fully clamped:
+
+<ul>
+	<li>If using the at-slot sensor: verify that the clamp is at a slot (turn on the at slot LED, wait for it to stabilize, read it, turn off the LED).
+	<li>Close the clamp.
+	<li>Wait a fixed interval (see the code) for clamping to finish.
+	<li>Verify that the clamp is fully closed: "clutch disenaged" signal on and both "jaw open" signals off.
+	<li>On failure, leave the servo motor on, start opening the clamp and return an error message.
+</ul>
+
+<h4>Auxiliary Status</h4>
+
+<p>The auxiliary status includes one extra item of data: the axis E servo error (in microsteps = motor encoder ticks). This value is useful to determine a good value for parameter ERE, the maximum allowed servo error.
+
+<h3>Additional Wiring</h3>
+
+<h4>Predefined Inputs</h4>
+
+<ul>
+	<li>Axes A-C control the tip and tilt of the tertiary mirror. The actuators get longer, pushing the mirror towards the secondary and instrument port, for positive moves. With the telescope at zenith, the actuators are as follows if facing the mirror (i.e. looking into the appropriate instrument port):
+    <ul>
+        <li>A is the upper actuator
+        <li>B is the lower left actuator
+        <li>C is the lower right actuator
+    </ul>
+	<li>There is no axis D.
+    <li>Axis E is the tertiary rotation servo motor. The motor shaft encoder is connected to the regular encoder input. The gear pickoff position encoder is connected to the <a href="#AuxiliaryEncoder">auxiliary encoder</a> input. The servo loop uses the motor shaft encoder. After a move we verify position using the gear pickoff position encoder.
+</ul>
+
+<h4>General-Purpose Digital Inputs</h4>
+
+<p>All digital inputs read 0 for true/sensed.
+
+<table border=1>
+   <tr><td>Bit</td><td>Description</td><td>Value</td></tr>
+   <tr><td>4</td><td>at "slot" sensor</td><td>0 = at slot (not used; see <a href="#AtSlotSensorNote">note</a>)</td></tr>
+   <tr><td>6</td><td>left jaw fully out</td><td>0 = out</td></tr>
+   <tr><td>7</td><td>right jaw fully out</td><td>0 = out</td></tr>
+   <tr><td>8</td><td>clutch disengaged</td><td>0 = disengaged (see <a href="#ClutchDisengagedSensorNote">note</a>)</td></tr>
+   <tr><td>9</td><td>mirror covers group 1 open</td><td>0 = open</td></tr>
+   <tr><td>10</td><td>mirror covers group 2 open</td><td>0 = open</td></tr>
+   <tr><td>11</td><td>mirror covers group 2 closed</td><td>0 = closed</td></tr>
+   <tr><td>12</td><td>mirror covers group 1 closed</td><td>0 = closed</td></tr>
+   <tr><td>13</td><td>(amplifier fault; a standard input)</td><td></td></tr>
+   <tr><td>14</td><td>eyelids all closed</td><td>0 = closed</td></tr>
+</table>
+
+<p>Notes:
+<ul>
+    <li><a name="AtSlotSensorNote"></a>At Slot Sensor: You must apply power to the at slot LED and sensor before reading the at slot sensor. To save power and reduce stray light, turn off the power when you are done reading the sensor. We do not actually use this sensor because it turned out not to be useful.
+    <li><a name="ClutchDisengagedSensorNote"></a>Clutch Disengaged Sensor: the clutch is directly controlled by the "clutch disengaged" sensor, which fires whenever the jaws are at least partially closed. This avoids back-driving the drive reduction gearbox.
+</ul>
+
+<h4>General-Purpose Digital Outputs</h4>
+
+<table border=1>
+   <tr><td>Bit</td><td>Description</td><td>Value</td></tr>
+   <tr><td>1</td><td>power to "at slot" LED and sensor</td><td>0 = power on (not used; see <a href="#AtSlotSensorNote">note</a>)</td></tr>
+   <tr><td>2</td><td>air to clamp</td><td>0 = open, 1 = close</td></tr>
+   <tr><td>3</td><td>(unused)</td><td></td></tr>
+   <tr><td>4</td><td>mirror cover drive enable</td><td>1 = enable</td></tr>
+   <tr><td>5</td><td>mirror cover group 1 open</td><td>1 = open</td></tr>
+   <tr><td>6</td><td>mirror cover group 2 open</td><td>1 = open</td></tr>
+   <tr><td>7</td><td>mirror cover group 2 close</td><td>1 = close</td></tr>
+   <tr><td>8</td><td>mirror cover group 1 close</td><td>1 = close</td></tr>
+   <tr><td>9</td><td>eyelid #1 (top center) open</td><td>1 = open</td></tr>
+   <tr><td>10</td><td>eyelid #2 (top left) open</td><td>1 = open</td></tr>
+   <tr><td>11</td><td>eyelid #3 (NA2) open</td><td>1 = open</td></tr>
+   <tr><td>12</td><td>eyelid #4 (bottom left) open</td><td>1 = open</td></tr>
+   <tr><td>13</td><td>eyelid #5 (bottom right) open</td><td>1 = open</td></tr>
+   <tr><td>14</td><td>eyelid #6 (NA1) open</td><td>1 = open</td></tr>
+   <tr><td>15</td><td>eyelid #7 (S-H) open</td><td>1 = open</td></tr>
+   <tr><td>16</td><td>(unused)</td><td></td></tr>
+</table>
+
+<h3>Mechanical Information</h3>
+
+<p>Axes A, B, C (axial actuators)
+
+<ul>
+    <li>The axial actuators use a stepper motor that drives a screw through a harmonic drive reducer. This achieves a very high resolution with great strength.
+    <li>Drive resolution is 32e6 microsteps/inch
+	<li>Encoder resolution is 10.16e6 ticks/inch = -3.1496 microsteps/tick
+	<li>Actuator details:
+    <ul>
+        <li>Superior Electric Slo-Syn KML060F05E stepper motors
+        <li>40 threads/inch
+        <li>80:1 harmonic drive reducer
+        <li>200 full steps/revolution
+        <li>50 microsteps/full step
+    </ul>
+    <li>Encoders details:
+    <ul>
+        <li>Heidenhain MT2581 heads
+        <li>Heidenhain IBV660B interpolators
+        <li>2 um period (with 4 ticks/period)
+        <li>50x interpolation
+        <li>400 ticks/um
+    </ul>
+</ul>
+
+<p>Axis E (rotation)
+
+<ul>
+    <li>A microstep is one count of the motor shaft encoder (as is true for any servomotor).
+	<li>Motor resolution is 14487.704 microsteps/deg of tertiary rotation.
+	<li>Auxiliary encoder resolution is 151.58730 aux encoder counts/deg of tertiary rotation = 95.573333 microsteps/aux encoder count.
+	<li>Details:
+    <ul>
+        <li>8192 counts/rev on the motor shaft encoder (2048 lines/rev)
+        <li>50:1 gear box reduction ratio
+        <li>45 teeth on the drive gear
+        <li>573 teeth on the big gear
+        <li>4000 counts/rev for the gear encoder (1000 lines/rev)
+        <li>42 teeth on the encoder gear
+    </ul>
+</ul>
+
+<h2><a name="SDSSPrimary"></a>SDSS Primary</h2>
+
+<h3>Overview</h3>
+
+<p>The SDSS primary mirror has six actuators: three axial (A, B, C = Axial A, B, C), one transverse perpendicular to the altitude axis (D = Transverse Vertical) and two parallel to the altitude axis (E, F = Lateral 1, 2). The lateral links are attached to the mirror via arms that contain air-driven force fuses. All other actuators control hard points which are used by the Yorke Brown air support servos.
+
+<p>The lateral link motors are weak and the axial air support pistons are high friction, so the lateral link force fuses must be disabled (air released) while moving the lateral links. To accomplish this, one of the Galil outputs drives an air valve. Note that turning on the air again will not position the mirror correctly; one must relax the system by driving it up and down axially 5-10 times, preferably while at the zenith.
+
+<p>In addition, there are also two proximity sensors on the lateral links; at present these are not in use, but they can be connected to analog inputs on the Galil. They are intended to help set the mirror rotation (by mechanically adjusting the relative lengths of the lateral links).
+
+<h3>Device-Specific Software</h3>
+
+<p>SDSS primary software v1.6, March 7, 2001.
+
+<h4>Constants</h4>
+
+<dl>
+	<dt>LLATTIME</dt>
+	
+	<dd>Time required to fully engage or disengage the lateral link air force fuse (sec)</dd>
+</dl>
+
+<h4>XQ #SHOWPAR</h4>
+
+<p>Displays an extra line showing the version of the device-specific software.
+
+<h4>XQ #STATUS</h4>
+
+<p>Displays an extra line showing the state of the lateral link air force fuse.
+
+<h4>Motion</h4>
+
+<p>For any move involving the lateral links (axes E or F), the following occurs:
+
+<p>Before the move begins, via #LMINIT:
+
+<ul>
+	<li>Turn off the lateral link air
+   
+	<li>Wait a fixed interval (see the code) for the air to bleed
+</ul>
+
+<p>After the move is finished, via #LMSTOP:
+
+<ul>
+	<li>Turn on the lateral link air
+</ul>
+
+<h3>Additional Wiring</h3>
+
+<h4>General-Purpose Digital Outputs</h4>
+
+<ul>
+	<li>9: lateral link air valve, 1 = air off, fuse disabled
+</ul>
+
+<h4>Notes:</h4>
+
+<ul>
+	<li>The one air valve drives both lateral link air fuses
+	<li>The air fuses take less than a second to fully engage or fully disengage
+</ul>
+
+<h3>Mechanical Information</h3>
+
+<p>Axes A, B, C (axial actuators) and D (transverse vertical)
+
+<ul>
+    <li>Resolution is 400,000 microsteps/inch
+    <ul>
+        <li>40 threads/inch
+        <li>200 full steps/revolution
+        <li>50 microsteps/full step
+    </ul>
+</ul>
+
+<p>Axis E, F (transverse lateral links)
+
+<ul>
+	<li>Resolution is 8e5 microsteps/inch
+    <ul>
+        <li>80 threads/inch
+        <li>200 full steps/revolution
+        <li>50 microsteps/full step
+    </ul>
+</ul>
+
+<h2><a name="SDSSSecondary"></a>SDSS Secondary</h2>
+
+<h3>Overview</h3>
+
+<p>The SDSS secondary mirror has five actuators: three axial (A, B, C = Axial A, B, C) and two transverse (D, E). The axial actuators are stepper motors; each driving a screw through a harmonic drive reducer. They have separate Heidenhain incremental linear encoders that are a few inches from the actuators, and so have systematic error when the mirror is tilted. The transverse actuators are linear actuators (the motor turns a nut that drives a threaded shaft) that tilt the central linear bearing; they are oriented at 45 degrees from vertical and are in tension (when both contract the mirror is raised).
+
+<p>The axial actuators also contain piezoelectric actuators in series, for fine adjustment. Mirror-specific Galil code computes position error and tries to correct it via the piezos. The piezos are centered while the axial actuators is being moved so that the main actuators can get as close as possible to the correct position. It is possible to disable piezo corrections (see LCSTOP and XQ #LPAUSE below) or set the piezo positions manually (see XQ #LMOVE below).
+
+<p>The total time for one piezo correction is roughly LWTTIME = LCORTIME + (8 * LSETMS / 1000) (in seconds). The Galil has to wait for 8 bit flips, two to set the position for each axis plus one to command the piezos to move.
+
+<h3>Device-Specific Software</h3>
+
+<p>SDSS secondary software v1.3, 2004-04-01.
+
+<h4>Constants</h4>
+
+<dl>
+	<dt>LCORFRAC</dt>
+	
+	<dd>Fraction of error to attempt to correct. Should be in the range (0.0, 1.0&#93;. If the piezos are driven into oscillation then reducing this may help.</dd>
+	
+	<dt>LCORTIME</dt>
+	
+	<dd>Maximum time the piezos take to move (sec). This excludes the time required to send a command to the piezo controller (that is computed from LSETMS). Setting LCORTIME too small will cause position errors to be measured before the piezos have stopped moving. That is probably not very serious. Setting LCORTIME too large needlessly slows down each piezo move and each axial actuator move.</dd>
+	
+	<dt>LCSTOP</dt>
+	
+	<dd>Set to 0 to enable or 1 to disable background corrections. Note that the background process requires up to LWTTIME seconds to halt after being disabled.</dd>
+	
+	<dt>LSETMS</dt>
+	
+	<dd>Maximum time the Galil takes to set a piezo control bit and the piezo controller takes to recognize that it has been set (ms). Be careful not to set LSETMS too small, because this introduces errors into the communications between the Galil and the piezo controller. Such errors are nearly impossible to detect except by watching the resulting length of the axial actuator. Setting LSETMS too large needlessly slows down each piezo move and each axial actuator move.</dd>
+
+	<dt>LMAXBIN = A90 hex</dt>
+	
+	<dd>Maximum position output (binary). The DAQ has 12 bits (4096) and outputs approx. 0-2.7 volts however, the output amplifier saturates at approximately 2V giving a maximum binary output of approximately A90 hex.</dd>
+
+	<dt>LRES = 1.24 microsteps/piezo increment</dt>
+	
+	<dd>Resolution of piezos in microsteps/piezo increment; computed as follows:<BR>
+	1 microstep/8 nm resolution of the axial actuator<BR>
+	2.7V/4096 bits resolution of DAQ<BR>
+	3 nm/200e-6V resolution of the piezo actuator</dd>
+</dl>
+
+<h4>XQ #LMOVE</h4>
+
+<p>Move the piezo actuators to the position specified by LDESPOSx, where x = A, B or C (in microsteps) and print status. Pauses automatic piezo corrections (otherwise the piezos would almost immediately move again). Notes:
+
+<ul>
+	<li>If piezo corrections are running, they are paused and the piezos are set to zero before being set to the final specified position (if any).
+	<li>Omitted positions are left alone (unless piezo corrections were running, in which case they are zeroed, as per the previous line).
+	<li>Position is automatically truncated to be within bounds.
+	<li>Automatic piezo corrections will resume (if LCSTOP=0) after any XQ #... command except the two obvious choices: XQ #LMOVE or XQ #LPAUSE. If you want to set LCSTOP=1 to prevent restarting automatic piezo corrections, please first determine the current value of LCSTOP via MG LCSTOP, then restore it when you are done with your testing.
+</ul>
+
+<p>Example (omitting colons):
+<pre>LDESPOSA = 100
+LDESPOSB = 4000     <i>Out of range, so it will be adjusted</i>
+LDESPOSC = -1000
+XQ#LMOVE
+ 1,  1,  1,  1,  1 axis homed
+ 000000000,  000000000,  000000000,  000000000,  000000000 commanded position
+ 000000000,  000000000,  000000000,  000000000,  000000000 actual position
+ 00331268,  00331268,  00331268,  00331268,  00273921 status word
+ 3 piezo status word
+ 000000100,  000001676, -000001000 piezo corrections (microsteps)
+OK
+</pre>
+
+<h4>XQ #LPAUSE</h4>
+
+<p>Zero the piezo actuators and pause automatic piezo corrections. Automatic piezo corrections will resume (if LCSTOP=0) after any XQ #... command except XQ #LMOVE or XQ #LPAUSE.
+
+<h4>XQ#SHOWPAR</h4>
+
+<p>Displays four extra lines of data, as per this example:
+
+<pre> 01.00 version of M2-specific additions
+-00001676.4874,  00001676.4874 min, max piezo position (microsteps)
+ 00002705 number of steps of piezo position
+ 00000001.2400 resolution (microsteps/piezo ctrl bit)</pre>
+
+<h4><a name="SDSSSecondaryStatus"></a>XQ #STATUS</h4>
+
+<p>Displays two extra lines showing the <a href="#SDSSSecondaryPiezoStatusWord">piezo status word</a> and and the amount of the most recently applied correction as per this example:
+<pre> 0 piezo status word
+ 000000100,  000001676, -000001000 piezo corrections (microsteps)
+</pre>
+ 
+<h4>Auxiliary Port Output</h4>
+ 
+<p>The auxiliary port output includes some extra data about the piezo actuators. The following items are appended to the <a href="#InterfaceAuxPortStatus">normal output</a>:
+<ul>
+	<li>Commanded position of piezo A, B, C (microsteps)
+	<li><a href="#SDSSSecondaryPiezoStatusWord">Piezo status word</a>
+</ul>
+
+<p>Example:
+<pre> 126,  000000000.0,  000000000.0,  000000000.0, -000003400.0,  000000000.0, 00,  1,  0001230775.78, -02539, -02539, -02539,  0
+ 126,  000000000.0,  000000000.0,  000000000.0, -000003400.0,  000000000.0, 00,  1,  0001230776.12, -02539, -02539, -02539,  0
+ 126,  000841850.0,  000803250.0,  000873850.0, -000003400.0,  000000000.0, 00,  0,  0001230776.45, -02539, -02539, -02539,  0
+</pre>
+
+<h4><a name="SDSSSecondaryPiezoStatusWord"></a>Piezo Status Word</h4>
+
+<p>The piezo status word shows the status of various flags related to piezo correction. The word is displayed as decimal, even though hex is more traditional. Internally, each flag is 0 for cleared and nonzero (usually 1) for set.
+<ul>
+	<li>1: piezo correction task halted. The task is automatically halted during any move of the axial actuators and restarted (if LCSTOP not set) after any command except XQ #LMOVE or XQ #LPAUSE.
+	<li>2: piezo correction pause requested (the LCPAUSE flag is set). This flag is automatically set during any move of the axial actuators and cleared at the end of any command except XQ #LPAUSE or XQ #LMOVE.
+	<li>3: piezo corrections disabled (the LCSTOP flag is set). The user is responsible for setting or clearing LCSTOP.
+</ul>
+<p>Typically at the beginning of a move you will see bit 2 set (pause requested) followed shortly by bit 1 (pause occurred). At the end of the move you will see both bits cleared.
+
+<h4>Automatic Motion</h4>
+
+<p>For any move involving the axial actuators (axes A, B or C), the following occurs:
+
+<ul>
+	<li>Before the move begins, #LGO calls #LPAUSE to zero the piezos and disable piezo corrections. This is done so that the motor-driven actuators can do their best to correct all error themselves.
+	<li>After the move is finished, #LMSTOP re-enables piezo corrections by setting LCPAUSE to 0. Piezo automatic correction then resumes if LCSTOP=0.
+</ul>
+
+<h3>Additional Wiring</h3>
+
+<h4>General-Purpose Digital Outputs</h4>
+
+<ul>
+	<li>16: Clear: 0/1 to enable/clear zero the voltage to all piezos
+   (clear all D/A converters).
+   
+	<li>15: Latch position data. Normally 1; 1-&gt;0-&gt;1 to latch.
+   
+   <ul>
+   	<li>Data is read into latch on 1-&gt;0, output on 0-&gt;1
+      transition.
+   </ul>
+   
+   
+	<li>14-13: address bits: A = 10, B = 01, C = 00, use new data = 11
+   
+   <ul>
+   	<li>For A-C a latch transition causes data to be loaded into a
+      buffer but the output of the piezo driver remains
+      unchanged.
+      
+   	<li>For "new data" a latch transition causes the buffered data
+      to be output.
+   </ul>
+   
+   
+	<li>12-1: position data (linear)
+   
+   <ul>
+   	<li>1111 1111 1111 = axial actuators are shortest, piezos are
+      longest
+      
+   	<li>1111 1111 1110
+      
+   	<li>...
+      
+   	<li>0000 0000 0001
+      
+   	<li>0000 0000 0000 = axial actuators are longest, piezos are
+      shortest
+   </ul>
+   
+</ul>
+
+<h4>Notes:</h4>
+
+<ul>
+	<li>In the above, 1 means a high output (e.g. via SBx)
+   
+	<li>The piezo driver has opto-isolated inputs which are driven low
+   for "on". Hence a 1 (high output from the Galil) corresponds to a
+   low state internal to the piezo controller.
+</ul>
+
+<h3>Mechanical Information</h3>
+
+<p>Axes A, B, C (axial actuators)
+
+<ul>
+	<li>Motor resolution is 32e6 microsteps/inch
+   
+	<li>Encoder resolution is -6.2992... microsteps/tick
+   
+   <ul>
+   	<li>40 threads/inch
+      
+   	<li>80:1 reduction
+      
+   	<li>200 full steps/rev
+      
+   	<li>50 microsteps/full step
+      
+   	<li>Encoders are Heidenhain MT 2501 with 2 um period, 4
+      ticks/period and a separate 100x interpolator
+   </ul>
+   
+   
+	<li>Piezo resolution is roughly 1.24 microsteps/binary bit
+   
+   <ul>
+   	<li>1 ustep/8 nm resolution of the axial actuator
+      
+   	<li>2.7V/4096 bits resolution of DAQ
+      
+   	<li>3 nm/200e-6V resolution of the piezo actuator
+   </ul>
+   
+</ul>
+
+<p>Axes D, E (transverse actuators)
+
+<ul>
+	<li>Resolution is 8e5 microsteps/inch
+   
+   <ul>
+   	<li>80 threads/inch
+      
+   	<li>200 full steps/revolution
+      
+   	<li>50 microsteps/full step
+   </ul>
+   
+</ul>
+
+<h2><a name="InstallingAGalil"></a>Installing A Galil</h2>
+
+<p>The Galils must have code loaded into them before they can
+function as described in this manual. (Without such code, only the
+low-level commands described in the factory manual will work.)
+
+<p><B>Warning</B>: a Galil that has not been programmed or has been
+incorrectly configured may cause motors to run away when it is first
+powered up. <B>Never</B> allow the Galil to control a motor until it
+has been properly programmed and that programming has been saved to
+flash memory and tested.
+
+<p>There are two configuration errors that can cause problems:
+
+<ul>
+	<li>A bad motor type (MT command) can cause the motors to run away
+   or move in the wrong direction. If they move in the wrong
+   direction, the limit switches become useless because they stop the
+   wrong direction of motion.
+   
+	<li>A bad switch configuration (CN command) can cause the switches
+   to have their logic inverted (an unpressed switch is read as a
+   pressed switch and visa versa). This is dangerous if the system is
+   powered up while a limit switch is engaged (since it will then
+   seem to be disengaged).
+</ul>
+
+<h3><a name="UploadCode"></a>Upload Code</h3>
+
+<p>You will need the following to upload Galil code:
+<ul>
+	<li>A <a href="http://subversion.tigris.org/">subversion</a> client, to obtain the code.
+	<li><a href="http://www.python.org">Python</a> (version 2.2.1 or later), to combine various files into the upload for one Galil. Note that python is standard with most non-Windows operating systems and is easily installed on Windows.
+	<li>A good connection to the Galil.
+</ul>
+
+<p>The procedure is as follows:
+
+<ol>
+	<li>Export the code from subversion repository <code>svn://svn.apo.nmsu.edu/galil/tags/</code>. The following commands list the available release versions and export a particular version:<pre>
+svn ls svn://svn.apo.nmsu.edu/galil/tags/
+svn export svn://svn.apo.nmsu.edu/galil/tags/v2.01 galil_v2.01
+</pre>
+
+	<li>Use python to combine the code files into one file for each desired mirror controller, as follows:<pre>
+cd <i>&lt;directory of Galil code&gt;</i>
+python combineGalilCode.py "<i>&lt;mirror name&gt;</i>"
+</pre>
+where <i>&lt;mirror name&gt;</i> is one of <code>35m M2</code>, <code>SDSS M1</code>, etc. For the full list, look for files named <code>"Constants <i>&lt;mirror name&gt;</i>.gal"</code>.
+The combined code is written to file: <code>"Combined <i>&lt;mirror name&gt;</i> <i>&lt;date&gt;</i>.gal"</code>. For example, the command: <code>'python combineGalilCode.py "SDSS M2"'</code> might create file: <code>"Combined SDSS M2 2005-01-31.gal"</code>.
+
+	<li>If the Galil does not presently contain mirror controller code for this mirror then make sure the Galil is <b>not connected to the mirror actuators</b>. If you can't do that, then you must disable the motors. Otherwise they may run away while you load the code. Any one of the following will work:   
+	<ul>
+		<li>If you have a force limit switch (as on the SDSS) then it is sufficient to disconnect the cable to that switch (thereby activing the force limit disable).
+		
+		<li>You may disconnect the motors, but be sure to power down the system first to avoid damaging the drive amplifiers.
+		
+		<li>Open the box containing the Galil and disconnected the header connectors from the Galil (but be sure you understand how to reconnect them!), leaving only the power and serial port connected to the Galil.
+	</ul>
+	
+	<li>Connect to the Galil's serial port. Do <b>not</b> use HOST from the TCC, because HOST does not lock out other users, which could corrupt the upload. If the Galil is attached to a terminal server, telnet to that. If the port is busy (e.g. if the tcc is hogging it), you can free it up by one of:
+	<ul>
+		<li>Log out the port. You will need the terminal server's privileged password for this. Connect to the terminal server's console port and issue these commands:<pre>
+set priv
+logout port <i>n</i>
+		</pre>
+		<li>Stop the TCC from talking to the controller by doing a telstop or disabling the collimation process (TCC command PROC DISABLE COLL) and waiting for the connection to time out.
+	</ul>
+	
+	<li>Send the appropriate file to the Galil, e.g. open the combined code file in any text editor and copy and paste the data to your connection. You will observe many lines go by normally, then many lines that may or may not overwrite each other (this seems to depend on the setup of the terminal server and/or your terminal emulator), then a few normal lines again. However, if you see one or more "?" or error messages, this indicates a failed upload.
+   
+	<li>Issue the following commands. If any fail, the code cannot be used:
+   
+   <ul>
+		<li>XQ#COMPVAR  (this should happen automatically at the end of the upload)
+		  
+		<li>XQ#SHOWPAR
+		  
+		<li>XQ#STATUS
+   </ul>
+   
+   
+	<li>When you are satisfied with this upload, save the code ("burn it") using the following commands (which save the configuration, the variables and the program, respectively):
+   
+	<ul>
+		<li>BN
+		
+		<li>BV
+		
+		<li>BP
+	</ul>
+	
+	
+	<li>Issue a RS (reset) command to simulate a power cycle.
+	
+	<li>Execute XQ#STATUS again. This makes sure the code was properly
+	saved to flash memory.
+	
+	<li><a href="#TestTheSystem">Test the system</a>.
+</ol>
+
+<h3><a name="TestTheSystem"></a>Test The System</h3>
+
+<ol>
+	<li>Make sure you understand and respect the <a href="http://www.apo.nmsu.edu/Telescopes/TCC/OperatorsManual.html#MirrorSpecific">limitations of the hardware</a> for the mirror in question. For instance some mirrors don't like large tilts, others don't move well in certain directions at certain altitudes.
+   
+	<li>Make sure the actuators are near their center of travel. For SDSS M2 axial and 3.5m M2 and M3 axial (A,B,C) actuators simply having them at least 1/16" away from the limit switch is adequate, as these actuators move very slowly.
+   
+	<li>Power up the system in such a way that you can remove power if the motors run away. If the motors run away, turn off power and configure the Galil before proceeding.
+   
+	<li>Check the limit switches. This is by far the most common source of problems after any engineering activity has occurred around the mirrors.
+   
+   <ol>
+   	<li>Issue the "TS" command. This returns a number representing the state of the switches for each axis. Only the numbers for the axes we control matter: 1-6 for M1, 1-5 for M2.
+      
+   	<li>For each axis, convert the number from decimal to binary.
+      
+   	<li>Make sure bits 1-3 are all high (where bit 0 is the first bit). The bits are: home switch, reverse limit switch and forward limit switch.
+      
+   	<li>Fix any limit switch problems before proceeding. Common failures are:
+      
+      <ol>
+      	<li>If bit 3 is high and 1 and 2 are low: the forward limit switch is pressed, a connector is off or a wire or switch is broken.
+         
+      	<li>If bits 1 and 2 are high and 3 is low: the reverse limit switch is pressed, a connector is off or a wire or switch is broken.
+         
+      	<li>If only bit 1 or 2 is high and all other bits are low: check the wiring of the reverse limit switch at the connector on the Galil (see the Galil manual for connector pinouts). The reverse limit switch is connected to both the reverse limit input and the home input, and the break must be after the wiring separates. Typically you'll find a pair of resistors at the connector; look there first.
+         
+      	<li>If bits 1, 2 and 3 are all high: both limit switches may be disconnected or the limit switch logic may be inverted (suggesting the Galil has not yet been configured).
+      </ol>
+      
+   </ol>
+   
+   
+	<li>Check that the motors turn in the correct direction.
+   
+   <ol>
+   	<li>Have somebody watch the actuator or a dial indicator.
+      
+   	<li>Start the motors moving slowly towards the home switch (which on the APO mirrors is also the reverse limit switch):<pre>
+      A=0
+      XQ#GOEDGE
+      When you are satisfied that motion is in the correct direction, halt it using:
+      ST
+      XQ#DONE
+      (Note: XQ#DONE is important, as it clears the A,B,C...variables). Then try the next axis.
+      </pre>
+   </ol>
+   
+   
+	<li><a href="http://www.apo.nmsu.edu/Telescopes/TCC/OperatorsManual.html#HomingMirrors">Home the axes</a>. For this level of testing, it is not necessary to have the telescope at the standard altitude. On the other hand, that may save another homing later!
+   
+	<li>Home them again (at the same altitude). If the errors seem large, something may be wrong.
+   
+	<li>When you are finished testing, move the actuators well away from their reverse limits. Never leave them near a limit.
+</ol>
+
+<h2><a name="Troubleshooting"></a>Troubleshooting</h2>
+
+<h3><a name="OnFullStepError"></a>On Full Step Error</h3>
+
+<p>If a move should end on a full step and does not, the Galil will
+complain. (Almost all APO mirror actuators are expected to end on a
+full step; the except is 3.5m tertiary rotation, which is a servo
+motor).
+
+<p>This error may be relatively benign, but should be investigated to
+be sure. To investigate:
+
+<ul>
+	<li>Home the axis causing the problem. Be sure to follow the usual
+   <a href="http://www.apo.nmsu.edu/Telescopes/TCC/OperatorsManual.html#HomingMirrors">rules
+   for homing</a>, which means you'll probably have to move the
+   telescope to a particular altitude and home more than just the one
+   axis.
+   
+	<li>Examine the position error reported by the homing
+   process.
+   
+	<li>The "on full step" error is probably benign if the reported
+   position error is acceptably small (the definition of acceptable
+   depending on the actuator's resolution) and only a count or two
+   off from a multiple of 50. If either of these conditions is not
+   met, you may have a serious problem.
+   
+	<li>If you are still not sure, move the mirror around and home
+   again. If you see a large error then you are definitely in
+   trouble.
+</ul>
+
+<p>If the error is benign, I suggest you continue to run, ignoring
+the error messages, until the problem can be fixed.
+
+<p>This problem is fundamentally a counting error between the Galil
+and the stepper motor driver amplifier. Either the Galil is emitting
+the wrong number of pulses or the stepper motor driver amplifier is
+mis-counting the pulses, or there is noise in the wires between them.
+This is an error in the requested position and has nothing to do with
+the actual motion of the motor; it <B>cannot</B> be caused by the
+motor itself getting jammed. Things to check:
+
+<ul>
+	<li>If the axis never worked, or something was recently changed,
+   then verify the configuration:
+   
+   <ul>
+   	<li>The stepper motor driver must be configured for the desired
+      number of microsteps per full step.
+      
+   	<li>The Galil must be configured for the desired number of
+      microsteps per full step -- the ST_FSx parameter.
+   </ul>
+   
+   
+	<li>Noise is getting into the step or direction or enable lines
+   between the Galil and the stepper motor driver. Check the
+   wiring.
+   
+	<li>The Galil sends out the correct number of counts. To test
+   this:
+   
+   <ul>
+   	<li>Put the Galil on a work bench
+      
+   	<li>Connect the "step" output from the Galil to a pulse counter
+      and configure the pulse counter to count steps correctly. This
+      can be a surprising hassle for the HP models; turning on the
+      noise filter may help.
+      
+   	<li>Configure that Galil to have very large limits and high
+      speed and acceleration. (A Galil fresh from the factory does
+      not require this step, as it is already configured for fast
+      moves over the full range.)
+      
+   	<li>Perform moves of various sizes. Move the same amount
+      forwards and back and see if the Galil emits the correct number
+      of pulses. If even very large moves (several million steps)
+      occur without problems then the Galil is working
+      correctly.
+   </ul>
+   
+   
+    <li>The stepper motor driver is working correctly. Try swapping out the driver. Make sure the new driver is configured correctly for 50 microsteps per full step.
+</ul>
+
+<h3><a name="AmplifierFault"></a>Amplifier Fault</h3>
+
+<p>One or more motor driver amplifiers is reporting a fault. This is a serious problem. You will not be able to move any actuator for this mirror until you correct it.
+
+<p>An amplifier can report a fault for many reasons, including:
+
+<ul>
+	<li>A short circuit on the amplifier output.
+   
+	<li>Amplifier logic power problem. Most of the stepper motor drivers have an external logic supply, to reduce heat dissipation (the external supply replaces an inefficient linear regulator in the stepper motor driver). This logic supply must be on for the drivers to be happy. It must also not come on any earlier than the main drive power. This leads us to the next item...
+   
+	<li>Power on sequencing problem. Very rarely, we have seen an amplifier come up in a faulted state. Power cycling the amplifier or the mirror controller box should fix the problem (be sure to leave the power off for 10 seconds or so before turning it back on).
+</ul>
+
+<p>One difficulty with tracking down amplifier faults is that the Galil only has one or two fault inputs (one for 1-4 axis units; two for units with more axes), to conserve inputs. Typically the "fault" signal from several motor amplifiers are "wire-or"ed to a single fault input. Hence it may be difficult to tell which amplifier is causing the fault. In the long run, we ought to have an LED on each fault line or at least a resistor or diode, so one can figure out which line is faulting without taking fancy steps.
+
+<h3><a name="GalilErrorLight"></a>Galil Error Light</h3>
+
+<p>The error light on the Galil can indicate several different problems. Note that there is an error output bit that tracks the error light (though we don't monitor it as of 2007-07-23).
+
+<ul>
+    <li>If driving a servo motor and an error limit is set (using the ER command), the light will be on whenever an axis has exceeded its error limit. The Galil will continue to function normally, but this still probably indicates a very serious problem with your actuator. Note that the state of the light is independent of whether OE (off on error) is set for that axis or whether there is a #POSERR subroutine.
+    
+    <li>A power supply glitch or internal fault will turn on the error light and send the Galil into a catatonic state. The only reliable way to recover from that is press the reset button (below the error light) or power cycle the Galil. This should never happen in normal operations, so please check the power supply and the Galil very carefully; one of them may need servicing.
+</ul>
+
+</body>
+</html>

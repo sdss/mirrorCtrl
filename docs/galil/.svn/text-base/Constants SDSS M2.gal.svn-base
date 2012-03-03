@@ -1,0 +1,128 @@
+NO: SDSS secondary mirror motion control constants
+
+NO: History:
+NO: 2/19/99 first version with history
+NO: 3/2/99 changed XQ#AUTO to XQ#COMPVAR. R.O.
+NO: 3/18/99 changed units and variable names for Galil code 1.5b10. R.O.
+NO: 4/27/99 added MAXCORRx for Galil code 1.5b12. R.O.
+NO: 8/16/99 reduced RNGD/E from 100k to 80k to accomodate
+NO:         mediocre adjustment of the limit switches. R.O.
+NO: 10/2/99 modified for Heidenhain encoders, including new ENCRESx,
+NO:         INDSEPx=0 (because the index pulse is too near limit)
+NO:         and lowered MARGx because it was using more range than desired
+NO: 1/14/00 lowered speed of D & E from 12000 to 5000 based on lab tests. R.O.
+NO: 1/23/00 Increased MAXCORRx and corrected ENCRESx. R.O.
+NO: 1/26/00 Decreased RNGx due to new support system and increased SPDA,B,C. R.O.
+NO: 6/13/00 Added DOAUX for code 1.7b5. R.O.
+NO: 1/11/00 Set SPDA,B,C=50000 which seems to be what was being used. R.O.
+NO: 2001-10-11 Added M2-specific constants (prev. in M2-specific code). R.O.
+NO: 2004-03-31 Removed constant LGAPTIME; increased LCORTIME. R.O.
+NO: 2005-03-24 Added NCORR and ENCTIME. Ditched unused DEFVF.
+NO: 2005-08-08 Added AUXMAXN.
+NO: 2006-07-06 Removed default constants and call to COMPVAR.
+NO: 2006-09-11 Removed two more sets of default constants.
+
+NO: ***** User-Set Constants *****
+
+NAXES  =  5;    NO: number of axes to control (1-6)
+NCORR  =  1;    NO: number of encoder corrections after a move
+DOAUX  =  1;    NO: output auxiliary port status? (1=Y,0=N)
+
+NO: Axis-Specific constants
+NO: Unless noted, all values must be > 0 if axis exists
+NO: Values are ignored if axis does not exist
+
+NO: Axes A, B, C have a resolution of 32e6 microsteps/inch
+NO: 40 threads/inch, 80:1 reduction 200 full steps/rev, 50 microsteps/full step
+NO: The encoders have a resolution of 6.2992... microsteps/tick
+NO: Heidenhain MT 2501: 2 um period, 4 ticks/period, 100x interpolation
+NO: hence 2e5 ticks/mm = 5.08e6 ticks/inch
+NO: They also have one index pulse 1.5 mm from short end of travel
+NO: and that's too small a margin to safely use
+
+NO: Axes D, E have a resolution of 8e5 microsteps/inch
+NO: 80 threads/inch, 200 full steps/revolution, 50 microsteps/full step
+
+NO: distance between hard and soft reverse limit (microsteps)
+MARGA = 400000;  NO: 0.0125 inches
+MARGB = MARGA
+MARGC = MARGA
+MARGD =   5000;  NO: 0.00625 inches
+MARGE = MARGD
+
+NO: full range of motion (microsteps)
+RNGA = 14500000;  NO: 0.453... inch
+RNGB = RNGA
+RNGC = RNGA
+RNGD =    36000;  NO: 0.045 inch
+RNGE = RNGD
+
+NO: speed (microsteps/sec)
+NO: warnings:
+NO: - excessive speeds may cause stalling due to loss of torque
+NO: - test a speed for resonances before using it
+SPDA = 50000;  NO: 5 revs/sec
+SPDB = SPDA
+SPDC = SPDA
+SPDD =  5000;  NO: tests showed very reliable operation under load at 5000
+SPDE = SPDD
+
+NO: homing speed (microsteps/sec)
+NO: should be significantly slower than normal speed
+HMSPDA = SPDA / 10
+HMSPDB = HMSPDA
+HMSPDC = HMSPDA
+HMSPDD = SPDD / 10
+HMSPDE = HMSPDD
+
+NO: acceleration (microsteps/sec^2)
+ACCA = SPDA * 10
+ACCB = ACCA
+ACCC = ACCA
+ACCD = SPDD * 10
+ACCE = ACCD
+
+NO: resolution of encoder (microsteps/encoder tick), 0 if no encoder
+ENCRESA = -6.2992
+ENCRESB = ENCRESA
+ENCRESC = ENCRESA
+ENCRESD = 0
+ENCRESE = ENCRESD
+
+NO: max error+1 to correct based on encoder (microsteps)
+NO: 0 if no encoder or no correction wanted
+MAXCORRA = 1000000
+MAXCORRB = MAXCORRA
+MAXCORRC = MAXCORRA
+MAXCORRD = 0
+MAXCORRE = MAXCORRD
+
+NO: SDSS M2-specific constants
+
+NO: Maximum position output (binary)
+NO: The DAQ has 12 bits (4096) and outputs approx. 0-2.7 volts
+NO: however, the output amplifier saturates at approximately 2V
+NO: giving a maximum binary output of approximately A90 hex
+LMAXBIN = $A90
+
+NO: Resolution of piezos (microsteps/binary bit)
+NO: 1 ustep/8 nm resolution of the axial actuator
+NO: 2.7V/4096 bits resolution of DAQ
+NO: 3 nm/200e-6V resolution of the piezo actuator
+LRES = 1.24
+
+NO: Fraction of error to attempt to correct
+LCORFRAC = 0.9
+
+NO: Time (sec) needed to move a piezo, once the piezo controller
+NO: has been commanded (i.e. ignoring LSETMS bit flip time).
+NO: Set large enough to match reality.
+LCORTIME = 0.5
+
+NO: Time (millisec) required to set piezo controller bit
+NO: Set large enough to match reality.
+LSETMS = 10
+
+NO: Set to 1 to completely disable automatic piezo corrections.
+NO: After setting, wait LWTIME seconds for the current correction to finish.
+LCSTOP = 0

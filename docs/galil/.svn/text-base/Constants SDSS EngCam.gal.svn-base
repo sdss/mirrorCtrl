@@ -1,0 +1,42 @@
+NO: SDSS engineering camera motion control constants
+
+NO: History:
+NO: 1/22/98 first version
+NO: 4/1/98 mod to use compvar, slowed speed, tweaked over vars. R.O.
+NO: 3/18/99 changed units and variable names for Galil code 1.5b10. R.O.
+NO: 4/25/99 added MAXCORRx for Galil code 1.5b12. R.O.
+NO: 1/27/99 bug fix: ACCA was ACCRVA. R.O. 
+NO: 6/13/00 Added DOAUX for code 1.7b5. R.O.
+NO: 2005-03-24 Added NCORR and ENCTIME. Ditched unused DEFVF.
+NO: 2005-08-08 Added AUXMAXN.
+NO: 2006-07-06 Removed default constants and call to COMPVAR.
+
+NO: ***** User-Set Constants *****
+
+NAXES  =  1;    NO: number of axes to control (1-6)
+
+NO: Axis-Specific constants
+NO: Unless noted, all values must be > 0 if axis exists
+NO: Values are ignored if axis does not exist
+
+NO: Axis A (the only axis) has a resolution of 1.0e5 microsteps/inch
+NO: 5 threads/inch, 400 full steps/revolution, 50 microsteps/full step
+
+NO: distance between hard and soft reverse limit (microsteps)
+MARGA = 1000;  NO: 0.01 inches
+
+NO: full range of motion (microsteps)
+RNGA = 1306000;   NO: 13.06 inches
+
+NO: speed (microsteps/sec)
+NO: warnings:
+NO: - excessive speeds may cause stalling due to loss of torque
+NO: - test a speed for resonances before using it
+SPDA = 25000
+
+NO: homing speed (microsteps/sec)
+NO: should be significantly slower than normal speed
+HMSPDA = 2500
+
+NO: acceleration (microsteps/sec^2)
+ACCA = 500000

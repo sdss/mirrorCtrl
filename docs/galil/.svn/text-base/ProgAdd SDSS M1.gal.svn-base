@@ -1,0 +1,133 @@
+NO: Addtional Galil code for M1
+
+NO: This code has been developed for ROM revision 2.0g.
+
+NO: History (be sure to update LVERS in #LCMPVAR)
+NO: 1.2  eliminated use of #DEFIN, starts at LCMPVAR,
+NO:      changed to handle lateral link air system. R.O. 12/29/98
+NO: 1.3  lateral link air bit sign changed and
+NO:      changed wait time for air from 5 to 2 seconds. R.O. 2/25/99
+NO: 1.4  added parameter LLATIME and
+NO:      added support for support for #LMITIME and #LMSTIME. R.O. 8/18/99
+NO: 1.5  R.O. 1/00
+NO:    Modified for main program version 1.6:
+NO:    - renamed #LMINIT to #LGO
+NO:    - renamed #LMITIME to #LMVTIME
+NO:    - changed #LMSTOP to call #CLEANUP instead of #DONE
+NO:    Changed #LGO to disengage lateral links only E or F are moving
+NO:    to a new position and if lateral links are not already disengaged.
+NO:    Changed #LMVTIME to only increment E and F time if #LGO will
+NO:    disengage the lateral links.
+NO: 1.6  R.O. 3/7/01
+NO:    Added explicit stop to allow download while AUX status running
+NO:    Modified for main program version 1.8 by adding #LCLNUP
+NO:    (with no mods) and started download from it
+NO:    Moved constants out of the program so they're easier to change
+NO:    (if you BV the new value is saved, not overwritten by the code).
+NO: 1.7  R.O. 2001-10-11
+NO:    Moved all variables to "Constants SDSS M1.gal"
+NO:    so all can be burned at once.
+NO: 1.8  R.O. 2004-04-28
+NO:    Added empty #LAUXOUT for main code version 1.12
+
+NO: Be sure to update LVERS in #LCMPVAR when changing version numbers
+
+NO: What this does
+NO: - if the lateral links are going to move a non-zero amount,
+NO:   turns off the air to the lateral link force springs before the move
+NO: - turns on air to the lateral link force springs after every move
+NO:   (this is a no-op if the air is already on).
+NO: - displays the state of the air to the lateral links for STATUS
+NO: - optionally (uncomment) displays analog inputs 1 & 2 for proximity sensors
+
+NO: New computed variables (leave alone):
+NO: LDOREL set by #LDOREL, which see
+
+ST;  NO: kill background processes and any motion
+
+DL #LCLNUP
+NO: Local addition to #CLEANUP, run as any command ends.
+NO: Do not call #DONE or #CLEANUP at the end, to avoid infinite loops.
+NO: Typical use is to make sure outputs and extra hardware
+NO: are in some desired state
+EN
+
+#LAUXOUT
+NO: Local addition to AUXOUT
+NO: To use this you must:
+NO: - increase AUXLEN accordingly in #LCMPVAR
+NO: - use only AUX-specific subroutines and variables
+NO: - end with a simple EN (do not call #DONE or #CLEANUP)
+EN
+
+#LCMPVAR
+NO: Local addition to #COMPVAR, run at power on and after reset.
+NO: Must at least define LVERS, the version of the local mods.
+LVERS = 1.8
+JP #DONE, _ZS0 = 0; EN
+
+#LDOREL
+NO: sets LDOREL = 1 if the lateral links should be released, 0 otherwise
+NO: The links should be released if E or F are moving to a new position
+NO: and the links are not already released
+LDOREL = ((E <> MAXINT) & (_PRE <> 0)) | ((F <> MAXINT) & (_PRF <> 0))
+LDOREL = LDOREL & ((_OP & 256) = 0)
+JP #DONE, _ZS0 = 0; EN
+
+#LGO
+NO: Called as a move begins (before turning on the motors if MOFF true)
+NO: x <> MAXINT if axis is about to be moved
+NO: _PRx <> 0 if move is non-null (it is safest not to rely on this
+NO: but the docs for #GO give instructions to make sure it'll work)
+NO: If starting is a multi-step process, make sure your code can
+NO: execute from any step (in case the process is interrupted and restarted)
+NO: if lateral links (E,F) moving, turn off air (clear digital output 9)
+JS #LDOREL
+JP #G2LMINI, LDOREL = 0
+SB 9
+WT LLATTIME * 1000
+#G2LMINI
+JP #DONE, _ZS0 = 0; EN
+
+#LMVTIME
+NO: Increases RESx by the time required to set up the current move,
+NO: i.e. the time to execute #LGO (in sec)
+JS #LDOREL
+RESE = RESE + (((E <> MAXINT) & LDOREL) * LLATTIME)
+RESF = RESF + (((F <> MAXINT) & LDOREL) * LLATTIME)
+JP #DONE, _ZS0 = 0; EN
+
+#LMSTIME
+NO: Increases RESx by the time required to execute #LMSTOP (in sec)
+RESE = RESE + ((E <> MAXINT) * LLATTIME)
+RESF = RESF + ((F <> MAXINT) * LLATTIME)
+JP #DONE, _ZS0 = 0; EN
+
+#LMSTOP
+NO: Called as a move ends (before turning off the motors if MOFF true)
+NO: x <> MAXINT if axis is was moved
+NO: If halting is a multi-step process, make sure your code can
+NO: execute from any step (in case the process is interrupted and restarted).
+NO: End success with JP #CLEANUP, _ZS0 = 0; EN, errors with JP #CLEANUP.
+NO: Do NOT call #DONE to avoid infinite loops.
+NO: Restore air to lateral links (set digital output 9)
+CB 9
+JP #CLEANUP, _ZS0 = 0; EN
+
+#LSTATUS
+NO: M1-specific code begins here with supplementary output
+NO: for the #STATUS routine
+MG {F1.0} ((_OP & 256) = 0), " lateral links (0 disengaged, 1 engaged)"
+NO: MG {F5.0} @AN[1], ", ", @AN[2], " M1 proximity sensors"
+JP #DONE, _ZS0 = 0; EN
+
+#LSHWPAR
+NO: Required local addition to #SHOWPAR
+MG {F2.2} LVERS, " version of M1-specific additions"
+JP #DONE, _ZS0 = 0; EN
+\
+                                                 
+                                                 
+NO: update computed variables
+XQ #COMPVAR
+NO: once tested, save the program to flash memory with BP

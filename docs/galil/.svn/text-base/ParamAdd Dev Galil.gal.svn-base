@@ -1,0 +1,12 @@
+NO: the following parameters are unique to the developmental Galil
+NO: and are required because the terminal server can't keep up
+NO: at 38400 baud
+
+CC 19200,0,0,0
+
+NO: the following parameters are unique to the developmental Galil
+NO: are are used so it can run standalone without shorting wires
+NO: faking limit switches
+CN -1, -1, -1;  NO: 1,1,1 for normally closed limit switches
+
+NO: once tested, save with BN

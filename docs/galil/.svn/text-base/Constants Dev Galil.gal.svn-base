@@ -1,0 +1,71 @@
+NO: developmental Galil constants
+
+NO: History:
+NO: 3/18/99 first version
+NO: 1/11/99 modified for 4-axis Galil
+NO: 6/13/00 added DOAUX for code 1.7b5. R.O.
+NO: 5/23/01 added ST_FSx and MAXCORRx. R.O.
+NO: 2005-03-24 Added NCORR and ENCTIME. Ditched unused DEFVF.
+NO: 2005-08-08 Added AUXMAXN.
+NO: 2006-07-06 Removed default constants and call to COMPVAR.
+
+NO: ***** User-Set Constants *****
+
+NAXES  =  4;    NO: number of axes to control (1-6)
+
+NO: Axis-Specific constants
+NO: Unless noted:
+NO: - all values must be > 0 if axis exists
+NO: - values are ignored or overwritten if axis does not exist
+
+NO: distance between hard and soft reverse limit (microsteps)
+MARGA = 5000
+MARGB = MARGA
+MARGC = MARGA
+MARGD = MARGA
+MARGE = MARGA
+MARGF = MARGA
+
+NO: full range of motion (microsteps)
+RNGA = 2000000000
+RNGB = RNGA
+RNGC = RNGA
+RNGD = RNGA
+RNGE = RNGA
+RNGF = RNGA
+
+NO: speed (microsteps/sec)
+NO: warnings:
+NO: - excessive speeds may cause stalling due to loss of torque
+NO: - test a speed for resonances before using it
+SPDA = 50000
+SPDB = SPDA
+SPDC = SPDA
+SPDD = SPDA
+SPDE = SPDA
+SPDF = SPDA
+
+NO: homing speed (microsteps/sec)
+NO: should be significantly slower than normal speed
+HMSPDA = 5000
+HMSPDB = HMSPDA
+HMSPDC = HMSPDA
+HMSPDD = HMSPDA
+HMSPDE = HMSPDA
+HMSPDF = HMSPDA
+
+NO: acceleration (microsteps/sec^2)
+ACCA = 500000
+ACCB = ACCA
+ACCC = ACCA
+ACCD = ACCA
+ACCE = ACCA
+ACCF = ACCA
+
+NO: microstepper resolution (microsteps/full step), 1 if a servo
+ST_FSA = 50
+ST_FSB = ST_FSA
+ST_FSC = ST_FSA
+ST_FSD = ST_FSA
+ST_FSE = ST_FSA
+ST_FSF = ST_FSA

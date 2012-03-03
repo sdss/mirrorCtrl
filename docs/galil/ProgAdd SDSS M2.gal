@@ -1,0 +1,296 @@
+NO: Addtional Galil code for M2 (be sure to update LVERS in #LCMPVAR)
+
+NO: This code has been developed for ROM revision 2.0g.
+
+NO: History
+NO: 1.0 R.O. 3/01
+NO: 1.1 R.O. 8/01 minor spelling error corrected in output msg (piezos -> piezo).
+NO: 1.2  R.O. 2001-10-11
+NO:    Moved all variables to "Constants SDSS M1.gal"
+NO:    so all can be burned at once. Moved LVERS back to #LCMPVAR.
+NO: 1.3 R.O. 2004-04-02
+NO:    Added piezo positions to output of AUX port.
+NO:    Added commands #LPAUSE and #LTEST
+NO:    Added variables LAUXSTAT, LDPOSx and LWTTIME
+NO:    Removed constant LGAPTIME
+NO: 1.4 R.O. 2005-10-14
+NO:	   Fix PR 294: set LCORRA, B and C in #LCMPVAR so new installations run
+NO: 1.5 R.O. 2006-05-18
+NO:    Set LCPAUSE=1 in LCMPVAR to avoid errors in freshly loaded code.
+
+NO: Be sure to update LVERS in #LCMPVAR when changing version numbers
+
+NO: What this does
+NO: After a move, continuously measures position error
+NO: and attempts to correct it by driving the piezos.
+NO: During a move this correction is disabled.
+NO: When #LCMPVAR is run, sets the piezos to 0 (mid range)
+NO: and makes sure the background piezo correction process is running
+NO: but disabled, ready to be enabled after the next move
+
+NO: New user-set constants:
+NO: LCORFRAC Fraction of measured error to correct with piezos.
+NO: LCORTIME Time for the piezos to actually move (ms) ignoring LSETMS
+NO: LCSTOP   Set to 1 to disable automatic piezo corrections
+NO:          the piezos may zeroed once, but are then left alone.
+NO: LSETMS   Time required to toggle a bit and for the piezo controller
+NO:          to see it (ms).
+NO: LMAXBIN  Maximum useful binary value for piezos.
+NO: LRES     Resolution of piezos (microsteps/piezo bit)
+
+NO: New user-set variables:
+NO: LDESPOS  Desired position of piezo actuators, for XQ#LMOVE
+
+NO: New computed constants and variables (leave alone):
+NO: LRLIM    minimum position (microsteps)
+NO: LFLIM    maximum position (microsteps)
+NO:
+NO: LDPOSx   The desired new piezo position for A, B, C (microsteps)
+NO: LCERRx   Error in axis A, B, C (microsteps)
+NO: LCORRx   the last-applied piezo position for A, B, C (microsteps);
+NO:          this is set to LMOVEx at the end of the move.
+NO: LCPAUSE  When set to 1, tells the piezo task to zero the piezos
+NO:          and stop automatic corrections. Automatically set to 1
+NO:          at the start of the move and to 0 after almost all commands.
+NO: LAUXSTAT Piezo status word; bits are: LCSTOP, LCPAUSE and task running
+NO: LMOVEx   Piezo position after truncating to limits, in microsteps
+NO: LMOVEPx  Piezo position after truncating to limits, in piezo driver bits
+NO: LWTTIME  Time to wait for a full piezo correction, including
+NO:          time to communicate with piezo controller + LCORTIME
+
+NO: When LCSTOP or LCPAUSE is first set to 1,
+NO: if the piezo correction process is running
+NO: the piezos are set to zero and the process halts.
+NO: The piezos are then not touched until LCSTOP and LCPAUSE
+NO: are both 0 (LCPAUSE is automatically zeroed after almost all commands)
+NO: and a command finishes (triggering a new round of corrections).
+
+NO: The digital outputs are as follows:
+NO: 16    Clear: 0/1 to enable/clear all piezo DACs. Always leave low=enabled.
+NO: 15    Latch position data. Normally 1; 1->0->1 to latch.
+NO:       Data is read into latch on 1->0, output on 0->1 transition.
+NO: 14-13 address bits: A = 10, B = 01, C = 00, use new data = 11
+NO:       for A-C a latch transition causes data to be loaded into a buffer
+NO:       but the output of the piezo driver remains unchanged
+NO:       for "new data" a latch transition causes the buffered data to be output
+NO: 12-1  position data (linear):
+NO:       1111 1111 1111 = axial actuators are shortest, piezos are longest
+NO:       1111 1111 1110
+NO:       ...
+NO:       0000 0000 0001
+NO:       0000 0000 0000 = axial actuators are longest, piezos are shortest
+NO:
+NO: Notes:
+NO: - In the above, 1 means a high output (e.g. via SBx)
+NO: - The piezo driver has opto-isolated inputs which are driven low for "on".
+
+ST;  NO: kill background processes and any motion
+
+DL #LCLNUP
+NO: Local addition to #CLEANUP, run as any command ends.
+NO: Do not call #DONE or #CLEANUP at the end, to avoid infinite loops.
+NO: Typical use is to make sure outputs and extra hardware
+NO: are in some desired state
+LDESPOSA = MAXINT; LDESPOSB = MAXINT; LDESPOSC = MAXINT
+EN
+
+#LCMPVAR
+NO: Local addition to #COMPVAR, run at power on and after reset.
+NO: Set computed constants
+LVERS = 1.05
+LFLIM = LRES * LMAXBIN / 2.0
+LRLIM = - LFLIM
+LDPOSA = 0; LDPOSB = 0; LDPOSC = 0
+LCORRA = 0; LCORRB = 0; LCORRC = 0
+LCPAUSE = 1
+NO: Additional aux length for ", -xxxxx" per axis
+NO: plus ", xx" for status word
+AUXLEN = AUXLEN + (3 * 8) + 4
+NO: Total wait time primarily consists of LCORTIME
+NO: plus the time for 8 togglings of piezo control bits.
+LWTTIME = LCORTIME + (8 * LSETMS / 1000)
+JS #DONE, _ZS0 = 0; EN
+
+#LAUXOUT
+NO: Local addition to AUXOUT
+NO: To use this you must:
+NO: - increase AUXLEN accordingly in #LCMPVAR
+NO: - use only AUX-specific subroutines and variables
+NO: - end with a simple EN (do not call #DONE or #CLEANUP)
+NO:
+NO: Write position output and status to AUX port
+LAUXSTAT = (4*(LCSTOP<>0)) + (2*(LCPAUSE<>0)) + (_HX3=0)
+MG {P2}{N}{F5.0} ", ",LCORRA,", ",LCORRB,", ",LCORRC,", ", {F1.0} LAUXSTAT
+EN
+
+#LCORR
+NO: applies piezo corrections
+NO: Intended to be run from a background process.
+NO: If axes not homed, don't try to apply corrections
+JP #LG4CORR, (HOMEDA*HOMEDB*HOMEDC=0)
+NO: Compute position error
+NO: copy the relevant parts of #PTERR using thread-safe variables
+LCERRA= @RND[(((_TPA*ISSTEPA)+(_TDA*(ISSTEPA=0)))*ENCRESA)-_RPA] * (ENCRESA<>0)
+LCERRB= @RND[(((_TPB*ISSTEPB)+(_TDB*(ISSTEPB=0)))*ENCRESB)-_RPB] * (ENCRESB<>0)
+LCERRC= @RND[(((_TPC*ISSTEPC)+(_TDC*(ISSTEPC=0)))*ENCRESC)-_RPC] * (ENCRESC<>0)
+NO: *****COMMENT OUT THE NEXT LINE FOR REAL OPERATION*****
+NO: MG {F9.0} LCERRA, ", ", LCERRB, ", ", LCERRC, " position error before"
+LDPOSA = (-LCERRA * LCORFRAC) + LCORRA
+LDPOSB = (-LCERRB * LCORFRAC) + LCORRB
+LDPOSC = (-LCERRC * LCORFRAC) + LCORRC
+NO: *****COMMENT OUT THE NEXT LINE FOR REAL OPERATION*****
+NO: MG {F9.0} LDPOSA, ", ", LDPOSB, ", ", LDPOSC, " desired piezo correction"
+JS #LMV
+NO: *****COMMENT OUT THE NEXT TWO LINES FOR REAL OPERATION*****
+NO: WT 1000; JS #GETPERR
+NO: MG {F9.0} RESA, ", ", RESB, ", ", RESC, " position error after"; MG
+JP #LCORR, (LCPAUSE | LCSTOP) = 0
+NO: pause or halt wanted; zero piezos and quit
+LDPOSA = 0; LDPOSB = 0; LDPOSC = 0; JS #LMV
+EN
+#LG4CORR
+NO: cannot correct, don't even try
+LCPAUSE = 1
+EN
+
+#LGO
+NO: Called as a move begins (before turning on the motors if MOFF true)
+NO: x <> MAXINT if axis is about to be moved
+NO: _PRx <> 0 if move is non-null (it is safest not to rely on this
+NO: but the docs for #GO give instructions to make sure it'll work)
+NO: If starting is a multi-step process, make sure your code can
+NO: execute from any step (in case the process is interrupted and restarted)
+NO: If piezo correction wanted, zero piezos and disable automatic corrections
+JS #LPAUSE, (A<>MAXINT) | (B<>MAXINT) | (C<>MAXINT)
+JS #DONE, _ZS0 = 0; EN
+
+#LMOVE
+NO: Move the piezos to the position specified by LDESPOSx where x=A, B, C.
+NO: Pauses automatic piezo corrections and returns status and OK when done.
+NO: When you are finished, issue any command except LMOVE or LPAUSE
+NO: (e.g. STATUS or MOVE) to resume automatic corrections.
+NO: LMOVE is a shim for LMV, allowing the foreground task to move the piezos.
+NO:
+NO: Disable automatic piezo corrections.
+NO: Then move piezos to the positon specified by LDPOSx.
+JS #LPAUSE
+LDPOSA = (LDESPOSA * (LDESPOSA <> MAXINT)) + (LDPOSA * (LDESPOSA = MAXINT))
+LDPOSB = (LDESPOSB * (LDESPOSB <> MAXINT)) + (LDPOSB * (LDESPOSB = MAXINT))
+LDPOSC = (LDESPOSC * (LDESPOSC <> MAXINT)) + (LDPOSC * (LDESPOSC = MAXINT))
+JS #LMV; JS #STATUS
+JS #CLEANUP, _ZS0 = 0; EN
+
+#LMV
+NO: Move to the position specified by LDPOSx (in microsteps)
+NO: positions out of bounds are truncated without warning
+NO: The applied position is stored in LCORRx (in microsteps)
+NO: Do NOT call from the main thread unless you disable
+NO: automatic correction first, e.g. by calling #LPAUSE.
+NO: Typically run in the background, so does not use RESx or TEMPx
+NO: and never returns "OK" at end
+NO:
+NO: Set LMOVEx to the desired position truncated to fit
+NO: within the range of motion [LRLIM,LFLIM]
+LMOVEA = LDPOSA
+LMOVEB = LDPOSB
+LMOVEC = LDPOSC
+LMOVEA=LMOVEA+((LRLIM-LMOVEA)*(LMOVEA<LRLIM))+((LFLIM-LMOVEA)*(LMOVEA>LFLIM))
+LMOVEB=LMOVEB+((LRLIM-LMOVEB)*(LMOVEB<LRLIM))+((LFLIM-LMOVEB)*(LMOVEB>LFLIM))
+LMOVEC=LMOVEC+((LRLIM-LMOVEC)*(LMOVEC<LRLIM))+((LFLIM-LMOVEC)*(LMOVEC>LFLIM))
+NO: *****COMMENT OUT THE NEXT LINE FOR REAL OPERATION*****
+NO: MG {F9.0} LMOVEA, ", ", LMOVEB, ", ", LMOVEC, " trunc piezo correction"
+NO: convert to piezo bits
+LMOVEPA = @INT[(LMOVEA / LRES) + (LMAXBIN / 2.0)]
+LMOVEPB = @INT[(LMOVEB / LRES) + (LMAXBIN / 2.0)]
+LMOVEPC = @INT[(LMOVEC / LRES) + (LMAXBIN / 2.0)]
+NO: first set address to A (anything except "use new data"), then set load bit
+SB 14; CB 13; SB 15
+NO: send data to each piezo driver:
+NO: DAQ enable bit 16 low (always)
+NO: start with load bit 15 high, then toggle low, high to load
+NO: address bits 14,13 = 10, 01, 00 for A, B, C
+NO: data bits 1-12 as needed
+OP (@COM[LMOVEPA] & $0FFF) | $6000; WT LSETMS; CB 15; WT LSETMS; SB 15
+OP (@COM[LMOVEPB] & $0FFF) | $5000; WT LSETMS; CB 15; WT LSETMS; SB 15
+OP (@COM[LMOVEPC] & $0FFF) | $4000; WT LSETMS; CB 15; WT LSETMS; SB 15
+NO: trigger the piezos to move
+NO: DAQ enable bit 16 low (always)
+NO: start with load bit 15 high, then toggle low, high to load
+NO: address bits 14,13 = 00 to load data in all axes
+NO: data bits 1-12 are ignored, so set high (DAQ inputs low)
+OP $7FFF; WT LSETMS; CB 15; WT LSETMS; SB 15
+NO: update LCORRx (do this last in case the process is interrupted)
+LCORRA = LMOVEA
+LCORRB = LMOVEB
+LCORRC = LMOVEC
+WT LCORTIME * 1000
+EN
+
+#LMSTIME
+NO: Increases RESx by the time required to execute #LMSTOP (in sec)
+NO: Called before a motion begins: X <> MAXINT and _PRx <> 0 if x will be moved
+NO: or after a move ends: X <> MAXINT if x was moved
+NO:
+NO: no change
+JS #DONE, _ZS0 = 0; EN
+
+#LMSTOP
+NO: Called as a command ends (before turning off the motors
+NO: if moving and if MOFF true).
+NO: x <> MAXINT if axis is was moved
+NO: If halting is a multi-step process, make sure your code can
+NO: execute from any step (in case the process is interrupted and restarted).
+NO: End success with JP #CLEANUP, _ZS0 = 0; EN, errors with JP #CLEANUP.
+NO: Do NOT call #DONE to avoid infinite loops.
+NO:
+NO: If wanted, homed and not running, restart piezo corrections as task 3
+JP #G2LMSTO, (LCSTOP<>0) | (HOMEDA*HOMEDB*HOMEDC=0) | ((LCPAUSE=0)&(_HX3<>0))
+HX3; LCPAUSE=0; XQ #LCORR, 3
+#G2LMSTO
+JS #CLEANUP, _ZS0 = 0; EN
+
+#LMVTIME
+NO: Increases RESx by the time required to set up the current move,
+NO: i.e. the time to execute #LGO (in sec)
+NO: Called before a motion begins: X <> MAXINT and _PRx <> 0 if x will be moved
+RESA = RESA + LWTTIME
+RESB = RESB + LWTTIME
+RESC = RESC + LWTTIME
+JS #DONE, _ZS0 = 0; EN
+
+#LPAUSE
+NO: Zeros piezo corrections and pauses them.
+NO: Does nothing if piezo corrections are already paused.
+NO: Piezo corrections are resumed at the end of the next command
+NO: unless LCSTOP=1.
+NO: Must only be called from the foreground thread.
+NO: LPAUSE does not, of course, resume piezo corrections.
+JP #G2LPAUS, _HX3=0
+LCPAUSE = 1; WT LWTTIME * 1000
+#G2LPAUS
+JS #CLEANUP, _ZS0 = 0; EN
+
+#LSHWPAR
+NO: Required local addition to #SHOWPAR
+MG {F2.2} LVERS, " version of M2-specific additions"
+MG {F8.4} LRLIM, ", ", LFLIM, " min, max piezo position (microsteps)"
+MG {F8.0} LMAXBIN + 1, " number of steps of piezo position"
+MG {F8.4} LRES, " resolution (microsteps/piezo ctrl bit)"
+JS #DONE, _ZS0 = 0; EN
+
+#LSTATUS
+NO: M1-specific code begins here with supplementary output
+NO: for the #STATUS routine
+MG {F1.0} LAUXSTAT, " piezo status word"
+NO: copy LCORRx so background process doesn't mess it up
+RESA = LCORRA
+RESB = LCORRB
+RESC = LCORRC
+MG {F9.0} RESA, ", ", RESB, ", ", RESC, " piezo corrections (microsteps)"
+EN
+\
+
+
+NO: update computed variables
+XQ #COMPVAR
+NO: once tested, save the program to flash memory with BP

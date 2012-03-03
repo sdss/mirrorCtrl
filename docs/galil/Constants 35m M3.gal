@@ -1,0 +1,139 @@
+NO: 3.5m tertiary mirror motion control constants
+
+NO: History:
+NO: 3/9/99 first draft, just intended to get testing started
+NO: 3/18/99 changed units and variable names for Galil code 1.5b10. R.O.
+NO: 4/8/99 improved ACCE and set ENCRESE. R.O.
+NO: 4/15/99 cosmetic changes. R.O.
+NO: 4/27/99 fixed INDSEPx and changed many D variables to 0. R.O.
+NO: 5/6/99 set RNGA-C to values measured by Jeff Morgan. R.O.
+NO: 7/7/99 improved description of axis resolution. R.O.
+NO: 12/2/99 removed use of index pulse, improved encoder resolution info. R.O.
+NO: 12/3/99 set range to 0.375", as per Mark's request. R.O.
+NO: 12/15/99 decreased MARGE to not overshoot the first instrument position
+NO:          and increased RNGE to get the last instrument position. C.L.
+NO: 6/13/00 Added DOAUX for code 1.7b5. R.O.
+NO: 6/14/00 Increased RNGE from 2100000 to 2270000. It appears that the 12/15/99
+NO:         change was somehow lost. R.O.
+NO: 8/2/00 set DOAUX = 1, by request of Craig Loomis. R.O.
+NO: 4/9/01 modified ENCRESA-C for the Heidenhain encoders. R.O.
+NO: 9/6/01 changed MAXCORRA-C from 1000 to 0 at Craig Loomis' request. R.O.
+NO: 2001-10-11 Added M3-specific constants (prev. in M3-specific code). R.O.
+NO: 2005-03-24 Added NCORR and ENCTIME. Ditched unused DEFVF. R.O.
+NO: 2005-08-08 Added AUXMAXN. R.O.
+NO: 2005-10-18 Changed MAXCORRA-C from 0 to 300000, enabling correction of A-C. R.O.
+NO: 2006-07-06 Removed default constants and call to COMPVAR.
+NO: 2007-07-23 ENCRESE was too small by 4x
+NO: 2007-07-27 Changed MARGE so home is at the TR2 port
+NO: 2007-07-30 Undid change to MARGE-having home right at NA2 causes problems.
+NO: 2007-11-28 ENCRESE was too big by 4x but why? See 2007-07-23
+NO: 2008-07-14 Modified for new 3.5m tertiary. R.O.
+NO: 2008-09-09 Increased RNGE because tert rot reverse limit switch moved. R.O.
+NO: 2008-11-21 Modified for new tert rot motor encoder -- 1000 lines to 2048 lines. R.O.
+
+NO: ***** User-Set Constants *****
+
+NAXES  =  5;    NO: number of axes to control (1-6)
+NCORR  =  1;    NO: number of encoder corrections after a move
+DOAUX  =  1;    NO: output auxiliary port status? (1=Y,0=N)
+
+NO: Axis-Specific constants
+NO: Unless noted, all values must be > 0 if axis exists
+NO: Values are ignored if axis does not exist
+
+NO: Axes A, B, C
+NO: 40 threads/inch, 80:1 reduction 200 full steps/rev, 50 microsteps/full step
+NO: for a resolution of 32e6 microsteps/inch = 1259.8425 microsteps/um
+NO: The margin includes some room for "crosstalk"
+NO: (the position of each axial encoder is somewhat affected by all axial actuators)
+NO: Heidenhain MT 2581 encoder:
+NO: 2 um period, 4 ticks/period, 50x interpolation
+NO: for a resolution of 400 ticks/um = 3.1496 microsteps/tick
+NO: The encoders have one index pulse 1.5 mm from short end of travel
+NO: and that's too small a margin to safely use
+
+NO: Axis D does not exist, but constants must be supplied anyway
+NO:   Non-zero values for speed and acceleration are safest as otherwise
+NO:   an attempted move (which should not happen) would take forever
+
+NO: Axis E
+NO:   Motor resolution is 7074.074074... microsteps/deg of tertiary rotation,
+NO:   where a microstep is a count on the motor shaft encoder
+NO:   Auxiliary encoder resolution is 186.666.... ticks/microstep
+NO:   Details:
+NO:      4000 counts/rev on the motor shaft encoder
+NO:      50:1 gear box reduction ratio
+NO:      45 teeth on drive gear
+NO:      573 teeth on big gear
+NO:      1000 counts/rev for the gear encoder
+NO:      42 teeth on encoder gear
+
+NO: distance between hard and soft reverse limit (microsteps)
+MARGA = 400000;  NO: 0.0125 inches
+MARGB = MARGA
+MARGC = MARGA
+MARGD = 0
+MARGE = 41000; NO: ~2.8 deg
+
+NO: full range of motion (microsteps)
+RNGA = 15300000 - (2 * MARGA)
+RNGB = RNGA
+RNGC = RNGA
+RNGD = 0
+RNGE =  5020000; NO: ~346 deg
+
+NO: speed (microsteps/sec)
+NO: warnings:
+NO: - excessive speeds may cause stalling due to loss of torque
+NO: - test a speed for resonances before using it
+SPDA = 50000;  NO: 5 revs/sec
+SPDB = SPDA
+SPDC = SPDA
+SPDD = SPDA
+SPDE = 82000; NO: ~5.7 deg/sec
+
+NO: homing speed (microsteps/sec)
+NO: should be significantly slower than normal speed
+HMSPDA = SPDA / 10
+HMSPDB = HMSPDA
+HMSPDC = HMSPDA
+HMSPDD = HMSPDA
+HMSPDE = 4000
+
+NO: acceleration (microsteps/sec^2)
+ACCA = SPDA * 10
+ACCB = ACCA
+ACCC = ACCA
+ACCD = ACCA
+ACCE =  164000
+
+NO: microstepper resolution (microsteps/full step), 1 if a servo
+ST_FSE =  1
+
+NO: resolution of encoder (microsteps/encoder tick), 0 if no encoder
+NO: for a servo motor, this is the auxiliary encoder
+ENCRESA = -3.1496
+ENCRESB = ENCRESA
+ENCRESC = ENCRESA
+ENCRESD = 0
+ENCRESE = 95.5733
+
+NO: max error+1 to correct based on encoder (microsteps)
+NO: 0 if no encoder or no correction wanted
+MAXCORRA = 1000000
+MAXCORRB = MAXCORRA
+MAXCORRC = MAXCORRA
+MAXCORRD = 0
+MAXCORRE = 74000;  NO: ~5 deg
+
+NO: Constants specific to the 3.5m M3
+
+LCLTIME  =  6; NO: time to close the clamp (sec)
+LOPTIME  =  5; NO: time to open the clamp (sec)
+LSLTIME  =  0.1; NO: time for the at slot sensor to settle (sec)
+LCVADDT  =  2.0; NO: extra time to run cover motors after switch contact (sec)
+LCVPOLLT =  0.5; NO: polling interval for mirror cover motion (sec)
+LEYETIME = 10.0; NO: time to open or close an eyelid (sec)
+LCVMAXT  = 15.1; NO: max time to open or close a group of mirror covers (sec)
+                 NO: before the switches fire. Hence the total time limit
+                 NO: is LCVMAXT + LCVADDT.

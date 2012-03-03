@@ -1,0 +1,88 @@
+NO: Default constants
+
+NO: History:
+NO: 2006-07-06 First created.
+
+NO: ***** User-Set Constants *****
+
+NO: you must set NAXES elsewhere
+NO: NAXES    =  ?;    NO: number of axes (1-6)
+DOAUX    =  0;    NO: output auxiliary port status? (1=Y,0=N)
+NCORR    =  0;    NO: number of encoder corrections after a move
+MOFF     =  1;    NO: turn motor off after moves? (1=Y,0=N)
+WTIME    =  0.1;  NO: settling time before turning off motors (sec)
+ENCTIME  =  0.0;  NO: settling time before reading encoders (sec)
+LSTIME   = 30;    NO: maximum time to back out of limit switch at low speed (sec)
+AUXMAXN  = 20;	  NO: maximum number of act pos for each cmd pos on aux port
+
+NO: Axis-Specific constants
+NO: Unless noted, all values must be > 0 if axis exists
+NO: Values are ignored if axis does not exist
+
+NO: The following axes-specific constants must be specified elsewhere
+NO: (where x means one value for each axis: A, B, C...)
+
+NO: distance between hard and soft reverse limit (microsteps)
+NO: MARGx
+
+NO: full range of motion (microsteps)
+NO: RNGx
+
+NO: speed (microsteps/sec)
+NO: warnings:
+NO: - excessive speeds may cause stalling due to loss of torque,
+NO:   especially at low temperatures
+NO: - test a speed for resonances before using it
+NO: SPDx
+
+NO: homing speed (microsteps/sec)
+NO: should be significantly slower than normal speed
+NO: HMSPDx
+
+NO: acceleration (microsteps/sec^2)
+NO: ACCx
+
+NO: microstepper resolution (microsteps/full step), 1 if a servo
+ST_FSA = 50
+ST_FSB = 50
+ST_FSC = 50
+ST_FSD = 50
+ST_FSE = 50
+ST_FSF = 50
+
+NO: resolution of encoder (microsteps/encoder tick), 0 if no encoder
+NO: for a servo motor, this is the auxiliary encoder (if any)
+ENCRESA = 0
+ENCRESB = 0
+ENCRESC = 0
+ENCRESD = 0
+ENCRESE = 0
+ENCRESF = 0
+
+NO: separation between index pulses (microsteps)
+NO: 0 if encoder index pulse nonexistent or not used for homing
+INDSEPA = 0
+INDSEPB = 0
+INDSEPC = 0
+INDSEPD = 0
+INDSEPE = 0
+INDSEPF = 0
+
+NO: minimum error to correct based on encoder (microsteps)
+NO: applied after rounding to nearest full step if MOFF=1
+MINCORRA = 0
+MINCORRB = 0
+MINCORRC = 0
+MINCORRD = 0
+MINCORRE = 0
+MINCORRF = 0
+
+NO: max error to correct based on encoder (microsteps)
+NO: applied after rounding to nearest full step if MOFF=1
+NO: 0 if no encoder or no correction wanted
+MAXCORRA = 0
+MAXCORRB = 0
+MAXCORRC = 0
+MAXCORRD = 0
+MAXCORRE = 0
+MAXCORRF = 0
