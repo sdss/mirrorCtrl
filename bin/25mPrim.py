@@ -1,4 +1,4 @@
-##/usr/bin/env python
+#!/usr/bin/env python
 """This script contains configuration for the 2.5m Primary mirror, and launches the galil actor.
 
 notes: may wish to:
