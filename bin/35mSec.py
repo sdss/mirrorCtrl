@@ -14,9 +14,9 @@ UserPort = ''
 ControllerAddr = ''
 ControllerPort = ''
 ########### For testing ###############
-#UserPort = 1025   
-#ControllerAddr = 'localhost'
-#ControllerPort = 8000 # matches twistedGalil.py for testing
+UserPort = 1025   
+ControllerAddr = 'localhost'
+ControllerPort = 8000 # matches twistedGalil.py for testing
 #######################################
 
 # choose the actuator model (adjustable base or adjustable length)
@@ -61,9 +61,10 @@ for i in range(5):
 # Fake FixedLengthLink, need to determine actual mir/basePos.
 linkLength = 150. #mm
 mirRadius = 1000. #mm
-fixMirPos = numpy.array([[0., mirRadius, -152.806]])
-fixBasePos = numpy.array([[linkLength, mirRadius, -152.806]])
-fixLinkList = [mirror.FixedLengthLink(fixBasePos, fixMirPos)]
+fixMirPos = numpy.array([0., mirRadius, -152.806])
+fixBasePos = numpy.array([linkLength, mirRadius, -152.806])
+fixLinkList = []
+fixLinkList.append(mirror.FixedLengthLink(fixBasePos, fixMirPos))
 
 encLinkList = None # need to get these too.
 
