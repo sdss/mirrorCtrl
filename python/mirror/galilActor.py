@@ -125,10 +125,19 @@ class GalilActor(TclActor.Actor):
         return True
         
     def cmd_stop(self, cmd):
-        """Abort any executing Galil command
+        """Abort any executing Galil command, put Galil in known state
         """
         try:
             self.galilDev.cmdStop(cmd)
+        except Exception, e:
+            raise TclActor.Command.CommandError(str(e))        
+        return True
+    
+    def cmd_reset(self, cmd):
+        """Reset the Galil using an 'RS' command.
+        """
+        try:
+            self.galilDev.cmdReset(cmd)
         except Exception, e:
             raise TclActor.Command.CommandError(str(e))        
         return True

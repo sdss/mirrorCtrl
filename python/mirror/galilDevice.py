@@ -9,13 +9,14 @@ http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.ht
 To Do:
 add mirror-specific galil replies
 ConstRMS keyword - how close the mirror can get to commanded orientation?
+switch to pyparsing for galil replies?
 
 
 Notes:
 Update Galil Code Constants:
 2.5m secondary, turn off piezo corrections, we handle them here now
 All mirrors w/ encoders, disable subsequent moves, we handle them here now
-
+I am unsure about how the best way to handle a 'RS'...check out the reset command
 """
 import time
 import itertools
@@ -483,8 +484,22 @@ class GalilDevice(TclActor.TCPDevice):
         self._clrDevCmd() # stop listening for replies        
         userCmd.setState("running")
         self.conn.writeLine('ST;')
+        # instead? self.con.writeLine('XQ# STOP';')
         time.sleep(1) # wait 1 second for deceleration
         self.cmdStatus(userCmd)
+        
+    def cmdReset(self, userCmd):
+        """Sends an 'RS' to the Galil, followed by a cmdStop to put Galil in known state.
+        """
+        if not self.currDevCmd.isDone():
+            self.currDevCmd.setState("cancelled", textMsg="stop interrupt")
+        if not self.status.Cmd.isDone():
+            self.status.Cmd.setState("cancelled", textMsg="stop interrupt")
+        self._clrDevCmd() # stop listening for replies        
+        userCmd.setState("running")
+        self.conn.writeLine('RS;')
+        time.sleep(3) # wait 3 seconds for reset
+        self.cmdStop(userCmd) # put Galil in known state         
                 
     def cmdStatus(self, userCmd):
         """Return the Galil status to the user.

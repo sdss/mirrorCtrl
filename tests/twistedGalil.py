@@ -100,9 +100,15 @@ def genStrFromSt():
     #str = '? Stop Error!'
     str = ''
     return str
+    
+def genStrFromRs():
+    """ Placeholder """
+    str = ''
+    return str
 
-CmdsTup = collections.namedtuple("CmdList", ["move", "home", "status", "showpar", "st"])    
-cmdRplList = [genStrFromMove(), genStrFromHome(), genStrFromStatus(), genStrFromShowpar(), genStrFromSt()]
+CmdsTup = collections.namedtuple("CmdList", ["move", "home", "status", "showpar", "st", "rs"])    
+cmdRplList = [genStrFromMove(), genStrFromHome(), genStrFromStatus(), 
+    genStrFromShowpar(), genStrFromSt(), genStrFromRs()]
 validCmds = CmdsTup(*cmdRplList) # for matching replies to commands
 
 class SpitBack(LineReceiver):
@@ -117,7 +123,7 @@ class SpitBack(LineReceiver):
             reply = getattr(validCmds, cmdRec)
         except:
             raise RuntimeError('Command not recognized: %s' % (cmdRec))
-        if cmdRec == "st":
+        if cmdRec == "st" or cmdRec == "rs":
             #interrupt everything
             self.replyList = None
             self.ind = None
