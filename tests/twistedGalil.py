@@ -2,7 +2,7 @@
 """
 This communicates with the Galil Actor.  It pings semi-faked Galil replies back for testing.
 """
-Port = 8000 # must match device port in Galil Actor.
+
 
 # Copyright (c) Twisted Matrix Laboratories.
 # See LICENSE for details.
@@ -11,6 +11,13 @@ from twisted.internet import reactor, protocol, defer
 from twisted.protocols.basic import LineReceiver
 import time
 import collections
+import sys
+
+Port = 8000 # must match device port in Galil Actor.
+
+if len(sys.argv) > 1:
+    # port was specified via command line, overwrite
+    Port = int(sys.argv[1])
 
 def genStrFromMove():
     """ gen galil reply from move command.  Same reply is always sent.
@@ -116,7 +123,7 @@ class SpitBack(LineReceiver):
 
     def lineReceived(self, line):
         """As soon as any data is received, look at it and write something back."""
-        
+        print 'got Line!: ', line
         splitLine = line.lower().split("xq #")
         cmdRec = splitLine[-1].strip("; ") # just get the cmd without any ';' or ' '.
         try:
@@ -138,6 +145,7 @@ class SpitBack(LineReceiver):
                 print "Error in writeBack: index = %s >= %s" % (self.ind, len(self.replyList))
                 return
             #print "Sending:", self.replyList[self.ind]
+            print 'sending line!: ', self.replyList[self.ind]
             self.sendLine(self.replyList[self.ind]) # send one line at a time
             time.sleep(.25) # pause inbetween lines sent, for the hell of it.
             self.ind += 1
