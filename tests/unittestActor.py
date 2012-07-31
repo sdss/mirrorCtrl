@@ -8,7 +8,7 @@ import telnetlib
 
 import mirror
 from data import genMirrors
-import twistedGalil
+import fakeGalil
     
 UserPort = 1025
 ControllerAddr = 'localhost'
@@ -20,7 +20,7 @@ Iter = 0
 mirr = genMirrors.Sec25().makeMirror() 
 # 3.5m M3 device because galil replies are specific to this mirror...
 # ./data/rawGalilReplies.txt have examples of all galil replies
-# these are spouted from twistedGalil.py
+# these are spouted from fakeGalil.py
 device = mirror.GalilDevice35M3
 
 def doCmdTest(root, cmdStrs):
@@ -75,7 +75,7 @@ class ActorTests(unittest.TestCase):
 #         self.assertEqual(0, 0, 'they are equal')
         
     def testCmds(self):
-        """This test starts up the actor and twistedGalil, then sends commands
+        """This test starts up the actor and fakeGalil, then sends commands
         to the actor via telnet, then listens for a ":" in the reply, signaling
         that the command finished properly.
         
@@ -85,7 +85,7 @@ class ActorTests(unittest.TestCase):
         global isOK
         isOK = 1
         # start up the fake galil
-        tGal = multiprocessing.Process(target=twistedGalil.main, args=())
+        tGal = multiprocessing.Process(target=fakeGalil.main, args=())
         tGal.start()
         time.sleep(1)
         # set up actor

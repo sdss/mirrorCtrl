@@ -221,6 +221,7 @@ class GalilDevice(TclActor.TCPDevice):
             -000006732,  000014944,  000003741,  999999999,  999999999 position error
              1,  1,  1,  0,  0 axis homed       
         """ 
+        #print "parseLine(line=%r)" % (line,)
         # Grab the data in each line:
         # Match only numbers (including decimal pt and negative sign) that are not preceeded by '/'
         # or immediately surrounded by any letters letters.
@@ -368,11 +369,12 @@ class GalilDevice(TclActor.TCPDevice):
         - Parse status to update the model parameters
         - If a command has finished, call the appropriate command callback
         """
-        
+        #print "handleReply(replyStr=%r)" % (replyStr,)
         if self.currDevCmd.isDone():
             # ignore unsolicited input
             return
-        replyStr = replyStr.encode("ASCII", "ignore").strip(' :;\r\n')
+        replyStr = replyStr.replace(":", "")
+        replyStr = replyStr.encode("ASCII", "ignore").strip(' ;\r\n')
         if not replyStr:
             # ignore blank replies
             return
@@ -483,7 +485,7 @@ class GalilDevice(TclActor.TCPDevice):
             self.status.Cmd.setState("cancelled", textMsg="stop interrupt")
         self._clrDevCmd() # stop listening for replies        
         userCmd.setState("running")
-        self.conn.writeLine('ST;')
+        self.conn.writeLine('ST')
         # instead? self.con.writeLine('XQ# STOP';')
         time.sleep(1) # wait 1 second for deceleration
         self.cmdStatus(userCmd)
@@ -497,7 +499,7 @@ class GalilDevice(TclActor.TCPDevice):
             self.status.Cmd.setState("cancelled", textMsg="stop interrupt")
         self._clrDevCmd() # stop listening for replies        
         userCmd.setState("running")
-        self.conn.writeLine('RS;')
+        self.conn.writeLine('RS')
         time.sleep(3) # wait 3 seconds for reset
         self.cmdStop(userCmd) # put Galil in known state         
                 
@@ -529,7 +531,7 @@ class GalilDevice(TclActor.TCPDevice):
         userCmd.setState("running")
         userCmd.timeLimit = 5
         self.status.Cmd = userCmd 
-        self.newCmd("XQ #STATUS;", callFunc = self._statusCallback)
+        self.newCmd("XQ #STATUS", callFunc = self._statusCallback)
                         
     def cmdParams(self, userCmd):
         """Show Galil parameters
@@ -540,7 +542,7 @@ class GalilDevice(TclActor.TCPDevice):
         userCmd.setState("running")
         userCmd.timeLimit = 5
         self.status.Cmd = userCmd  
-        self.newCmd("XQ #SHOWPAR;", callFunc = self._userCmdCallback)
+        self.newCmd("XQ #SHOWPAR", callFunc = self._userCmdCallback)
         
     def cmdHome(self, axisList, userCmd):
         """Home the specified actuators
@@ -731,10 +733,10 @@ class GalilDevice(TclActor.TCPDevice):
         argList = []
         for axis in self.validAxisList:
             if axis in axisSet:
-                argList.append("%s=1" % (axis,))
+                argList.append("%s=1;" % (axis,))
             else:
-                argList.append("%s=MAXINT" % (axis,))
-        return axisList, " ".join(argList) + 'XQ #HOME'
+                argList.append("%s=MAXINT;" % (axis,))
+        return axisList, " ".join(argList) + "XQ #HOME"
 
 
 class GalilDevice35M3(GalilDevice):
@@ -852,4 +854,4 @@ class GalilDevice25M2(GalilDevice):
         for ind, mount in enumerate(mountList):
             # axes to move
             argList.append("LDESPOS%s=%.0f;" % (self.validAxisList[ind], mount))
-        return " ".join(argList) + 'XQ #LMOVE'            
+        return " ".join(argList) + "XQ #LMOVE"

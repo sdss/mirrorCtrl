@@ -14,9 +14,9 @@ UserPort = ''
 ControllerAddr = ''
 ControllerPort = ''
 ########### For testing ###############
-UserPort = 1025   
+UserPort = 2531   
 ControllerAddr = 'localhost'
-ControllerPort = 8000 # matches twistedGalil.py for testing
+ControllerPort = 8000 # matches fakeGalil.py for testing
 #######################################
 
 # choose the actuator model (adjustable base or adjustable length)
