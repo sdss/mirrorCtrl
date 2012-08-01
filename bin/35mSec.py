@@ -10,13 +10,12 @@ To Do:
 import mirror
 import numpy
 
-UserPort = ''
-ControllerAddr = ''
-ControllerPort = ''
-########### For testing ###############
+Name = '3.5m Secondary'
+
 UserPort = 3532
-ControllerAddr = 'localhost'
-ControllerPort = 8000 # matches fakeGalil.py for testing
+########### For testing ###############
+GalilHost = 'localhost'
+GalilPort = 8000 # matches fakeGalil.py for testing
 #######################################
 
 # choose the actuator model (adjustable base or adjustable length)
@@ -68,14 +67,13 @@ fixLinkList.append(mirror.FixedLengthLink(fixBasePos, fixMirPos))
 
 encLinkList = None # need to get these too.
 
-# make the mirror
-name = '3.5m Secondary'
-Mir = mirror.DirectMirror(actLinkList, fixLinkList, encLinkList, name)
-Dev = mirror.GalilDevice
-# start up actor
+Mirror = mirror.DirectMirror(actLinkList, fixLinkList, encLinkList, Name)
+
 if __name__ == "__main__":
-    mirror.runGalil(Mir, Dev, UserPort, ControllerAddr, ControllerPort)
-
-    
-
+    device = mirror.GalilDevice(
+        mirror = Mirror,
+        host = GalilHost,
+        port = GalilPort,
+    )
+    mirror.runMirrorController(device = device, userPort = UserPort)
 

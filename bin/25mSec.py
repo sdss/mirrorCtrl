@@ -11,16 +11,15 @@ To Do:
     the docs directory.
 
 """
-import mirror
 import numpy
+import mirror
 
-UserPort = ''
-ControllerAddr = ''
-ControllerPort = ''
-########### For testing ###############
+Name = 'SDSS Secondary'
+
 UserPort = 2532   
-ControllerAddr = 'localhost'
-ControllerPort = 8000 # matches fakeGalil.py for testing
+########### For testing ###############
+GalilHost = 'localhost'
+GalilPort = 8000 # matches fakeGalil.py for testing
 #######################################
 
 # choose the actuator model (adjustable base or adjustable length)
@@ -92,15 +91,12 @@ fixLinkList.append(mirror.FixedLengthLink(fixBasePos, fixMirPos))
 
 encLinkList = None # need to get these positions from French.
 
-# make the mirror
-name = 'SDSS Secondary'
-Mir = mirror.TipTransMirror(CtrMirZ, CtrBaseZ, actLinkList, 
-                            fixLinkList, encLinkList, name)
-Dev = mirror.GalilDevice25M2
-# start up actor
+Mirror = mirror.TipTransMirror(CtrMirZ, CtrBaseZ, actLinkList, fixLinkList, encLinkList, Name)
+
 if __name__ == "__main__":
-    mirror.runGalil(Mir, Dev, UserPort, ControllerAddr, ControllerPort)
-
-    
-
-
+    device = mirror.GalilDevice25M2(
+        mirror = Mirror,
+        host = GalilHost,
+        port = GalilPort,
+    )
+    mirror.runMirrorController(device = device, userPort = UserPort)

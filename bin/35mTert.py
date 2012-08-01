@@ -22,17 +22,16 @@ Notes:
 
 Need to add encoder positions!
 """
-import mirror
-import numpy
 import math
+import numpy
+import mirror
 
-UserPort = ''
-ControllerAddr = ''
-ControllerPort = ''
-########### For testing ###############
+Name = '3.5m Tertiary'
+
 UserPort = 3533   
-ControllerAddr = 'localhost'
-ControllerPort = 8000 # matches fakeGalil.py for testing
+########### For testing ###############
+GalilHost = 'localhost'
+GalilPort = 8000 # matches fakeGalil.py for testing
 #######################################
 
 # choose the actuator model (adjustable base or adjustable length)
@@ -159,14 +158,14 @@ for i in range(3):
     
 encLinkList = None # need to eventually obtain encoder positions!
 
-# make the mirror
-name = '3.5m Tertiary'
-Mir = mirror.DirectMirror(actLinkList, fixLinkList, encLinkList, name)
-Dev = mirror.GalilDevice35M3
-# start up actor
-if __name__ == "__main__":
-    mirror.runGalil(Mir, Dev, UserPort, ControllerAddr, ControllerPort)
+Mirror = mirror.DirectMirror(actLinkList, fixLinkList, encLinkList, Name)
 
-    
+if __name__ == "__main__":
+    device = mirror.GalilDevice35M3(
+        mirror = Mirror,
+        host = GalilHost,
+        port = GalilPort,
+    )
+    mirror.runMirrorController(device = device, userPort = UserPort)
 
 

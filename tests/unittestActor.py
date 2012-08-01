@@ -11,8 +11,8 @@ from data import genMirrors
 import fakeGalil
     
 UserPort = 1025
-ControllerAddr = 'localhost'
-ControllerPort = 8000
+GalilHost = 'localhost'
+GalilPort = 8000
 isOK = 0
 Iter = 0
 
@@ -21,9 +21,9 @@ mirr = genMirrors.Sec25().makeMirror()
 # 3.5m M3 device because galil replies are specific to this mirror...
 # ./data/rawGalilReplies.txt have examples of all galil replies
 # these are spouted from fakeGalil.py
-device = mirror.GalilDevice35M3
+Device = mirror.GalilDevice35M3
 
-def doCmdTest(root, cmdStrs):
+def doCmdTest(reactor, cmdStrs):
     """Loop over cmds in cmdStrs, send to actor via telnet, listen for ":".
     When all commands have been sent, destroy the actor instance, and the main
     test thread will continue and check the exit conditions of this thread.
@@ -33,7 +33,7 @@ def doCmdTest(root, cmdStrs):
     global Iter
     # time for widget to start up and initialize
     time.sleep(3)
-    tnet = telnetlib.Telnet(host = ControllerAddr, port = UserPort, timeout=100)
+    tnet = telnetlib.Telnet(host = GalilHost, port = UserPort, timeout=100)
     # wait for connection
     time.sleep(2)
     Iter = 0
@@ -49,15 +49,14 @@ def doCmdTest(root, cmdStrs):
             break        
     tnet.close()
     time.sleep(2)
-    root.destroy()
+    reactor.stop()
 
 def makeActor(dev, mirr):
-    """set up actor, return the Tkinter root and the actor itself
+    """create a mirror controller actor
     """
-    root = Tkinter.Tk()
-    actor = mirror.GalilActor(dev, mir=mirr, userPort=UserPort, controllerAddr=ControllerAddr, controllerPort = ControllerPort)
-    #root.mainloop()
-    return root, actor
+    device = Device(mirror = mirr, host = GalilHost, port = GalilPort)
+    actor = mirror.MirrorController(device = device, userPort=UserPort)
+    return actor
 
 class ActorTests(unittest.TestCase):
     """Tests for actor
@@ -65,13 +64,14 @@ class ActorTests(unittest.TestCase):
 #     def testParser(self):
 #         with open('./data/rawGalilReplies.txt', 'r') as f:
 #             RawGalilReplies = f.readlines()
+#         from twisted.internet import reactor
 #         time.sleep(4) # wait for prev test to shut down...
-#         root, actor = makeActor(device, mirr)
+#         actor = makeActor(Device, mirr)
 #         parser = actor.galilDev.parseLine
 #         for line in RawGalilReplies:
 #             out = parser(line)
 #             print 'out: ', out
-#         root.destroy()
+#         reactor.stop()
 #         self.assertEqual(0, 0, 'they are equal')
         
     def testCmds(self):
@@ -82,6 +82,7 @@ class ActorTests(unittest.TestCase):
         note: lots of sleep time to allow for startup and shutdown of actors,
         connections to ports, etc.
         """
+        from twisted.internet import reactor
         global isOK
         isOK = 1
         # start up the fake galil
@@ -89,7 +90,7 @@ class ActorTests(unittest.TestCase):
         tGal.start()
         time.sleep(1)
         # set up actor
-        root, actor = makeActor(device, mirr)
+        actor = makeActor(Device, mirr)
         # list of commands you want to test
         cmdStrs = [
             "move 4,4,4\r\n",
@@ -100,9 +101,9 @@ class ActorTests(unittest.TestCase):
             ]
         # send commands from different thread
         # actor must run in main thread
-        thread.start_new_thread(lambda: doCmdTest(root, cmdStrs), ())
+        thread.start_new_thread(lambda: doCmdTest(reactor, cmdStrs), ())
         # start up the actor instance
-        root.mainloop()
+        reactor.run()
         tGal.terminate()
         self.assertEqual(1, isOK, 'failed on cmd %s' % cmdStrs[Iter])
 

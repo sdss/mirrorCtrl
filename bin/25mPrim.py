@@ -7,16 +7,17 @@ notes: may wish to:
     use actual length links (not inf)?
     attach trans y to mirror vertex?
 """
-import mirror
 import numpy
+import RO.Comm.Generic
+RO.Comm.Generic.setFramework("twisted")
+import mirror
 
-UserPort = ''
-ControllerAddr = ''
-ControllerPort = ''
-########### For testing ###############
+Name = 'SDSS Primary'
+
 UserPort = 2531   
-ControllerAddr = 'localhost'
-ControllerPort = 8000 # matches fakeGalil.py for testing
+########### For testing ###############
+GalilHost = 'localhost'
+GalilPort = 8000 # matches fakeGalil.py for testing
 #######################################
 
 # choose the actuator model (adjustable base or adjustable length)
@@ -101,14 +102,13 @@ for i in range(6):
     actOffset = ActMountOffset[i]
     actLink = genLink(actBasePos, actMirPos, actMin, actMax, actScale, actOffset)
     actLinkList.append(actLink)
-# make the mirror
-name = 'SDSS Primary'
-Mir = mirror.DirectMirror(actLinkList, fixLinkList, encLinkList, name)
-Dev = mirror.GalilDevice
-# start up actor
+
+Mirror = mirror.DirectMirror(actLinkList, fixLinkList, encLinkList, Name)
+
 if __name__ == "__main__":
-    mirror.runGalil(Mir, Dev, UserPort, ControllerAddr, ControllerPort)
-
-    
-
-
+    device = mirror.GalilDevice(
+        mirror = Mirror,
+        host = GalilHost,
+        port = GalilPort,
+    )
+    mirror.runMirrorController(device = device, userPort = UserPort)

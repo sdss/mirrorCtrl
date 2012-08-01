@@ -1,13 +1,15 @@
 """ Actor for mirrors (via Galil devices).
 """
+__all__ = ["MirrorController", "runMirrorController"]
+
 import itertools
 import math
-import Tkinter
 
 import numpy
-import TclActor
 
-#from .galilDevice import GalilDevice, GalilDevice35M3, GalilDevice25M2
+from twistedActor import Actor, CommandError, UserCmd
+
+DefaultMaxUsers = 5
 
 MMPerMicron = 1 / 1000.0        # millimeters per micron
 RadPerDeg  = math.pi / 180.0    # radians per degree
@@ -17,33 +19,33 @@ RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
 ConvertOrient = numpy.array([MMPerMicron, RadPerArcSec, RadPerArcSec,
                              MMPerMicron, MMPerMicron], dtype = float)
 
-
-class GalilActor(TclActor.Actor):
-    def __init__(self, device, mir, userPort, controllerAddr, controllerPort, maxUsers = 5):
+class MirrorController(Actor):
+    def __init__(self,
+        device,
+        userPort,
+        maxUsers = DefaultMaxUsers,
+    ):
         """Create a Galil mirror controller actor
         
         Inputs:
-        - device: A TclActor.TCPDevice from galilDevice.py
-        - mir: an instance of mirror.MirrorBase
-        - userPort: port on which to listen for client connections
-        - maxUsers: maximum allowed simultaneous users
+        - device    A Galil device from galilDevice.py
+        - userPort  port on which to listen for client connections
+        - maxUsers  maximum allowed simultaneous users
         """
-        self.mirror = mir
-        self.galilDev = device(controllerAddr, controllerPort, actor=self)
-        TclActor.Actor.__init__(self,
+        self.galilDev = device
+        Actor.__init__(self,
             userPort = userPort,
             devs = [self.galilDev],
-            maxUsers = 5
+            maxUsers = maxUsers,
         )
         
     def initialConn(self):
         """Perform initial connections.  Same as Actor Base Class method, but with the
         addition of commanding 'stop' to put the Galil in a known state upon connection.
         """
-        TclActor.Actor.initialConn(self)
-        # do we need a pause?
+        Actor.initialConn(self)
         # get device state
-        initCmd = TclActor.Command.UserCmd()
+        initCmd = UserCmd()
         initCmd.timeLimit = 10 # give it 10 seconds before timeout
         self.cmd_stop(initCmd) # put Galil in known state   
     
@@ -58,13 +60,13 @@ class GalilActor(TclActor.Actor):
         it is silently replaced with the constrained value (typically nearly zero).
         """
         if not cmd or not cmd.cmdArgs:
-            raise TclActor.Command.CommandError("No orientation specified")
+            raise CommandError("No orientation specified")
         try:    
             cmdArgList = numpy.asarray(cmd.cmdArgs.split(","), dtype=float)
         except Exception:
-            raise TclActor.Command.CommandError("Could not parse %s as a comma-separated list of floats" % (cmd.cmdArgs,))
+            raise CommandError("Could not parse %s as a comma-separated list of floats" % (cmd.cmdArgs,))
         if not (0 < len(cmdArgList) < 6):
-            raise TclActor.Command.CommandError("Must specify 1 to 5 orientation values; got %s" % (len(cmdArgList)))
+            raise CommandError("Must specify 1 to 5 orientation values; got %s" % (len(cmdArgList)))
         # pad extra orientations with zeros, if not specified 5.
         if len(cmdArgList) < 5:
             pad = numpy.zeros(5 -  len(cmdArgList))
@@ -76,7 +78,7 @@ class GalilActor(TclActor.Actor):
             cmdOrient = cmdOrient * ConvertOrient
             self.galilDev.cmdMove(cmdOrient, userCmd=cmd)
         except Exception, e:
-            raise TclActor.Command.CommandError(str(e))
+            raise CommandError(str(e))
         return True
             
     def cmd_home(self, cmd):
@@ -86,12 +88,12 @@ class GalilActor(TclActor.Actor):
         axisList = [arg.strip() for arg in cmd.cmdArgs.split(",") if arg.strip()]
         for arg in axisList:
             if len(arg) != 1:
-                raise TclActor.Command.CommandError(
+                raise CommandError(
                     "Could not parse %s as a comma-separated list of letters" % (cmd.cmdArgs,))
         try:
             self.galilDev.cmdHome(axisList, userCmd=cmd)
         except Exception, e:
-            raise TclActor.Command.CommandError(str(e))
+            raise CommandError(str(e))
         return True
         
     def cmd_log(self, cmd):
@@ -100,19 +102,19 @@ class GalilActor(TclActor.Actor):
         try:
             self.galilDev.cmdLog(userCmd=cmd)
         except Exception, e:
-            raise TclActor.Command.CommandError(str(e))
+            raise CommandError(str(e))
         return True 
             
     def cmd_status(self, cmd):
         """Show status of Galil mirror controller
         """
-        # TclActor status
-        TclActor.Actor.cmd_status(self, cmd)
+        # twistedActor status
+        Actor.cmd_status(self, cmd)
         try:
             # additional status from Galil
             self.galilDev.cmdStatus(cmd)
         except Exception, e:
-            raise TclActor.Command.CommandError(str(e))
+            raise CommandError(str(e))
         return True
         
     def cmd_showparams(self, cmd):
@@ -121,7 +123,7 @@ class GalilActor(TclActor.Actor):
         try:
             self.galilDev.cmdParams(cmd)
         except Exception, e:
-            raise TclActor.Command.CommandError(str(e))
+            raise CommandError(str(e))
         return True
         
     def cmd_stop(self, cmd):
@@ -130,7 +132,7 @@ class GalilActor(TclActor.Actor):
         try:
             self.galilDev.cmdStop(cmd)
         except Exception, e:
-            raise TclActor.Command.CommandError(str(e))        
+            raise CommandError(str(e))        
         return True
     
     def cmd_reset(self, cmd):
@@ -139,22 +141,22 @@ class GalilActor(TclActor.Actor):
         try:
             self.galilDev.cmdReset(cmd)
         except Exception, e:
-            raise TclActor.Command.CommandError(str(e))        
+            raise CommandError(str(e))        
         return True
         
-def runGalil(mir, device, userPort, controllerAddr, controllerPort):
-    """Start up an actor event loop
+def runMirrorController(device, userPort):
+    """Start up a Galil actor
+    
     Inputs:
-    mir = a mirror object (see mirror.mirror)
-    device = a TclActor-based Galil Device (see mirror.galilDevice)
-    userPort
-    controllerAddr
-    controllerPort
+    device      a twistedActor-based Galil Device (see mirror.galilDevice)
+    userPort    port on which actor accepts user commands
     """
-    root = Tkinter.Tk()
-    print "Galil actor is starting up on port %s" % (userPort,)
-    galilActor = None
-    galilActor = GalilActor(device, mir=mir, userPort=userPort, controllerAddr=controllerAddr, controllerPort = controllerPort)
-    print "Galil ICC is running on port %s" % (userPort,)
-    root.mainloop()
-    print "Galil ICC is shutting down"
+    from twisted.internet import reactor
+
+    Actor = MirrorController(
+        device = device,
+        userPort = userPort,
+    )    
+
+    print "%s mirror controller starting on port %s" % (device.mirror.name, userPort,)
+    reactor.run()    
