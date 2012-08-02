@@ -32,10 +32,9 @@ class MirrorController(Actor):
         - userPort  port on which to listen for client connections
         - maxUsers  maximum allowed simultaneous users
         """
-        self.galilDev = device
         Actor.__init__(self,
             userPort = userPort,
-            devs = [self.galilDev],
+            devs = [device],
             maxUsers = maxUsers,
         )
         
@@ -76,7 +75,7 @@ class MirrorController(Actor):
         try:
             # convert to natural units, mm and radians
             cmdOrient = cmdOrient * ConvertOrient
-            self.galilDev.cmdMove(cmdOrient, userCmd=cmd)
+            self.dev.galil.cmdMove(cmdOrient, userCmd=cmd)
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -91,7 +90,7 @@ class MirrorController(Actor):
                 raise CommandError(
                     "Could not parse %s as a comma-separated list of letters" % (cmd.cmdArgs,))
         try:
-            self.galilDev.cmdHome(axisList, userCmd=cmd)
+            self.dev.galil.cmdHome(axisList, userCmd=cmd)
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -100,7 +99,7 @@ class MirrorController(Actor):
         """Prints raw (unparsed) Galil reply log to user
         """
         try:
-            self.galilDev.cmdLog(userCmd=cmd)
+            self.dev.galil.cmdLog(userCmd=cmd)
         except Exception, e:
             raise CommandError(str(e))
         return True 
@@ -112,7 +111,7 @@ class MirrorController(Actor):
         Actor.cmd_status(self, cmd)
         try:
             # additional status from Galil
-            self.galilDev.cmdStatus(cmd)
+            self.dev.galil.cmdStatus(cmd)
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -121,7 +120,7 @@ class MirrorController(Actor):
         """Show parameters of Galil mirror controller
         """
         try:
-            self.galilDev.cmdParams(cmd)
+            self.dev.galil.cmdParams(cmd)
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -130,7 +129,7 @@ class MirrorController(Actor):
         """Abort any executing Galil command, put Galil in known state
         """
         try:
-            self.galilDev.cmdStop(cmd)
+            self.dev.galil.cmdStop(cmd)
         except Exception, e:
             raise CommandError(str(e))        
         return True
@@ -139,7 +138,7 @@ class MirrorController(Actor):
         """Reset the Galil using an 'RS' command.
         """
         try:
-            self.galilDev.cmdReset(cmd)
+            self.dev.galil.cmdReset(cmd)
         except Exception, e:
             raise CommandError(str(e))        
         return True
