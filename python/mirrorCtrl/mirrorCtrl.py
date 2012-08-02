@@ -1,6 +1,6 @@
 """ Actor for mirrors (via Galil devices).
 """
-__all__ = ["MirrorController", "runMirrorController"]
+__all__ = ["MirrorCtrl", "runMirrorCtrl"]
 
 import itertools
 import math
@@ -19,7 +19,7 @@ RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
 ConvertOrient = numpy.array([MMPerMicron, RadPerArcSec, RadPerArcSec,
                              MMPerMicron, MMPerMicron], dtype = float)
 
-class MirrorController(Actor):
+class MirrorCtrl(Actor):
     def __init__(self,
         device,
         userPort,
@@ -143,16 +143,16 @@ class MirrorController(Actor):
             raise CommandError(str(e))        
         return True
         
-def runMirrorController(device, userPort):
+def runMirrorCtrl(device, userPort):
     """Start up a Galil actor
     
     Inputs:
-    device      a twistedActor-based Galil Device (see mirror.galilDevice)
+    device      a twistedActor-based Galil Device (see mirrorCtrl/galilDevice.py)
     userPort    port on which actor accepts user commands
     """
     from twisted.internet import reactor
 
-    Actor = MirrorController(
+    Actor = MirrorCtrl(
         device = device,
         userPort = userPort,
     )    

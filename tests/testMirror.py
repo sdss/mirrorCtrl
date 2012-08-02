@@ -10,7 +10,7 @@ import time
 zeroFlag = False
 
 from data import genMirrors
-import mirror
+import mirrorCtrl
 import RO.Astro.Tm
 
 MMPerMicron = 1 / 1000.0        # millimeters per micron

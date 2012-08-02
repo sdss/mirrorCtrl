@@ -10,7 +10,7 @@ notes: may wish to:
 import numpy
 import RO.Comm.Generic
 RO.Comm.Generic.setFramework("twisted")
-import mirror
+import mirrorCtrl
 
 Name = 'SDSS Primary'
 
@@ -21,8 +21,8 @@ GalilPort = 8000 # matches fakeGalil.py for testing
 #######################################
 
 # choose the actuator model (adjustable base or adjustable length)
-genLink = mirror.AdjBaseActuator # new style
-# genLink = mirror.AdjLengthLink # old style
+genLink = mirrorCtrl.AdjBaseActuator # new style
+# genLink = mirrorCtrl.AdjLengthLink # old style
 
 # Warnings:
 # - most of this info is from drawings and may be a bit off
@@ -103,12 +103,12 @@ for i in range(6):
     actLink = genLink(actBasePos, actMirPos, actMin, actMax, actScale, actOffset)
     actLinkList.append(actLink)
 
-Mirror = mirror.DirectMirror(actLinkList, fixLinkList, encLinkList, Name)
+Mirror = mirrorCtrl.DirectMirror(actLinkList, fixLinkList, encLinkList, Name)
 
 if __name__ == "__main__":
-    device = mirror.GalilDevice(
+    device = mirrorCtrl.GalilDevice(
         mirror = Mirror,
         host = GalilHost,
         port = GalilPort,
     )
-    mirror.runMirrorController(device = device, userPort = UserPort)
+    mirrorCtrl.runMirrorCtrl(device = device, userPort = UserPort)

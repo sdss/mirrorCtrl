@@ -24,7 +24,7 @@ Need to add encoder positions!
 """
 import math
 import numpy
-import mirror
+import mirrorCtrl
 
 Name = '3.5m Tertiary'
 
@@ -35,8 +35,8 @@ GalilPort = 8000 # matches fakeGalil.py for testing
 #######################################
 
 # choose the actuator model (adjustable base or adjustable length)
-genLink = mirror.AdjBaseActuator # new style
-# genLink = mirror.AdjLengthLink # old style
+genLink = mirrorCtrl.AdjBaseActuator # new style
+# genLink = mirrorCtrl.AdjLengthLink # old style
 
 # -------BEGIN copying from 3.5m M3 Actuator Positions 2008-04-18.py--------
 MMPerInch = 25.4
@@ -154,18 +154,18 @@ fixLinkList = []
 for i in range(3):
     fixBasePos = numpy.array([FixBaseX[i], FixBaseY[i], FixBaseZ[i]])
     fixMirPos = numpy.array([FixMirX[i], FixMirY[i], FixMirZ[i]])
-    fixLinkList.append(mirror.FixedLengthLink(fixBasePos, fixMirPos))
+    fixLinkList.append(mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos))
     
 encLinkList = None # need to eventually obtain encoder positions!
 
-Mirror = mirror.DirectMirror(actLinkList, fixLinkList, encLinkList, Name)
+Mirror = mirrorCtrl.DirectMirror(actLinkList, fixLinkList, encLinkList, Name)
 
 if __name__ == "__main__":
-    device = mirror.GalilDevice35M3(
+    device = mirrorCtrl.GalilDevice35M3(
         mirror = Mirror,
         host = GalilHost,
         port = GalilPort,
     )
-    mirror.runMirrorController(device = device, userPort = UserPort)
+    mirrorCtrl.runMirrorCtrl(device = device, userPort = UserPort)
 
 

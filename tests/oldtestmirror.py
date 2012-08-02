@@ -5,7 +5,7 @@ import math
 import time
 
 from data import genMirData
-import mirror
+import mirrorCtrl
 import RO.Astro.Tm
 
 MMPerMicron = 1 / 1000.0        # millimeters per micron
@@ -62,12 +62,12 @@ for orient in orientList:
 # tert35List[2]: 
 
 
-prim25 = [mirror.DirectMirror(*input) for input in genMirData.prim25List]
+prim25 = [mirrorCtrl.DirectMirror(*input) for input in genMirData.prim25List]
 secCtrMirZ = -135.70
 secCtrBaseZ = -178.40
-sec25 = [mirror.TipTransMirror(secCtrMirZ, secCtrBaseZ, *input) for input in genMirData.sec25List]
-sec35 = [mirror.DirectMirror(*input) for input in genMirData.sec35List]
-tert35 = [mirror.DirectMirror(*input) for input in genMirData.tert35List]
+sec25 = [mirrorCtrl.TipTransMirror(secCtrMirZ, secCtrBaseZ, *input) for input in genMirData.sec25List]
+sec35 = [mirrorCtrl.DirectMirror(*input) for input in genMirData.sec35List]
+tert35 = [mirrorCtrl.DirectMirror(*input) for input in genMirData.tert35List]
 # choose which mirrors you want to include in the tests
 mirList = prim25 + sec25 + sec35 + tert35
 print 'mirList len: ', len(mirList)

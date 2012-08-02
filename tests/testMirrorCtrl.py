@@ -6,22 +6,15 @@ import multiprocessing
 import time
 import telnetlib
 
-import mirror
+import mirrorCtrl
 from data import genMirrors
 import fakeGalil
     
 UserPort = 1025
 GalilHost = 'localhost'
-GalilPort = 8000
+GalilPort = 8001
 isOK = 0
 Iter = 0
-
-# 2.5m M2 because galil replies have 5 actuators
-mirr = genMirrors.Sec25().makeMirror() 
-# 3.5m M3 device because galil replies are specific to this mirror...
-# ./data/rawGalilReplies.txt have examples of all galil replies
-# these are spouted from fakeGalil.py
-Device = mirror.GalilDevice35M3
 
 def doCmdTest(reactor, cmdStrs):
     """Loop over cmds in cmdStrs, send to actor via telnet, listen for ":".
@@ -38,7 +31,7 @@ def doCmdTest(reactor, cmdStrs):
     time.sleep(2)
     Iter = 0
     for ind, cmd in enumerate(cmdStrs):
-        tnet.write(cmd) # send command to actor
+        tnet.write(cmd + "\r\n") # send command to actor
         # listen until ":" is received or timeout
         justIn = tnet.read_until(":", 15)
         justIn = justIn.split('\r\n')
@@ -51,11 +44,22 @@ def doCmdTest(reactor, cmdStrs):
     time.sleep(2)
     reactor.stop()
 
-def makeActor(dev, mirr):
-    """create a mirror controller actor
+def makeActor():
+    """Create a 3.5m secondary mirror controller actor
+    
+    Replies from the fakeGalil are appropriate for this mirror controller.
     """
-    device = Device(mirror = mirr, host = GalilHost, port = GalilPort)
-    actor = mirror.MirrorController(device = device, userPort=UserPort)
+# 
+# # 2.5m M2 because galil replies have 5 actuators
+# mirr = genMirrors.Sec25().makeMirror() 
+# # 3.5m M3 device because galil replies are specific to this mirror...
+# # ./data/rawGalilReplies.txt have examples of all galil replies
+# # these are spouted from fakeGalil.py
+# Device = mirror.GalilDevice35M3
+
+    mirror = genMirrors.Sec25().makeMirror()
+    device = mirrorCtrl.GalilDevice35M3(mirror=mirror, host=GalilHost, port=GalilPort)
+    actor = mirrorCtrl.MirrorCtrl(device=device, userPort=UserPort)
     return actor
 
 class ActorTests(unittest.TestCase):
@@ -66,7 +70,7 @@ class ActorTests(unittest.TestCase):
 #             RawGalilReplies = f.readlines()
 #         from twisted.internet import reactor
 #         time.sleep(4) # wait for prev test to shut down...
-#         actor = makeActor(Device, mirr)
+#         actor = makeActor()
 #         parser = actor.galilDev.parseLine
 #         for line in RawGalilReplies:
 #             out = parser(line)
@@ -86,18 +90,18 @@ class ActorTests(unittest.TestCase):
         global isOK
         isOK = 1
         # start up the fake galil
-        tGal = multiprocessing.Process(target=fakeGalil.main, args=())
+        tGal = multiprocessing.Process(target=fakeGalil.main, args=(GalilPort,))
         tGal.start()
         time.sleep(1)
         # set up actor
-        actor = makeActor(Device, mirr)
+        actor = makeActor()
         # list of commands you want to test
         cmdStrs = [
-            "move 4,4,4\r\n",
-            "home A,B,C\r\n",
-            "status\r\n",
-            "showparams\r\n",
-            "stop\r\n"
+            "move 4,4,4",
+            "home A,B,C",
+            "status",
+            "showparams",
+            "stop"
             ]
         # send commands from different thread
         # actor must run in main thread

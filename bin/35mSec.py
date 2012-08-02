@@ -7,7 +7,7 @@ To Do:
 2. get actual address info
 3. get mir/base positions for the anti-rotation link, it is currently being faked here.
 """
-import mirror
+import mirrorCtrl
 import numpy
 
 Name = '3.5m Secondary'
@@ -19,8 +19,8 @@ GalilPort = 8000 # matches fakeGalil.py for testing
 #######################################
 
 # choose the actuator model (adjustable base or adjustable length)
-genLink = mirror.AdjBaseActuator # new style
-# genLink = mirror.AdjLengthLink # old style
+genLink = mirrorCtrl.AdjBaseActuator # new style
+# genLink = mirrorCtrl.AdjLengthLink # old style
 
 # Actuators are: Axial A, B, C, Transverse D, E
 # Limits of motion (mount units) for each actuator
@@ -35,7 +35,7 @@ ActMountScale  = numpy.array([1259.843, 1259.843, 1259.843, 31.496, 31.496])
 # All numbers are for the 3.5m secondary mirror support system
 # X = right, Y = up, Z = from the sky towards the telescope
 # where up/down/left/right are as seen with the telescope at the horizon,
-# standing behind the primary mirror, looking towards the secondary mirror.
+# standing behind the primary mirror, looking towards the secondary mirrorCtrl.
 
 ActMirX  = numpy.array([      0., -230.529,  230.529,  29.186,   -29.186])
 ActMirY  = numpy.array([ 266.192, -133.096, -133.096,  29.186,    29.186])
@@ -63,17 +63,17 @@ mirRadius = 1000. #mm
 fixMirPos = numpy.array([0., mirRadius, -152.806])
 fixBasePos = numpy.array([linkLength, mirRadius, -152.806])
 fixLinkList = []
-fixLinkList.append(mirror.FixedLengthLink(fixBasePos, fixMirPos))
+fixLinkList.append(mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos))
 
 encLinkList = None # need to get these too.
 
-Mirror = mirror.DirectMirror(actLinkList, fixLinkList, encLinkList, Name)
+Mirror = mirrorCtrl.DirectMirror(actLinkList, fixLinkList, encLinkList, Name)
 
 if __name__ == "__main__":
-    device = mirror.GalilDevice(
+    device = mirrorCtrl.GalilDevice(
         mirror = Mirror,
         host = GalilHost,
         port = GalilPort,
     )
-    mirror.runMirrorController(device = device, userPort = UserPort)
+    mirrorCtrl.runMirrorCtrl(device = device, userPort = UserPort)
 

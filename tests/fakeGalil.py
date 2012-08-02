@@ -1,15 +1,18 @@
 #!/usr/bin/env python
+"""Fake 3.5m M3 Galil.
+
+It is primitive: it responds to each command with a canned set of replies
+and thus ignores command arguments (e.g. A=).
 """
-This communicates with the Galil Actor.  It pings semi-faked Galil replies back for testing.
-"""
-Port = 8000 # must match device port in Galil Actor.
+DefaultPort = 8000
 
 # Copyright (c) Twisted Matrix Laboratories.
 # See LICENSE for details.
 
+import re
+import sys
 from twisted.internet import reactor, protocol, defer
 from twisted.protocols.basic import LineReceiver
-import re
 from RO.Comm.TwistedTimer import Timer
 
 Debug = True
@@ -76,8 +79,7 @@ ReplyDict = dict(
         OK""",
 )
 
-class SpitBack(LineReceiver):
-    """Lines..."""
+class FakeGalilProtocol(LineReceiver):
     def __init__(self, *args, **kwargs):
         self.replyTimer = Timer()
         self.replyList = None
@@ -139,16 +141,19 @@ class SpitBack(LineReceiver):
         if self.replyList:
             self.replyTimer.start(0.25, self.writeBack)
 
-def main():
-    """Run a fake mirror controller Galil on port Port"""
-    print "Starting fake Galil on port %s" % (Port,)
+def main(port):
+    """Run a fake mirror controller Galil on the specified port"""
+    print "Starting fake Galil on port %s" % (port,)
     factory = protocol.ServerFactory()
-    factory.protocol = SpitBack
-    reactor.listenTCP(Port, factory) # Port defined up top
-    #reactor.connectTCP('localhost', Port, factory, timeout=1)
+    factory.protocol = FakeGalilProtocol
+    reactor.listenTCP(port, factory)
     reactor.run()
 
 
 # this only runs if the module was *not* imported
 if __name__ == '__main__':
-    main()
+    if len(sys.argv) > 1:
+        port = int(sys.argv[1])
+    else:
+        port = DefaultPort
+    main(port=port)

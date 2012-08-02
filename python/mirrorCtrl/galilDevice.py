@@ -136,7 +136,7 @@ class GalilDevice(TCPDevice):
         """Construct a GalilDevice
         
         Inputs:
-        - mirror    an instance of mirror.MirrorBase
+        - mirror    an instance of mirrorCtrl.MirrorBase
         - host      host address of Galil controller
         - port      port of Galil controller
         - callFunc  function to call when state of device changes;
@@ -700,7 +700,7 @@ class GalilDevice(TCPDevice):
 
         notes:
         The actuator mechanical/positional data needs to be defined in the
-        correct order for each mirror...no way to check if that was done once
+        correct order for each mirrorCtrl...no way to check if that was done once
         we're here.
         """
         if len(mountList) > self.nAct:

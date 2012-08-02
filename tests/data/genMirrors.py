@@ -8,7 +8,7 @@ import numpy
 import matplotlib.pyplot
 import mpl_toolkits.mplot3d
 
-import mirror
+import mirrorCtrl
     
 class ConstMirrorBase(object):
     """This object is used to construct APO mirrors to be used in unit testing
@@ -86,9 +86,9 @@ class ConstMirrorBase(object):
         actList[n]: list of n actuator objects.
         """    
         if actType == 'adjLen':
-            genLink = mirror.AdjLengthLink
+            genLink = mirrorCtrl.AdjLengthLink
         elif actType == 'adjBase':
-            genLink = mirror.AdjBaseActuator
+            genLink = mirrorCtrl.AdjBaseActuator
         else:
             # earlier checks should make getting here impossible, but....
             raise RuntimeError('actType must be either "adjLen" or "adjBase"')
@@ -163,9 +163,7 @@ class ConstMirrorBase(object):
         if basePos.shape[1] != 3 or mirPos.shape[1] != 3:
             raise RuntimeError('mir/base positions must have xyz coords along 2nd axis!')
         
-        fixedList = [ mirror.FixedLengthLink(base, mir) 
-                    for base, mir 
-                    in itertools.izip(basePos, mirPos) ]
+        fixedList = [mirrorCtrl.FixedLengthLink(base, mir) for base, mir in itertools.izip(basePos, mirPos)]
         return fixedList
         
         
@@ -174,7 +172,7 @@ class ConstDirectMirror(ConstMirrorBase):
         
     def makeMirror(self, name=None):
         """Returns a Direct mirror ready for use"""
-        return mirror.DirectMirror(self.actList, self.fixList, self.encList, name) #must specify mirror id....
+        return mirrorCtrl.DirectMirror(self.actList, self.fixList, self.encList, name) #must specify mirror id....
         
         
 class ConstTipTransMirror(ConstMirrorBase):
@@ -188,7 +186,7 @@ class ConstTipTransMirror(ConstMirrorBase):
     
         secCtrMirZ = -135.70
         secCtrBaseZ = -178.40
-        return mirror.TipTransMirror(secCtrMirZ, secCtrBaseZ, self.actList, 
+        return mirrorCtrl.TipTransMirror(secCtrMirZ, secCtrBaseZ, self.actList, 
                                      self.fixList, self.encList, name)
                                      
 

@@ -29,7 +29,7 @@ class MirrorBase(object):
         """Construct a MirrorBase
 
         Inputs:
-        - actuatorList: List of actuators that support the mirror.
+        - actuatorList: List of actuators that support the mirrorCtrl.
         - fixedLinkList: List of fixed-length links that support the mirror
         - encoderList:  Encoders associated with actuators. None if there are no encoders,
                         else a list of items: each an encoder or None if the associated
@@ -415,12 +415,12 @@ class MirrorBase(object):
         return rotMat, offsets
         
 class DirectMirror(MirrorBase):
-    """A mirror supported by 6 actuators or fixed links connected directly to the mirror.
+    """A mirror supported by 6 actuators or fixed links connected directly to the mirrorCtrl.
     """
     def __init__(self, actuatorList, fixedLinkList, encoderList = None, name=None):
         """
         Inputs:
-        - actuatorList: List of the 6 actuators actuators and fixed links that support the mirror.
+        - actuatorList: List of the 6 actuators actuators and fixed links that support the mirrorCtrl.
         - encoderList:  Encoders associated with actuators. None if there are no encoders,
                         else a list of 6 items: each an encoder or None if the associated
                         actuator has no encoder.
@@ -489,10 +489,10 @@ class TipTransMirror(MirrorBase):
     """Tip-Trans Mirror.
     
     A mirror that rides on a central linear bearing;
-    the bearing is tipped about a ball joint to translate the mirror.
-    Actuators 0, 1, 2 are axial actuators attached to the mirror.
+    the bearing is tipped about a ball joint to translate the mirrorCtrl.
+    Actuators 0, 1, 2 are axial actuators attached to the mirrorCtrl.
     Actuators 3, 4 are attached to the linear bearing to tip it.
-    Actuator 5 is an antirotation link attached to the mirror.
+    Actuator 5 is an antirotation link attached to the mirrorCtrl.
     """
     def __init__(self, ctrMirZ, ctrBaseZ, actuatorList, fixedLinkList, encoderList = None, name=None):
         MirrorBase.__init__(self, actuatorList, fixedLinkList, encoderList, name)
