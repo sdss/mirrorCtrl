@@ -6,7 +6,7 @@ import numpy
 import math
 
 from data import genMirData
-import mirror
+import mirrorCtrl
 
 MMPerMicron = 1 / 1000.0        # millimeters per micron
 RadPerDeg  = math.pi / 180.0    # radians per degree
@@ -71,7 +71,7 @@ print '-------------------- CASE 1--------------------------'
 links = genMirData.prim25List[4]
 # fyi for the version with the other actuator fixed: genMirData.prim25List[2]
 
-mir = mirror.DirectMirror(*links)
+mir = mirrorCtrl.DirectMirror(*links)
 
 # define a desired orientation
 orientIn = [0., 0., 0., 25., 0.]

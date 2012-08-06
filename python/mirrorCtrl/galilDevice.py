@@ -1,6 +1,6 @@
 """Galil Device.
 
-This talks to a Galil motor controller, which commands actuators to move the mirror and 
+This talks to a Galil motor controller, which commands actuators to move the mirror and
 reads from encoders to determine mirror position.
 
 There is lots of info at:
@@ -20,16 +20,15 @@ I am unsure about how the best way to handle a 'RS'...check out the reset comman
 """
 import time
 import itertools
-import collections
 import math
 import re
-import Tkinter
-
-from RO.StringUtil import quoteStr, strFromException
-from RO.SeqUtil import asSequence
 
 import numpy
-import TclActor
+from RO.StringUtil import quoteStr, strFromException
+from RO.SeqUtil import asSequence
+from twistedActor import TCPDevice, CommandError
+
+__all__ = ["GalilDevice", "GalilDevice25M2", "GalilDevice35M3"]
 
 MMPerMicron = 1 / 1000.0        # millimeters per micron
 RadPerDeg  = math.pi / 180.0    # radians per degree
@@ -58,14 +57,14 @@ class GalilTimer(object):
     """
     def __init__(self):
         self.reset()
-    
+
     def reset(self):
         self.initTime = numpy.nan
-    
+
     def startTimer(self):
         """start time"""
         self.initTime = time.time()
-        
+
     def getTime(self):
         """return time spent executing, so far
         """
@@ -73,10 +72,9 @@ class GalilTimer(object):
 
 class GalilStatus(object):
     """A container for holding the status of the Galil """
-    def __init__(self, device, actor):
+    def __init__(self, device):
         """Initialize all keywords in StatusKeys """
-        self.actor = actor
-        self.mirror = actor.mirror
+        self.mirror = device.mirror
         self.nAct = len(self.mirror.actuatorList)
 
         # all the Status keyword/value pairs we will cache, and their initial values
@@ -87,7 +85,7 @@ class GalilStatus(object):
         self.Duration = GalilTimer()
 #        self.remainExecTime = numpy.nan
         self.ActMount = [numpy.nan]*self.nAct # get rid of?
-        self.CmdMount = [numpy.nan]*self.nAct # updated upon iteration 
+        self.CmdMount = [numpy.nan]*self.nAct # updated upon iteration
         self.Orient = [numpy.nan]*6 # get rid of?
         self.DesOrient = [numpy.nan]*6
         self.DesOrientAge = GalilTimer()
@@ -99,11 +97,11 @@ class GalilStatus(object):
 
     def _getKeyValStr(self, keywords):
         """Package and return current keyword value info in status cache
-        
+
         input:
         - keywords: a list of keywords for which you wish to return a formatted string.
-                    
-        
+
+
         output:
         - statusStr: string in the correct keword value format to be sent to users
         """
@@ -131,35 +129,44 @@ class GalilStatus(object):
         return "; ".join(strList)
 
 
-class GalilDevice(TclActor.TCPDevice):
+class GalilDevice(TCPDevice):
     """The Galil Device Object
     """
-    def __init__(self, controllerAddr, controllerPort, callFunc = None, actor = None):
-        TclActor.TCPDevice.__init__(self,
+    def __init__(self, mirror, host, port, callFunc = None):
+        """Construct a GalilDevice
+        
+        Inputs:
+        - mirror    an instance of mirrorCtrl.MirrorBase
+        - host      host address of Galil controller
+        - port      port of Galil controller
+        - callFunc  function to call when state of device changes;
+                    note that it is NOT called when the connection state changes;
+                    register a callback with "conn" for that task.
+        """
+        self.mirror = mirror
+        TCPDevice.__init__(self,
             name = "galil",
-            addr = controllerAddr,
-            port = controllerPort,
+            host = host,
+            port = port,
             callFunc = callFunc,
-            actor = actor,
-            cmdInfo = (), 
+            cmdInfo = (),
         )
-        self.mirror = actor.mirror
         self.currDevCmd = self.cmdClass('null') # initialize empty command in cmd slot
         self.currDevCmd.setState("done") # set it to a done state so subsequent cmds can execute
         self.replyLog = []
-        self.parsedKeyList = None 
+        self.parsedKeyList = None
         self.nAct = len(self.mirror.actuatorList)
         self.validAxisList =  ('A', 'B', 'C', 'D', 'E', 'F')[0:self.nAct]
-        self.status = GalilStatus(self, actor)
+        self.status = GalilStatus(self)
         self.expectedReplies = set([
-            'max sec for move', 
+            'max sec for move',
             'target position',
             'final position',
             'axis homed',
             'commanded position',
-            'actual position', 
+            'actual position',
             'status word',
-            'max sec to find reverse limit switch', # homing 
+            'max sec to find reverse limit switch', # homing
             'reverse limit switch not depressed for axes:', # data follows this one
             'trying again',
             'max sec to find home switch',
@@ -188,14 +195,14 @@ class GalilDevice(TclActor.TCPDevice):
             'INDSEP index encoder pulse separation',
             'ENCRESx encoder resolution (microsteps/tick)',
             ])
-            
+
     def formatAsKeyValStr(self, keyword, value):
-        """Format a keyword/value pair string. 
-        
+        """Format a keyword/value pair string.
+
         Inputs:
         -keyword: a keyword (string)
         -value: the associated value for the keyword, should always be a list
-        
+
         Output:
         -outStr: a string in the correct format to be sent to the user
         """
@@ -205,13 +212,13 @@ class GalilDevice(TclActor.TCPDevice):
 
     def parseLine(self, line):
         """Tries to parse a reply from the Galil and seperate into descriptor-value format.
-        I consider any descriptive text following the data a descriptor, there can be multiple 
+        I consider any descriptive text following the data a descriptor, there can be multiple
         descriptor and values on a single line.
-        
+
         output:
         - dataMatched: string array containing data
         - keys: string array, text describing any data
-        
+
         example lines:
             0000.2,  0362.7,  0000.2,  0000.0,  0000.0 max sec to find reverse limit switch
              0300.1,  0300.1,  0300.1,  0000.0,  0000.0 max sec to find home switch
@@ -219,8 +226,9 @@ class GalilDevice(TclActor.TCPDevice):
             Finding next full step
              041,  006.6 microsteps, sec to find full step
             -000006732,  000014944,  000003741,  999999999,  999999999 position error
-             1,  1,  1,  0,  0 axis homed       
-        """ 
+             1,  1,  1,  0,  0 axis homed
+        """
+        #print "parseLine(line=%r)" % (line,)
         # Grab the data in each line:
         # Match only numbers (including decimal pt and negative sign) that are not preceeded by '/'
         # or immediately surrounded by any letters letters.
@@ -230,14 +238,14 @@ class GalilDevice(TclActor.TCPDevice):
         # Grab descriptor info on each line, which follows data.
         # split on whitespace n times, last split will be descriptor info
         textOnly = re.split(r' +', line, maxsplit = numVals)[-1]
-        # if there are multiple descriptors on a line, they will be separated by a ',' 
+        # if there are multiple descriptors on a line, they will be separated by a ','
         # or whitespace following a '?'
         # ....so split the text further
         keys = re.split(r',|(?<=\?) ', textOnly)
         # remove leading and trailing whitespace in each descriptor
         keys = [key.strip() for key in keys]
-        # on each incoming data line we expect either 
-        # (1) 1 descriptor and 1 value for each actuator 
+        # on each incoming data line we expect either
+        # (1) 1 descriptor and 1 value for each actuator
         # or
         # (2) n descriptors and n values
         goodMatch = [
@@ -247,24 +255,24 @@ class GalilDevice(TclActor.TCPDevice):
         if not (True in goodMatch):
             # There is confusion in the amount of descriptors and values in this particular line.
             # report it but keep going
-            self.actor.writeToUsers("w", "BadGalilReply=%s, \"num descriptors do not match num values.\"" % (quoteStr(line),), cmd=self.status.Cmd)
+            self.writeToUsers("w", "BadGalilReply=%s, \"num descriptors do not match num values.\"" % (quoteStr(line),), cmd=self.status.Cmd)
             return
         # check to see if descriptor/s are an expected reply
         knownReply = [(key in self.expectedReplies) for key in keys]
         if False in knownReply:
             # a descriptor wasn't recognized as an expected reply for this Galil/mirror
             # report it but keep going
-            self.actor.writeToUsers("w","BadGalilReply=%s, \"Descriptor text not recognized.\"" % (quoteStr(line),), cmd=self.status.Cmd)
+            self.writeToUsers("w","BadGalilReply=%s, \"Descriptor text not recognized.\"" % (quoteStr(line),), cmd=self.status.Cmd)
             return
         return dataMatched, keys
-        
+
     def sendGalilParam(self, key, data):
         """Key is determined to be a Galil parameter, send the key and data to the user.
         Keyword for Galil Paramaters are 'GPar<par>' where par is the name from the
         Galil itself.
-        
+
         key example: -RNGx/2 reverse limits
-       
+
         """
         param = key.split()[0] # in example: just keep -RNGx/2
         # format as a legal keyword swap out '-' and '/' if present
@@ -272,11 +280,11 @@ class GalilDevice(TclActor.TCPDevice):
         param = param.replace('/', 'div')
         keyword = 'GPar%s' % (param)
         outStr = self.formatAsKeyValStr(keyword, data)
-        self.actor.writeToUsers("i", outStr, cmd = self.status.Cmd)        
+        self.writeToUsers("i", outStr, cmd = self.status.Cmd)
 
     def actOnKey(self, key, data):
         """Takes a key parsed from self.parseLine, and chooses what to do with the data
-        
+
         inputs:
         -key: parsed descriptive string from self.parseLine (a list)
         -data: parsed data from self.parseLine (a list)
@@ -286,13 +294,13 @@ class GalilDevice(TclActor.TCPDevice):
             # this is a Galil parameter, format it and send it to the user
             self.sendGalilParam(key, data)
             return
-            
+
         elif 'software version' in key:
             # this is a special parameter case, and can't be treated using sendParam
             msgStr = 'GPar%s=%s' % (('SoftwareVersion', data[0])) #data is a single element list
-            self.actor.writeToUsers("i", msgStr, cmd = self.status.Cmd)
+            self.writeToUsers("i", msgStr, cmd = self.status.Cmd)
             return
-                   
+
         elif timeEstRegEx.match(key):
             # contains information about estimated execution time
             # update status and notify users
@@ -302,21 +310,21 @@ class GalilDevice(TclActor.TCPDevice):
             updateStr = self.status._getKeyValStr(["Cmd", "MaxDuration"])
             # append text describing time for what
             updateStr += '; Text=%s' % (quoteStr(key),)
-            self.actor.writeToUsers("i", updateStr, cmd=self.status.Cmd)
+            self.writeToUsers("i", updateStr, cmd=self.status.Cmd)
             # update cmd timeouts here!
             # add 10% more time than estimated for the device cmd
             self.currDevCmd.timeLimit += 1.1 * maxTime
             # add 15% more time than estimated for the user cmd
             self.status.Cmd.timeLimit += 1.15 * maxTime
             return
-        
+
         elif ('commanded position' == key) or ('target position' == key):
             self.status.CmdMount = [int(x) for x in data]
             updateStr = self.status._getKeyValStr(["CmdMount"])
-            self.actor.writeToUsers("i", updateStr, cmd=self.status.Cmd)
+            self.writeToUsers("i", updateStr, cmd=self.status.Cmd)
             return
 
-        elif ('actual position' == key) or ('final position' == key):        
+        elif ('actual position' == key) or ('final position' == key):
             # measured position (adjusted)
             # account for encoder --> actuator spatial difference
             encMount = numpy.asarray(data, dtype=float)
@@ -329,38 +337,38 @@ class GalilDevice(TclActor.TCPDevice):
             actMount = self.mirror.actuatorMountFromOrient(orient)
             actMount = numpy.asarray(actMount, dtype=float)
             # add these new values to status
-            self.status.Orient = numpy.asarray(orient[:], dtype=float) 
+            self.status.Orient = numpy.asarray(orient[:], dtype=float)
             self.status.ActMount = actMount
             updateStr = self.status._getKeyValStr(["Orient", "ActMount"])
-            self.actor.writeToUsers("i", updateStr, cmd=self.status.Cmd)
+            self.writeToUsers("i", updateStr, cmd=self.status.Cmd)
             return
-        
+
         elif key == 'axis homed':
             data = [int(num) for num in data]
             self.status.AxisHomed = data
             updateStr = self.status._getKeyValStr(["AxisHomed"])
-            self.actor.writeToUsers("i", updateStr, cmd=self.status.Cmd)
+            self.writeToUsers("i", updateStr, cmd=self.status.Cmd)
             return
-        
+
         elif key == 'status word':
             data = [int(num) for num in data]
             self.status.Status = data
             updateStr = self.status._getKeyValStr(["Status"])
-            self.actor.writeToUsers("i", updateStr, cmd=self.status.Cmd)
+            self.writeToUsers("i", updateStr, cmd=self.status.Cmd)
             return
-                
+
         else:
             # send the remaining info back to the user
             msgStr = "UnparsedReply=%s, %s" % (quoteStr(key), quoteStr(str(data)))
-            self.actor.writeToUsers("i", msgStr, cmd=self.status.Cmd)
+            self.writeToUsers("i", msgStr, cmd=self.status.Cmd)
             return
-                                
+
     def handleReply(self, replyStr):
         """Handle a line of output from the device. Called whenever the device outputs a new line of data.
-        
+
         Inputs:
         - replyStr  the reply, minus any terminating \n
-        
+
         Tasks include:
         - Parse the reply
         - Manage the pending commands
@@ -368,21 +376,22 @@ class GalilDevice(TclActor.TCPDevice):
         - Parse status to update the model parameters
         - If a command has finished, call the appropriate command callback
         """
-        
-        if self.currDevCmd.isDone():
+        #print "handleReply(replyStr=%r)" % (replyStr,)
+        if self.currDevCmd.isDone:
             # ignore unsolicited input
             return
-        replyStr = replyStr.encode("ASCII", "ignore").strip(' :;\r\n')
+        replyStr = replyStr.replace(":", "")
+        replyStr = replyStr.encode("ASCII", "ignore").strip(' ;\r\n')
         if not replyStr:
             # ignore blank replies
             return
-        self.replyLog.append(replyStr)  # add reply to log       
+        self.replyLog.append(replyStr)  # add reply to log
         if MatchQMBeg.match(replyStr): # if line begins with '?'
             # there was an error. End current process
-            self.actor.writeToUsers("f", "Text=\"Galil Error: %s\"" % (replyStr,), cmd = self.currDevCmd)
+            self.writeToUsers("f", "Text=\"Galil Error: %s\"" % (replyStr,), cmd = self.currDevCmd)
             self.currDevCmd.setState("failed", textMsg=replyStr)
             self.status.Cmd.setState("failed", textMsg=replyStr)
-            self._clrDevCmd()        
+            self._clrDevCmd()
             return
         if okLineRegEx.match(replyStr):
             # command finished
@@ -391,11 +400,11 @@ class GalilDevice(TclActor.TCPDevice):
         cmdEchoRegEx = re.compile(r'xq #[a-z]+$', re.IGNORECASE)
         if cmdEchoRegEx.search(replyStr):
             # this is just the command echo, ignore it
-            return         
+            return
         if not startsWithNumRegEx.match(replyStr):
             # line doesn't begin with a data value, eg 'Finding next full step'
             # show it to the user and return
-            self.actor.writeToUsers("i", "UnparsedReply=\"%s\"" % (replyStr,), cmd = self.status.Cmd)
+            self.writeToUsers("i", "UnparsedReply=\"%s\"" % (replyStr,), cmd = self.status.Cmd)
             return
         # if we made it this far, separate the data from the descriptive text
         parsedLine = self.parseLine(replyStr)
@@ -405,7 +414,7 @@ class GalilDevice(TclActor.TCPDevice):
         else:
             data = parsedLine[0]
             description = parsedLine[1]
-            
+
         if len(description) == 1:
             key = description[0]
             self.actOnKey(key, data)
@@ -417,15 +426,14 @@ class GalilDevice(TclActor.TCPDevice):
                     self.actOnKey(key, dat)
                     self.parsedKeyList.append(key)
 
-            
-    def newCmd(self, cmdStr, callFunc=None, userCmd=None):
+    def newCmd(self, cmdStr, callFunc=None):
         """Start a new device command.
-        
+
         Slightly changed from base class definition.
         """
-        # 
+        #
         cmd = self.cmdClass(cmdStr, callFunc=callFunc)
-        if not self.currDevCmd.isDone():
+        if not self.currDevCmd.isDone:
             # this should never happen, but...
             raise RuntimeError("Cannot start new command, there is a cmd currently running")
         self.parsedKeyList=[]
@@ -437,23 +445,23 @@ class GalilDevice(TclActor.TCPDevice):
         except Exception, e:
             cmd.setState("failed", textMsg=strFromException(e))
             self._clrDevCmd()
-    
+
     def cmdLog(self, userCmd):
         """Prints out all (raw) replies received from Galil since startup.
         """
         for line in self.replyLog:
             msgStr = 'Text=%s' % (quoteStr(line),)
-            self.actor.writeToUsers("i", msgStr, cmd=userCmd)
+            self.writeToUsers("i", msgStr, cmd=userCmd)
         userCmd.setState("done")
-    
+
     def cmdMove(self, orient, userCmd):
         """Accepts an orientation then commands the move.
-        
+
         Subsequent moves are commanded until an acceptable orientation is reached (within errors).
-        Cmd not tied to state of devCmd, because of subsequent moves. 
+        Cmd not tied to state of devCmd, because of subsequent moves.
         """
         # if Galil is busy, abort the command
-        if not self.currDevCmd.isDone():
+        if not self.currDevCmd.isDone:
             userCmd.setState("cancelled", textMsg="Galil is busy")
             return
         userCmd.setState("running")
@@ -461,7 +469,7 @@ class GalilDevice(TclActor.TCPDevice):
         self.status.Cmd = userCmd
         # enable iteration for mirrors with encoders
         if self.mirror.hasEncoders:
-            self.status.Iter = 1 
+            self.status.Iter = 1
         # (user) commanded orient --> mount
         mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient=True)
         self.status.CmdMount = numpy.asarray(mount, dtype=float) # this will change upon iteration
@@ -470,45 +478,44 @@ class GalilDevice(TclActor.TCPDevice):
         cmdMoveStr = self._galCmdFromMount(mount)
         self.status.DesOrientAge.startTimer()
         updateStr = self.status._getKeyValStr(["DesOrient", "DesOrientAge", "CmdMount", "MaxIter"])
-        self.actor.writeToUsers(">", updateStr, cmd=userCmd)
+        self.writeToUsers(">", updateStr, cmd=userCmd)
         self.newCmd(cmdMoveStr, callFunc=self._moveCallback)
-    
+
     def cmdStop(self, userCmd):
         """Sends an 'ST' to the Galil, causing it to stop whatever it is doing,
         waits 1 sec for motors to decelerate, then queries for status.
         """
-        if not self.currDevCmd.isDone():
+        if not self.currDevCmd.isDone:
             self.currDevCmd.setState("cancelled", textMsg="stop interrupt")
-        if not self.status.Cmd.isDone():
+        if not self.status.Cmd.isDone:
             self.status.Cmd.setState("cancelled", textMsg="stop interrupt")
-        self._clrDevCmd() # stop listening for replies        
+        self._clrDevCmd() # stop listening for replies
         userCmd.setState("running")
-        self.conn.writeLine('ST;')
-        # instead? self.con.writeLine('XQ# STOP';')
+        self.conn.writeLine('ST')
         time.sleep(1) # wait 1 second for deceleration
         self.cmdStatus(userCmd)
-        
+
     def cmdReset(self, userCmd):
         """Sends an 'RS' to the Galil, followed by a cmdStop to put Galil in known state.
         """
-        if not self.currDevCmd.isDone():
+        if not self.currDevCmd.isDone:
             self.currDevCmd.setState("cancelled", textMsg="stop interrupt")
-        if not self.status.Cmd.isDone():
+        if not self.status.Cmd.isDone:
             self.status.Cmd.setState("cancelled", textMsg="stop interrupt")
-        self._clrDevCmd() # stop listening for replies        
+        self._clrDevCmd() # stop listening for replies
         userCmd.setState("running")
-        self.conn.writeLine('RS;')
+        self.conn.writeLine('RS')
         time.sleep(3) # wait 3 seconds for reset
-        self.cmdStop(userCmd) # put Galil in known state         
-                
+        self.cmdStop(userCmd) # put Galil in known state
+
     def cmdStatus(self, userCmd):
         """Return the Galil status to the user.
-        
-        Called directly from the user, or indirectly through a cmdStop. Cmd 
+
+        Called directly from the user, or indirectly through a cmdStop. Cmd
         (cmd_stop or cmd_status) state tied to devCmd state.
         """
-        if not self.currDevCmd.isDone():
-            self.actor.writeToUsers("w", "Text=\"Galil is busy, showing cached status\"", cmd = self.currDevCmd)            
+        if not self.currDevCmd.isDone:
+            self.writeToUsers("w", "Text=\"Galil is busy, showing cached status\"", cmd = self.currDevCmd)
             statusStr = self.status._getKeyValStr([
             "Cmd",
             "MaxDuration",
@@ -523,32 +530,33 @@ class GalilDevice(TclActor.TCPDevice):
             "Homing",
             "AxisHomed",
             ])
-            self.actor.writeToUsers("i", statusStr, cmd=userCmd)
+            self.writeToUsers("i", statusStr, cmd=userCmd)
             userCmd.setState("done")
             return
+
         userCmd.setState("running")
         userCmd.timeLimit = 5
-        self.status.Cmd = userCmd 
-        self.newCmd("XQ #STATUS;", callFunc = self._statusCallback)
-                        
+        self.status.Cmd = userCmd
+        self.newCmd("XQ #STATUS", callFunc = self._statusCallback)
+
     def cmdParams(self, userCmd):
         """Show Galil parameters
         """
-        if not self.currDevCmd.isDone():
+        if not self.currDevCmd.isDone:
             userCmd.setState("cancelled", textMsg="Galil is busy")
-            return    
+            return
         userCmd.setState("running")
         userCmd.timeLimit = 5
-        self.status.Cmd = userCmd  
-        self.newCmd("XQ #SHOWPAR;", callFunc = self._userCmdCallback)
-        
+        self.status.Cmd = userCmd
+        self.newCmd("XQ #SHOWPAR", callFunc = self._userCmdCallback)
+
     def cmdHome(self, axisList, userCmd):
         """Home the specified actuators
-        
+
         Inputs:
         - axisList: a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
         """
-        if not self.currDevCmd.isDone():
+        if not self.currDevCmd.isDone:
             userCmd.setState("cancelled", textMsg="Galil is busy")
             return
         userCmd.setState("running")
@@ -556,30 +564,30 @@ class GalilDevice(TclActor.TCPDevice):
         self.status.Cmd = userCmd
         if not axisList:
             axisList = self.validAxisList
-        self.actor.writeToUsers(">", "Text = Homing Actuators: %s" % (", ".join(str(v) for v in axisList)), cmd = userCmd)
+        self.writeToUsers(">", "Text = Homing Actuators: %s" % (", ".join(str(v) for v in axisList)), cmd = userCmd)
         homeStatus = numpy.zeros(self.nAct)
         for axis in axisList:
             ind = self.validAxisList.index(axis) # which one is homing?
             homeStatus[ind] = 1  # set it to 1
         self.status.Homing = homeStatus
         updateStr = self.status._getKeyValStr(["Homing"])
-        self.actor.writeToUsers("i", updateStr, cmd=userCmd)
+        self.writeToUsers("i", updateStr, cmd=userCmd)
         # format Galil command
         axisList, cmdMoveStr = self._galCmdForHome(axisList)
         self.newCmd(cmdMoveStr, callFunc=self._userCmdCallback)
-        
+
     def _actOnMove(self):
-        """Called after a move command.  This method tests if all went well with the move, 
+        """Called after a move command.  This method tests if all went well with the move,
         and commands another if wanted.
-        
+
         Outputs:
         returns True if move command is finished and no more moves are necessary
         """
         # check if we got all expected information from Galil...
         if not ('max sec for move' in self.parsedKeyList):
-            self.actor.writeToUsers("w", "Text=\"Move time estimates were not received from move\"", cmd=self.status.Cmd)
+            self.writeToUsers("w", "Text=\"Move time estimates were not received from move\"", cmd=self.status.Cmd)
         if not('target position' in self.parsedKeyList):
-            self.actor.writeToUsers("w", "Text=\"Target actuator positions not received from move\"", cmd=self.status.Cmd)
+            self.writeToUsers("w", "Text=\"Target actuator positions not received from move\"", cmd=self.status.Cmd)
         if not('final position' in self.parsedKeyList):
             # final actuator positions are needed for subsequent moves...better fail the cmd
             self._clrDevCmd()
@@ -599,7 +607,7 @@ class GalilDevice(TclActor.TCPDevice):
                 self.status.Iter += 1
                 self.status.Duration.reset() # new timer for new move
                 statusStr = self.status._getKeyValStr(["Cmd", "CmdMount", "Iter"])
-                self.actor.writeToUsers("i", statusStr, cmd=self.status.Cmd)
+                self.writeToUsers("i", statusStr, cmd=self.status.Cmd)
                 cmdMoveStr = self._galCmdFromMount(self.status.CmdMount)
                 self.newCmd(cmdMoveStr, callFunc=self._moveCallback)
                 return False
@@ -609,11 +617,11 @@ class GalilDevice(TclActor.TCPDevice):
     def _moveCallback(self, cmd):
         """This code is executed when a device move command changes state. Most of the work
         is in the _actOnMove() method...
-        
-        Inputs: 
-        - cmd: passed automatically due to TclActor callback framework
+
+        Inputs:
+        - cmd: passed automatically due to twistedActor callback framework
         """
-        
+
         if not cmd.state == "done":
             return
         done = self._actOnMove()
@@ -625,27 +633,27 @@ class GalilDevice(TclActor.TCPDevice):
 
     def _statusCallback(self, cmd):
         """Callback for status command.
-        
+
         Inputs:
         -cmd: passed automatically due to TclActor callback framework
         """
         if not cmd.state == "done":
-            return           
+            return
         # check if we got all expected information from Galil...
         if not ('commanded position' in self.parsedKeyList):
-            self.actor.writeToUsers("w", "Text=\"Desired actuator positions not received, sending cached value\"", cmd=self.status.Cmd)
+            self.writeToUsers("w", "Text=\"Desired actuator positions not received, sending cached value\"", cmd=self.status.Cmd)
             statusStr = self.status._getKeyValStr(["CmdMount"])
-            self.actor.writeToUsers("i", statusStr, cmd = self.status.Cmd)
+            self.writeToUsers("i", statusStr, cmd = self.status.Cmd)
         if not ('actual position' in self.parsedKeyList):
-            self.actor.writeToUsers("w", "Text=\"Actual actuator positions not received, sending cached value\"", cmd=self.status.Cmd)
+            self.writeToUsers("w", "Text=\"Actual actuator positions not received, sending cached value\"", cmd=self.status.Cmd)
             statusStr = self.status._getKeyValStr(["ActMount"])
-            self.actor.writeToUsers("i", statusStr, cmd = self.status.Cmd)
+            self.writeToUsers("i", statusStr, cmd = self.status.Cmd)
         if not ('status word' in self.parsedKeyList):
             # don't send cached value?
-            self.actor.writeToUsers("w", "Text=\"status word not received\"", cmd=self.status.Cmd)
+            self.writeToUsers("w", "Text=\"status word not received\"", cmd=self.status.Cmd)
         if not ('axis homed' in self.parsedKeyList):
             # don't send cached value?
-            self.actor.writeToUsers("w", "Text=\"homed axis info not received\"", cmd=self.status.Cmd)
+            self.writeToUsers("w", "Text=\"homed axis info not received\"", cmd=self.status.Cmd)
         # grab cached info that wasn't already sent to the user
         getThese = [
             "Cmd",
@@ -658,28 +666,28 @@ class GalilDevice(TclActor.TCPDevice):
             "Homing",
             ]
         statusStr = self.status._getKeyValStr(getThese)
-        self.actor.writeToUsers("i", statusStr, cmd = self.status.Cmd)
+        self.writeToUsers("i", statusStr, cmd = self.status.Cmd)
         self._clrDevCmd()
         self.status.Cmd.setState("done")
 
     def _userCmdCallback(self, cmd):
         """Generic callback that sets the user cmd done
-        
+
         Inputs:
-        -cmd: passed automatically due to TclActor callback framework
+        -cmd: passed automatically due to twistedActor callback framework
         """
         if not cmd.state == "done":
-            return           
+            return
         # parse info needed
-        self._clrDevCmd() 
+        self._clrDevCmd()
         self.status.Cmd.setState("done")
-                 
+
     def _clrDevCmd(self):
         """Clean up device command when finished.
         """
         self.parsedKeyList = None
         self.status.Iter = numpy.nan
-        if not self.currDevCmd.isDone():
+        if not self.currDevCmd.isDone:
             # failsafe, cmd should always be done at this point.
             self.currDevCmd.setState("failed")
         self.status.Homing = [0]*self.nAct
@@ -688,10 +696,10 @@ class GalilDevice(TclActor.TCPDevice):
 
     def _galCmdFromMount(self, mountList):
         """Converts mount information into a string command for a Galil
-        
-        notes: 
+
+        notes:
         The actuator mechanical/positional data needs to be defined in the
-        correct order for each mirror...no way to check if that was done once
+        correct order for each mirrorCtrl...no way to check if that was done once
         we're here.
         """
         if len(mountList) > self.nAct:
@@ -704,49 +712,59 @@ class GalilDevice(TclActor.TCPDevice):
             # axes to leave alone (paranoia)
             argList.append("%s=MAXINT;" % (self.validAxisList[ind],))
         return " ".join(argList) + 'XQ #MOVE'
-        
+
     def _galCmdForHome(self, axisList):
         """Format Galil home command from a list of axes
-        
+
         Input:
         - axisList: a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
-        
+
         Return:
         - final axis list (full set if [] supplied; forced to uppercase)
         - command string
-        
-        Raise TclActor.Command.CommandError if invalid axes are specified
+
+        Raise twistedActor.Command.CommandError if invalid axes are specified
         """
         axisList = [axis.upper() for axis in axisList]
 
         axisSet = set()
         validAxisSet = set(self.validAxisList)
-        
+
         invalidAxisSet = axisSet - validAxisSet
         if invalidAxisSet:
             invalidAxisList = sorted(list(invalidAxisSet))
-            raise TclActor.Command.CommandError(
+            raise CommandError(
                 "Invalid axes %s; must be in: %s" % (invalidAxisList, self.validAxisList))
 
         argList = []
         for axis in self.validAxisList:
             if axis in axisSet:
-                argList.append("%s=1" % (axis,))
+                argList.append("%s=1;" % (axis,))
             else:
-                argList.append("%s=MAXINT" % (axis,))
-        return axisList, " ".join(argList) + 'XQ #HOME'
+                argList.append("%s=MAXINT;" % (axis,))
+        return axisList, " ".join(argList) + "XQ #HOME"
 
 
 class GalilDevice35M3(GalilDevice):
     """A Galil Device controller that is specific to the 3.5m Tertiary mirror
     """
-    def __init__(self, controllerAddr, controllerPort, callFunc = None, actor = None):
-        GalilDevice.__init__(self, controllerAddr, controllerPort, callFunc = callFunc, actor = actor)
+    def __init__(self,
+        mirror,
+        host,
+        port,
+        callFunc = None,
+    ):
+        GalilDevice.__init__(self,
+            mirror = mirror,
+            host = host,
+            port = port,
+            callFunc = callFunc,
+        )
         self.expectedReplies |= set([
             'version of M3-specific additions',
             'off-on-error?',
             'error limit for tertiary rotation',
-            'time to close rotation clamp', 
+            'time to close rotation clamp',
             'open clamp',
             'turn on at-slot sensor (sec)',
             'max time',
@@ -755,30 +773,40 @@ class GalilDevice35M3(GalilDevice):
             'time for primary mirror eyelid motion (sec)',
             'sec to finish move'
             ])
-        
+
 
 class GalilDevice25M2(GalilDevice):
     """A Galil Device controller that is specific to the 2.5m Secondary mirror
-    
+
     note: add in piezo corrections for move, LCSTOP should be set to 1 to disable
     piezo corrections inside the Galil
     """
-    def __init__(self, controllerAddr, controllerPort, callFunc = None, actor = None):
-        GalilDevice.__init__(self, controllerAddr, controllerPort, callFunc = callFunc, actor = actor)
+    def __init__(self,
+        mirror,
+        host,
+        port,
+        callFunc = None,
+    ):
+        GalilDevice.__init__(self,
+            mirror = mirror,
+            host = host,
+            port = port,
+            callFunc = callFunc,
+        )
         self.expectedReplies |= set([
-            'piezo status word', 
+            'piezo status word',
             'piezo corrections (microsteps)',
             'version of M2-specific additions',
             'min, max piezo position (microsteps)',
             'number of steps of piezo position',
             'resolution (microsteps/piezo ctrl bit)'
             ])
- 
+
 # uncomment method below if piezoStatusWord should be it's own keyword.
 #     def actOnKey(self, key, data):
 #         """An overwritten version from the base class to incorporate 2.5m Specific Keywords.
 #         Takes a key parsed from self.parseLine, and chooses what to do with the data
-#         
+#
 #         inputs:
 #         -key: parsed descriptive string from self.parseLine
 #         -data: parsed data from self.parseLine, may be a numpy array
@@ -787,15 +815,15 @@ class GalilDevice25M2(GalilDevice):
 #         if 'piezo status word' in key:
 #             data = [int(num) for num in data]
 #             outStr = self.formatAsKeyValStr("piezoStatusWord", data)
-#             self.actor.writeToUsers("i", outStr, cmd=self.status.Cmd)
+#             self.writeToUsers("i", outStr, cmd=self.status.Cmd)
 #             return
 #         # then run as normal
 #         else:
 #             GalilDevice.actOnKey(key, data)
-            
+
     def cmdMovePiezos(self):
-        """A command for moving piezos that are set in series with actuators A, B, and C.  
-        
+        """A command for moving piezos that are set in series with actuators A, B, and C.
+
         Inputs:
         piezoMount: 3 item list containing the ammount of required adjustment (microsteps) for A, B, C.
         """
@@ -804,15 +832,15 @@ class GalilDevice25M2(GalilDevice):
         # only first 3 actuators have piezos
         cmdStr = self._galPiezoCmdFromMount(self.status.CmdMount[0:3])
         self.newCmd(cmdStr, callFunc=self._piezoMoveCallback)
-        
+
     def _moveCallback(self, cmd):
         """Overwritten from base class, to allow for a piezo move command after all the
         coarse moves have been finished.
-        
-        Inputs: 
-        - cmd: passed automatically due to TclActor callback framework
+
+        Inputs:
+        - cmd: passed automatically due to twistedActor callback framework
         """
-        
+
         if not cmd.state == "done":
             return
         done = self._actOnMove()
@@ -827,24 +855,24 @@ class GalilDevice25M2(GalilDevice):
         """Called when the piezos are finished moving
         """
         if not('commanded position' in self.parsedKeyList):
-            self.actor.writeToUsers("w", "Text=\"Commanded actuator positions not received from piezo move\"", cmd=self.status.Cmd)
-        if not('actual position' in self.parsedKeyList):        
-            self.actor.writeToUsers("w", "Text=\"Actual actuator positions not received from piezo move\"", cmd=self.status.Cmd)
-        if not('status word' in self.parsedKeyList):        
-            self.actor.writeToUsers("w", "Text=\"Status word not received from piezo move\"", cmd=self.status.Cmd)
-        if not('piezo status word' in self.parsedKeyList):        
-            self.actor.writeToUsers("w", "Text=\"Piezo status word not received from piezo move\"", cmd=self.status.Cmd)
-        if not('piezo corrections (microsteps)' in self.parsedKeyList):        
-            self.actor.writeToUsers("w", "Text=\"Piezo corrections not received from piezo move\"", cmd=self.status.Cmd)
+            self.writeToUsers("w", "Text=\"Commanded actuator positions not received from piezo move\"", cmd=self.status.Cmd)
+        if not('actual position' in self.parsedKeyList):
+            self.writeToUsers("w", "Text=\"Actual actuator positions not received from piezo move\"", cmd=self.status.Cmd)
+        if not('status word' in self.parsedKeyList):
+            self.writeToUsers("w", "Text=\"Status word not received from piezo move\"", cmd=self.status.Cmd)
+        if not('piezo status word' in self.parsedKeyList):
+            self.writeToUsers("w", "Text=\"Piezo status word not received from piezo move\"", cmd=self.status.Cmd)
+        if not('piezo corrections (microsteps)' in self.parsedKeyList):
+            self.writeToUsers("w", "Text=\"Piezo corrections not received from piezo move\"", cmd=self.status.Cmd)
         self._clrDevCmd()
         self.status.Cmd.setState("done")
-            
+
     def _galPiezoCmdFromMount(self, mountOffset):
         """Converts mount information into a string command for a Galil.  Only actuators
         A, B, and C have piezos, so no translational fine-tuning is available here.
-        
+
         Inputs:
-        mountList: a list of 3 mount values (microsteps) for each piezo to move. 
+        mountList: a list of 3 mount values (microsteps) for each piezo to move.
         """
         if len(mountList) != 3:
             raise RuntimeError("Must provide 3 peizo values")
@@ -852,4 +880,4 @@ class GalilDevice25M2(GalilDevice):
         for ind, mount in enumerate(mountList):
             # axes to move
             argList.append("LDESPOS%s=%.0f;" % (self.validAxisList[ind], mount))
-        return " ".join(argList) + 'XQ #LMOVE'            
+        return " ".join(argList) + "XQ #LMOVE"

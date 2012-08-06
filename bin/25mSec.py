@@ -11,21 +11,20 @@ To Do:
     the docs directory.
 
 """
-import mirror
 import numpy
+import mirrorCtrl
 
-UserPort = ''
-ControllerAddr = ''
-ControllerPort = ''
+Name = 'SDSS Secondary'
+
+UserPort = 2532   
 ########### For testing ###############
-UserPort = 1025   
-ControllerAddr = 'localhost'
-ControllerPort = 8000 # matches twistedGalil.py for testing
+GalilHost = 'localhost'
+GalilPort = 8000 # matches fakeGalil.py for testing
 #######################################
 
 # choose the actuator model (adjustable base or adjustable length)
-genLink = mirror.AdjBaseActuator # new style
-# genLink = mirror.AdjLengthLink # old style
+genLink = mirrorCtrl.AdjBaseActuator # new style
+# genLink = mirrorCtrl.AdjLengthLink # old style
 
 # Warnings:
 # - most of this info is from drawings and may be a bit off
@@ -88,19 +87,16 @@ MMPerInch = 25.4
 fixLinkList = [] 
 fixMirPos = numpy.array([0., -17.296 * MMPerInch, -193.0])
 fixBasePos = numpy.array([13.125 * MMPerInch, -17.296 * MMPerInch, -193.0])
-fixLinkList.append(mirror.FixedLengthLink(fixBasePos, fixMirPos))
+fixLinkList.append(mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos))
 
 encLinkList = None # need to get these positions from French.
 
-# make the mirror
-name = 'SDSS Secondary'
-Mir = mirror.TipTransMirror(CtrMirZ, CtrBaseZ, actLinkList, 
-                            fixLinkList, encLinkList, name)
-Dev = mirror.GalilDevice25M2
-# start up actor
+Mirror = mirrorCtrl.TipTransMirror(CtrMirZ, CtrBaseZ, actLinkList, fixLinkList, encLinkList, Name)
+
 if __name__ == "__main__":
-    mirror.runGalil(Mir, Dev, UserPort, ControllerAddr, ControllerPort)
-
-    
-
-
+    device = mirrorCtrl.GalilDevice25M2(
+        mirror = Mirror,
+        host = GalilHost,
+        port = GalilPort,
+    )
+    mirrorCtrl.runMirrorCtrl(device = device, userPort = UserPort)

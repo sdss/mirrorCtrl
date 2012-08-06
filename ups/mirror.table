@@ -1,5 +1,0 @@
-setupRequired("RO")
-setupRequired("TclActor")
-
-envAppend(PATH, ${PRODUCT_DIR}/bin)
-envAppend(PYTHONPATH, ${PRODUCT_DIR}/python)
