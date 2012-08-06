@@ -35,7 +35,7 @@ class GalilActor(TclActor.Actor):
             devs = [self.galilDev],
             maxUsers = 5
         )
-        
+    
     def initialConn(self):
         """Perform initial connections.  Same as Actor Base Class method, but with the
         addition of commanding 'stop' to put the Galil in a known state upon connection.

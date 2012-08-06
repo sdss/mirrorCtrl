@@ -418,7 +418,7 @@ class GalilDevice(TclActor.TCPDevice):
                     self.parsedKeyList.append(key)
 
             
-    def newCmd(self, cmdStr, callFunc=None):
+    def newCmd(self, cmdStr, callFunc=None, userCmd=None):
         """Start a new device command.
         
         Slightly changed from base class definition.
