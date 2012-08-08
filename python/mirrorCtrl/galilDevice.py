@@ -146,7 +146,7 @@ class GalilDevice(TCPDevice):
         self.mirror = mirror
         TCPDevice.__init__(self,
             name = "galil",
-            host = host,
+            addr = host,
             port = port,
             callFunc = callFunc,
             cmdInfo = (),
