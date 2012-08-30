@@ -2,14 +2,18 @@
 """2.5m primary mirror controller
 """
 import mirrorCtrl
-from mirrorCtrl.devices.device25mPrim import DeviceInfo
+from mirrorCtrl.devices.device25mPrim import Mirror
 
 UserPort = 2531
 
+# for testing
+GalilHost = 'localhost'
+GalilPort = 8000 # matches fakeGalil.py for testing
+
 if __name__ == "__main__":
     device = mirrorCtrl.GalilDevice(
-        mirror = DeviceInfo.mirror,
-        host = DeviceInfo.host,
-        port = DeviceInfo.port,
+        mirror = Mirror,
+        host = GalilHost,
+        port = GalilPort,
     )
     mirrorCtrl.runMirrorCtrl(device = device, userPort = UserPort)

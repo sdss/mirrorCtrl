@@ -18,11 +18,18 @@ Differences are:
    +X, rather than -X).
    The old positions are included below for reference but commented out.
    
+3.5m M3 Actuator Positions 2008-04-18.py has a worksheet showing old TCC 3.5m M3 model
+   
 Notes:
 
-Need to add encoder positions!
+7/12    - Measured encoder / actuator positions during shutdown.
+            actuator radius = 8.96"
+            encoder radius = 10.69"
+        - Fixed length links: 2 extend towards A (-y?), 1 extends towards B (+x?). 
+            I think this is correct convention.
+        - Did not adjust Z positions.
 """
-__all__ = ["DeviceInfo"]
+__all__ = ["Mirror"]
 
 import math
 import numpy
@@ -30,24 +37,17 @@ import mirrorCtrl
 
 Name = '3.5m Tertiary'
 
-UserPort = 3533   
-########### For testing ###############
-GalilHost = 'localhost'
-GalilPort = 8000 # matches fakeGalil.py for testing
-#######################################
-
-# choose the actuator model (adjustable base or adjustable length)
-genLink = mirrorCtrl.AdjBaseActuator # new style
-# genLink = mirrorCtrl.AdjLengthLink # old style
-
-# -------BEGIN copying from 3.5m M3 Actuator Positions 2008-04-18.py--------
 MMPerInch = 25.4
 RadPerDeg = math.pi / 180.0
 
-rad =   11.714 * MMPerInch
+#rad =   11.714 * MMPerInch # old
+actRad =   8.96 * MMPerInch # updated 7/12 distance from center of actuator to center of mirror
+encRad = 10.69 * MMPerInch # encoders are radially offset from actuators
+
 zMir =  -0.875 * MMPerInch
 zBase = -3.375 * MMPerInch
-angDegList = numpy.arange(-90.0, 359.0, 360.0 / 3.0)
+#angDegList = numpy.arange(-90.0, 359.0, 360.0 / 3.0) # bug?
+angDegList = numpy.array([-90.0, 30., 150.])
 angRadList = angDegList * RadPerDeg
 
 # compute in-plane positions
@@ -57,46 +57,45 @@ angRadList = angDegList * RadPerDeg
 # x is as required for right-handed coordinate system
 # Actuator index:
 #   0-2 = axial actuators A-C
-#   3-5 = constraints
-mirIP = numpy.zeros([6,3])
-baseIP = numpy.zeros([6,3])
+mirAct = numpy.zeros([3,3])
+baseAct = numpy.zeros([3,3])
+mirEnc = numpy.zeros([3,3])
+baseEnc = numpy.zeros([3,3])
 # first handle actuators A, B and C
 # they are located at the angular positions in andRadList
 for actInd, angRad in enumerate(angRadList):
-    mirIP[actInd, :] = numpy.array((
-        math.cos(angRad) * rad,
-        math.sin(angRad) * rad,
+    mirAct[actInd, :] = numpy.array((
+        math.cos(angRad) * actRad,
+        math.sin(angRad) * actRad,
         zMir
     ))
-    baseIP[actInd, 0:2] = mirIP[actInd, 0:2]
-    baseIP[actInd, 2] = zBase
+    baseAct[actInd, 0:2] = mirAct[actInd, 0:2]
+    baseAct[actInd, 2] = zBase
+
+    mirEnc[actInd, :] = numpy.array((
+        math.cos(angRad) * encRad,
+        math.sin(angRad) * encRad,
+        zMir
+    ))
+    baseEnc[actInd, 0:2] = mirAct[actInd, 0:2]
+    baseEnc[actInd, 2] = zBase
     
-# now add constraints:
-# 3,4 are transverse
-# 5 is anti-rotation
+# now add fixed link constraints:
+# 0,1 are transverse
+# 2 is anti-rotation
+# positions of fixed link ends (from Nick MacDonald drawing)
+# measurements during 2012 3.5m shutdown are pretty damn close
+mirFix = numpy.zeros([3, 3])
+baseFix = numpy.zeros([3, 3])
+mirFix[0, :] = numpy.array([-203.2, 0., 0.])
+mirFix[1, :] = numpy.array([203.2, 0., 0.])
+mirFix[2, :] = numpy.array([0., 0., 0.])
+baseFix[0, :] = mirFix[0, :]#.copy()
+baseFix[0, 1] = -281.47 # fixed links extend towards A
+baseFix[1, :] = mirAct[1, :]#.copy()
+baseFix[1, 1] = -281.47 # fixed links extend towards A
+baseFix[2, :] = numpy.array([281.47, 0., 0.])
 
-# ------- old implementation ----------
-# infinite links below are taken to be 1e4 to avoid
-# roundoff error in new implementation (old version used 1e9)
-# mirIP[3] = numpy.zeros(3)
-# mirIP[4] = mirIP[3].copy()
-# mirIP[5] = mirIP[3].copy()
-# mirIP[5,0] = rad
-# baseIP[3] = mirIP[3].copy()
-# baseIP[3, 0:2] = (1.0e4, 1.0e4)   
-# baseIP[4, 0:2] = (-1.0e4, 1.0e4)
-# baseIP[5] = (rad, 1.0e4, 0)
-
-# --------- new implementation ------------
-# actual positions (from Nick MacDonald)
-mirIP[3] = (-203.2, 0., 0.)
-mirIP[4] = (203.2, 0., 0.)
-mirIP[5] = (0., 0., 0.)
-baseIP[3] = mirIP[3].copy()
-baseIP[3, 1] = (281.47)
-baseIP[4] = mirIP[4].copy()
-baseIP[4, 1] = (281.47) 
-baseIP[5] = (281.47, 0., 0.)
 
 
 # rotate to final coordinate system which is:
@@ -111,11 +110,13 @@ rotMat[1,1] = math.cos(rotAng)
 rotMat[1,2] = math.sin(rotAng)
 rotMat[2,2] = rotMat[1,1]
 rotMat[2,1] = -rotMat[1,2]
-mirPos = numpy.dot(mirIP, rotMat)
-basePos = numpy.dot(baseIP, rotMat)
+mirPosAct = numpy.dot(mirAct, rotMat)
+basePosAct = numpy.dot(baseAct, rotMat)
+mirPosEnc = numpy.dot(mirEnc, rotMat)
+basePosEnc = numpy.dot(baseEnc, rotMat)
+mirPosFix = numpy.dot(mirFix, rotMat)
+basePosFix = numpy.dot(baseFix, rotMat)
 
-# -------END (mostly) copying from 3.5m M3 Actuator Positions 2008-04-18.py--------
-# from mir_35.dat:
 # Limits of motion (mount units) for each actuator
 ActMinMount = numpy.array([-7250000., -7250000., -7250000])
 ActMaxMount = numpy.array([ 7250000.,  7250000.,  7250000])
@@ -123,47 +124,25 @@ ActMaxMount = numpy.array([ 7250000.,  7250000.,  7250000])
 ActMountOffset = numpy.array([      0.,       0.,       0.])
 ActMountScale  = numpy.array([1259.843, 1259.843, 1259.843])
 
-# actuator positions (1st 3 columns of mir/basePos)
-ActBaseX = basePos[0:3,0]
-ActBaseY = basePos[0:3,1]
-ActBaseZ = basePos[0:3,2]
-ActMirX = mirPos[0:3,0]
-ActMirY = mirPos[0:3,1]
-ActMirZ = mirPos[0:3,2]
-
 actLinkList = []
-# generate list of actuators
-for i in range(3):
-    actBasePos = numpy.array([ActBaseX[i], ActBaseY[i], ActBaseZ[i]])
-    actMirPos = numpy.array([ActMirX[i], ActMirY[i], ActMirZ[i]])
-    actMin = ActMinMount[i]
-    actMax = ActMaxMount[i]
-    actScale = ActMountScale[i]
-    actOffset = ActMountOffset[i]
-    actLink = genLink(actBasePos, actMirPos, actMin, actMax, actScale, actOffset)
-    actLinkList.append(actLink)
-
-# fixed link positions (last 3 columns of mir/basePos)
-FixBaseX = basePos[3:,0]
-FixBaseY = basePos[3:,1]
-FixBaseZ = basePos[3:,2]
-FixMirX = mirPos[3:,0]
-FixMirY = mirPos[3:,1]
-FixMirZ = mirPos[3:,2]
-
-# generate list of fixed length links
+encLinkList = []
 fixLinkList = []
-for i in range(3):
-    fixBasePos = numpy.array([FixBaseX[i], FixBaseY[i], FixBaseZ[i]])
-    fixMirPos = numpy.array([FixMirX[i], FixMirY[i], FixMirZ[i]])
-    fixLinkList.append(mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos))
+# generate list of actuators, encoders, and fixed links
+for i in range(3):    
+    actLinkList.append(
+        mirrorCtrl.AdjBaseActuator(
+            basePosAct[i, :], mirPosAct[i, :], ActMinMount[i], 
+            ActMaxMount[i], ActMountScale[i], ActMountOffset[i]
+        )
+    )    
+    encLinkList.append(
+        mirrorCtrl.AdjLengthLink(
+            basePosEnc[i, :], mirPosEnc[i, :], ActMinMount[i], 
+            ActMaxMount[i], ActMountScale[i], ActMountOffset[i]        
+        )
+    )    
+    fixLinkList.append(
+        mirrorCtrl.FixedLengthLink( basePosFix[i, :], mirPosFix[i, :] )
+    )
     
-encLinkList = None # need to eventually obtain encoder positions!
-
 Mirror = mirrorCtrl.DirectMirror(actLinkList, fixLinkList, encLinkList, Name)
-
-DeviceInfo = mirrorCtrl.GalilDeviceInfo(
-    mirror = Mirror,
-    host = GalilHost,
-    port = GalilPort,
-)

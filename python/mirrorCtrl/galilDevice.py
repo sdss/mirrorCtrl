@@ -153,7 +153,7 @@ class GalilDevice(TCPDevice):
         self.mirror = mirror
         TCPDevice.__init__(self,
             name = "galil",
-            host = host,
+            addr = host,
             port = port,
             callFunc = callFunc,
             cmdInfo = (),
@@ -432,7 +432,6 @@ class GalilDevice(TCPDevice):
                     # even if they contain only one value
                     self.actOnKey(key, dat)
                     self.parsedKeyList.append(key)
-
 
     def newCmd(self, cmdStr, callFunc=None):
         """Start a new device command.

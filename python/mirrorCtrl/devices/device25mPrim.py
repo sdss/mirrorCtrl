@@ -6,17 +6,12 @@ notes: may wish to:
     use actual length links (not inf)?
     attach trans y to mirror vertex?
 """
+__all__ = ["Mirror"]
+
 import numpy
 import mirrorCtrl
 
-__all__ = ["DeviceInfo"]
-
 Name = 'SDSS Primary'
-
-########### For testing ###############
-GalilHost = 'localhost'
-GalilPort = 8000 # matches fakeGalil.py for testing
-#######################################
 
 # choose the actuator model (adjustable base or adjustable length)
 genLink = mirrorCtrl.AdjBaseActuator # new style
@@ -102,9 +97,3 @@ for i in range(6):
     actLinkList.append(actLink)
 
 Mirror = mirrorCtrl.DirectMirror(actLinkList, fixLinkList, encLinkList, Name)
-
-DeviceInfo = mirrorCtrl.GalilDeviceInfo(
-    mirror = Mirror,
-    host = GalilHost,
-    port = GalilPort,
-)

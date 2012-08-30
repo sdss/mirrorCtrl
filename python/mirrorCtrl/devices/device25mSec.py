@@ -1,31 +1,33 @@
 #!/usr/bin/env python
-"""This script contains configuration for the 2.5m Secondary mirror, and launches the galil actor.
+"""Configuration of the 2.5m Secondary mirror
 
-To Do:
+To Do: 
 1. need to incorporate actual encoder positions
 2. get actual address info
 3. French's model places the anti-rotation arm Z height = 1 inch below the glass. I don't know
     what the z offset from the vertex of the mirror is for this dimension. So I adoped the Z
     position of the A,B,C actuators instead.  Also the X and Y axes were not labeled, so
-    I am making an educated assumption about which is which. The drawings are currently in
+    I am making an educated assumption about which is which. The drawings are currently in 
     the docs directory.
-
+    
+notes:
+    8/12    - was able to get rough measurment of encoder offset relative to
+            axial actuators.  It is not radial.  They are at the same radius as
+            actuators but about 2 inches away (greater angle)
+            Could not measure transverse encoder offset, will assume the 
+            same offset as 3.5m secondary for now
 """
+__all__ = ["Mirror"]
+
 import numpy
 import mirrorCtrl
 
-__all__ = ["DeviceInfo"]
-
 Name = 'SDSS Secondary'
 
-########### For testing ###############
-GalilHost = 'localhost'
-GalilPort = 8000 # matches fakeGalil.py for testing
-#######################################
+MMPerInch = 25.4
 
-# choose the actuator model (adjustable base or adjustable length)
-genLink = mirrorCtrl.AdjBaseActuator # new style
-# genLink = mirrorCtrl.AdjLengthLink # old style
+# from 3.5m secondary.  THIS IS NOT VERIFIED TO BE TRUE FOR THIS MIRROR!!!!!
+zEncOffsetTrans = 0.90 * MMPerInch # Transverse encoders are between actuator and glass.
 
 # Warnings:
 # - most of this info is from drawings and may be a bit off
@@ -71,31 +73,55 @@ CtrBaseZ = -178.40
 
 # generate a lists of link objects for mirror configuration
 actLinkList = []
+encLinkList = []
 for i in range(5):
-    actBasePos = numpy.array([ActBaseX[i], ActBaseY[i], ActBaseZ[i]])
-    actMirPos = numpy.array([ActMirX[i], ActMirY[i], ActMirZ[i]])
-    actMin = ActMinMount[i]
-    actMax = ActMaxMount[i]
-    actScale = ActMountScale[i]
-    actOffset = ActMountOffset[i]
-    actLink = genLink(actBasePos, actMirPos, actMin, actMax, actScale, actOffset)
-    actLinkList.append(actLink)
+    baseAct = numpy.array([ActBaseX[i], ActBaseY[i], ActBaseZ[i]])
+    mirAct = numpy.array([ActMirX[i], ActMirY[i], ActMirZ[i]])
+    actLinkList.append(
+        mirrorCtrl.AdjBaseActuator(
+            baseAct, mirAct, ActMinMount[i], 
+            ActMaxMount[i], ActMountScale[i], ActMountOffset[i]
+        )
+    )
+    # encoders lead actuators along same radius by approx 2 inches
+    # I will estimate encoder position here based on previously accepted actuator positions
+    if i in [0, 1, 2]:
+        # axial encoder
+        radius = numpy.sqrt(numpy.sum(mirAct[0:2]**2))
+        theta = numpy.arctan2(mirAct[1], mirAct[0])
+        # offset by 2 inch along circular arc
+        deltaTheta = 2 * MMPerInch / radius
+        newTheta = theta + deltaTheta
+        xPos = radius * numpy.cos(newTheta)
+        yPos = radius * numpy.sin(newTheta)
+        encLinkList.append(
+            mirrorCtrl.AdjLengthLink(
+                numpy.array([xPos, yPos, baseAct[2]]),
+                numpy.array([xPos, yPos, mirAct[2]]),
+                ActMinMount[i], ActMaxMount[i], 
+                ActMountScale[i], ActMountOffset[i]
+            )
+        )
+    else:
+        # transverse encoders
+        encLinkList.append(
+            mirrorCtrl.AdjLengthLink(
+                numpy.array([baseAct[0], baseAct[1], baseAct[2] + zEncOffsetTrans]),
+                numpy.array([mirAct[0], mirAct[1], mirAct[2] + zEncOffsetTrans]),
+                ActMinMount[i], ActMaxMount[i], 
+                ActMountScale[i], ActMountOffset[i]
+            )
+        )
+
 
 # Fixed Link from French's anti-rotation arm drawings.
 # note: x and y poitions were not labeled, so may be transposed
-MMPerInch = 25.4
+
 # note: French's model has Z = 1 inch below glass, but I'm adopting Z = actuators' mir pos.
-fixLinkList = []
+fixLinkList = [] 
 fixMirPos = numpy.array([0., -17.296 * MMPerInch, -193.0])
 fixBasePos = numpy.array([13.125 * MMPerInch, -17.296 * MMPerInch, -193.0])
 fixLinkList.append(mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos))
 
-encLinkList = None # need to get these positions from French.
-
 Mirror = mirrorCtrl.TipTransMirror(CtrMirZ, CtrBaseZ, actLinkList, fixLinkList, encLinkList, Name)
 
-DeviceInfo = mirrorCtrl.GalilDeviceInfo(
-    mirror = Mirror,
-    host = GalilHost,
-    port = GalilPort,
-)
