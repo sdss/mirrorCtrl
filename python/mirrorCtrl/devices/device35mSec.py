@@ -11,8 +11,9 @@ notes:
 """
 __all__ = ["Mirror"]
 
-import mirrorCtrl
+import math
 import numpy
+import mirrorCtrl
 
 Name = '3.5m Secondary'
 
