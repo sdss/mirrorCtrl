@@ -28,7 +28,7 @@ from RO.StringUtil import quoteStr, strFromException
 from RO.SeqUtil import asSequence
 from twistedActor import TCPDevice, CommandError
 
-__all__ = ["GalilDevice", "GalilDevice25M2", "GalilDevice35M3"]
+__all__ = ["GalilDevice", "GalilDeviceInfo", "GalilDevice25M2", "GalilDevice35M3"]
 
 MMPerMicron = 1 / 1000.0        # millimeters per micron
 RadPerDeg  = math.pi / 180.0    # radians per degree
@@ -128,6 +128,13 @@ class GalilStatus(object):
             strList.append("%s=%s" % (keyword, strVal))
         return "; ".join(strList)
 
+class GalilDeviceInfo(object):
+    """Information needed to construct a GalilDevice
+    """
+    def __init__(self, mirror, host, port):
+        self.mirror = mirror
+        self.host = host
+        self.port = port
 
 class GalilDevice(TCPDevice):
     """The Galil Device Object
