@@ -27,6 +27,7 @@ import numpy
 from RO.StringUtil import quoteStr, strFromException
 from RO.SeqUtil import asSequence
 from twistedActor import TCPDevice, CommandError
+from twisted.internet import reactor
 
 __all__ = ["GalilDevice", "GalilDevice25M2", "GalilDevice35M3"]
 
@@ -146,13 +147,14 @@ class GalilDevice(TCPDevice):
         self.mirror = mirror
         TCPDevice.__init__(self,
             name = "galil",
-            addr = host,
+            host = host,
             port = port,
             callFunc = callFunc,
             cmdInfo = (),
         )
         self.currDevCmd = self.cmdClass('null') # initialize empty command in cmd slot
         self.currDevCmd.setState("done") # set it to a done state so subsequent cmds can execute
+        self.isLocked = False # set to true for stop and reset commands. Will fail any incoming cmds.
         self.replyLog = []
         self.parsedKeyList = None
         self.nAct = len(self.mirror.actuatorList)
@@ -434,7 +436,7 @@ class GalilDevice(TCPDevice):
         #
         cmd = self.cmdClass(cmdStr, callFunc=callFunc)
         if not self.currDevCmd.isDone:
-            # this should never happen, but...
+            # this should never happen, but...just in case
             raise RuntimeError("Cannot start new command, there is a cmd currently running")
         self.parsedKeyList=[]
         self.currDevCmd = cmd
@@ -461,6 +463,9 @@ class GalilDevice(TCPDevice):
         Cmd not tied to state of devCmd, because of subsequent moves.
         """
         # if Galil is busy, abort the command
+        if self.isLocked:
+            userCmd.setState("cancelled", textMsg="Galil is stopping or resetting")
+            return            
         if not self.currDevCmd.isDone:
             userCmd.setState("cancelled", textMsg="Galil is busy")
             return
@@ -485,35 +490,47 @@ class GalilDevice(TCPDevice):
         """Sends an 'ST' to the Galil, causing it to stop whatever it is doing,
         waits 1 sec for motors to decelerate, then queries for status.
         """
+        if self.isLocked and not hasattr(userCmd, 'hasKey'):
+            userCmd.setState("cancelled", textMsg="Galil is stopping or resetting")
+            return  
         if not self.currDevCmd.isDone:
             self.currDevCmd.setState("cancelled", textMsg="stop interrupt")
         if not self.status.Cmd.isDone:
             self.status.Cmd.setState("cancelled", textMsg="stop interrupt")
         self._clrDevCmd() # stop listening for replies
+        userCmd.hasKey = True # hack. Status cmd will look for this attribute and know to unlock
+        self.isLocked = True # lock the device from incoming commands
         userCmd.setState("running")
         self.conn.writeLine('ST')
-        time.sleep(1) # wait 1 second for deceleration
-        self.cmdStatus(userCmd)
+        reactor.callLater(1, self.cmdStatus, userCmd) # in 1 second, query status
 
     def cmdReset(self, userCmd):
         """Sends an 'RS' to the Galil, followed by a cmdStop to put Galil in known state.
         """
+        if self.isLocked:
+            userCmd.setState("cancelled", textMsg="Galil is stopping or resetting")
+            return  
         if not self.currDevCmd.isDone:
             self.currDevCmd.setState("cancelled", textMsg="stop interrupt")
         if not self.status.Cmd.isDone:
             self.status.Cmd.setState("cancelled", textMsg="stop interrupt")
         self._clrDevCmd() # stop listening for replies
+        userCmd.hasKey = True # hack. Status cmd will look for this attribute and know to unlock
+        self.isLocked = True # lock the device from incoming commands
         userCmd.setState("running")
         self.conn.writeLine('RS')
-        time.sleep(3) # wait 3 seconds for reset
-        self.cmdStop(userCmd) # put Galil in known state
+        #time.sleep(3) # wait 3 seconds for reset
+        reactor.callLater(3, self.cmdStop, userCmd) # wait 3 seconds then command a stop
 
     def cmdStatus(self, userCmd):
         """Return the Galil status to the user.
 
         Called directly from the user, or indirectly through a cmdStop. Cmd
         (cmd_stop or cmd_status) state tied to devCmd state.
-        """
+        """ 
+        if self.isLocked and not hasattr(userCmd, 'hasKey'):
+            userCmd.setState("cancelled", textMsg="Galil is stopping or resetting")
+            return  
         if not self.currDevCmd.isDone:
             self.writeToUsers("w", "Text=\"Galil is busy, showing cached status\"", cmd = self.currDevCmd)
             statusStr = self.status._getKeyValStr([
@@ -542,6 +559,9 @@ class GalilDevice(TCPDevice):
     def cmdParams(self, userCmd):
         """Show Galil parameters
         """
+        if self.isLocked:
+            userCmd.setState("cancelled", textMsg="Galil is stopping or resetting")
+            return  
         if not self.currDevCmd.isDone:
             userCmd.setState("cancelled", textMsg="Galil is busy")
             return
@@ -556,6 +576,9 @@ class GalilDevice(TCPDevice):
         Inputs:
         - axisList: a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
         """
+        if self.isLocked:
+            userCmd.setState("cancelled", textMsg="Galil is stopping or resetting")
+            return  
         if not self.currDevCmd.isDone:
             userCmd.setState("cancelled", textMsg="Galil is busy")
             return
@@ -565,11 +588,13 @@ class GalilDevice(TCPDevice):
         if not axisList:
             axisList = self.validAxisList
         self.writeToUsers(">", "Text = Homing Actuators: %s" % (", ".join(str(v) for v in axisList)), cmd = userCmd)
-        homeStatus = numpy.zeros(self.nAct)
+        #homeStatus = numpy.zeros(self.nAct, dtype=int)
+        homeStatus = [int(0)] * self.nAct
         for axis in axisList:
             ind = self.validAxisList.index(axis) # which one is homing?
-            homeStatus[ind] = 1  # set it to 1
+            homeStatus[ind] = int(1)  # set it to 1
         self.status.Homing = homeStatus
+        self.writeToUsers("i", "Text = self.status.Homing " + str(self.status.Homing), cmd=userCmd)
         updateStr = self.status._getKeyValStr(["Homing"])
         self.writeToUsers("i", updateStr, cmd=userCmd)
         # format Galil command
@@ -669,6 +694,10 @@ class GalilDevice(TCPDevice):
         self.writeToUsers("i", statusStr, cmd = self.status.Cmd)
         self._clrDevCmd()
         self.status.Cmd.setState("done")
+        if hasattr(self.status.Cmd, 'hasKey'):
+            # this status was initiated after a stop or reset command, now safe to unlock
+            # isLocked is an attribute appended to the userCmd during a stop or reset.
+            self.isLocked = False
 
     def _userCmdCallback(self, cmd):
         """Generic callback that sets the user cmd done

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import sys
 import unittest
 import numpy
 import math
@@ -11,6 +12,11 @@ zeroFlag = False
 
 from data import genMirrors
 import mirrorCtrl
+sys.path.insert(1,'../bin/')
+import Prim25m
+import Sec25m
+import Sec35m
+import Tert35m
 import RO.Astro.Tm
 
 MMPerMicron = 1 / 1000.0        # millimeters per micron
@@ -61,17 +67,26 @@ for orient in orientList:
 
 # choose which mirrors you want to include in the tests
 # there are options for various mirrors, eg fixing a link on the 2.5m primary
-# they are shown in genMirrors
+# they are shown in genMirrors. genMirrors contains generally fictious mirrors
 # mirrors can be viewed using the plotMirror() method, eg: genMirrors.Prim25().plotMirror()
-mirList = [genMirrors.Prim25().makeMirror(), # defaults to AdjBase actuators.
-           genMirrors.Prim25(actType='adjLen').makeMirror(), # AdjLen (old) type actuators.
-           genMirrors.Prim25(fix=1).makeMirror(), 
-           genMirrors.Prim25(fix=2).makeMirror(),
-           genMirrors.Sec25().makeMirror(),
-           genMirrors.Sec35().makeMirror(),
-           genMirrors.Tert35().makeMirror(), # new non-inf length links
-           genMirrors.Tert35(vers='old').makeMirror() # old semi-inf length links
-           ]
+# mirList = [genMirrors.Prim25().makeMirror(), # defaults to AdjBase actuators.
+#            genMirrors.Prim25(actType='adjLen').makeMirror(), # AdjLen (old) type actuators.
+#            genMirrors.Prim25(fix=1).makeMirror(), 
+#            genMirrors.Prim25(fix=2).makeMirror(),
+#            genMirrors.Sec25().makeMirror(),
+#            genMirrors.Sec35().makeMirror(),
+#            genMirrors.Tert35().makeMirror(), # new non-inf length links
+#            genMirrors.Tert35(vers='old').makeMirror() # old semi-inf length links
+#            ]
+           
+# mirrors can be viewed using the plotMirror() method, eg: Prim25m.Mirror.plotMirror()
+# use the non-fictitous mirrors:
+mirList = [
+    Prim25m.Mirror,
+    Sec25m.Mirror,
+    Sec35m.Mirror,
+    Tert35m.Mirror,
+]
 
 print 'mirList len: ', len(mirList)
 ############################# TESTS #####################################

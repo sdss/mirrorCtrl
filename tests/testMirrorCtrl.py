@@ -1,101 +1,229 @@
-#!/usr/bin/env python
-import unittest
-import Tkinter
-import thread
-import multiprocessing
+"""http://twistedmatrix.com/documents/current/core/howto/trial.html
+"""
+
+import sys
+import os
+import fcntl
 import time
-import telnetlib
-
-import mirrorCtrl
-from data import genMirrors
 import fakeGalil
-    
-UserPort = 1025
-GalilHost = 'localhost'
-GalilPort = 8001
-isOK = 0
-Iter = 0
+from twisted.trial import unittest
+from twisted.internet.defer import Deferred, maybeDeferred, gatherResults
+from twisted.internet import reactor
+from twisted.internet.protocol import Factory, Protocol, ClientFactory, ClientCreator, ProcessProtocol, ServerFactory
+from twisted.protocols.basic import LineReceiver
+from twisted.internet.endpoints import TCP4ClientEndpoint
+import subprocess
+import mirrorCtrl
 
-def doCmdTest(reactor, cmdStrs):
-    """Loop over cmds in cmdStrs, send to actor via telnet, listen for ":".
-    When all commands have been sent, destroy the actor instance, and the main
-    test thread will continue and check the exit conditions of this thread.
-    If isOK is 0, a test failed.
-    """
-    global isOK
-    global Iter
-    # time for widget to start up and initialize
-    time.sleep(3)
-    tnet = telnetlib.Telnet(host = GalilHost, port = UserPort, timeout=100)
-    # wait for connection
-    time.sleep(2)
-    Iter = 0
-    for ind, cmd in enumerate(cmdStrs):
-        tnet.write(cmd + "\r\n") # send command to actor
-        # listen until ":" is received or timeout
-        justIn = tnet.read_until(":", 15)
-        justIn = justIn.split('\r\n')
-        if not (":" in justIn[-1]):
-            # if ":" not found
-            isOK = 0
-            Iter = ind
-            break        
-    tnet.close()
-    time.sleep(2)
-    reactor.stop()
+from opscore.protocols.parser import ReplyParser,ParseError
+#     reply = rParser.parse("tui.operator 911 BossICC : type=decaf;blend = 20:80, Kenyan,Bolivian ; now")
+#     for keyword in reply.keywords:
+#         print ' ',keyword.name,keyword.values
 
-def makeActor():
-    """Create a 3.5m secondary mirror controller actor
-    
-    Replies from the fakeGalil are appropriate for this mirror controller.
-    """
-# 
-# # 2.5m M2 because galil replies have 5 actuators
-# mirr = genMirrors.Sec25().makeMirror() 
-# # 3.5m M3 device because galil replies are specific to this mirror...
-# # ./data/rawGalilReplies.txt have examples of all galil replies
-# # these are spouted from fakeGalil.py
-# Device = mirror.GalilDevice35M3
 
-    mirror = genMirrors.Sec25().makeMirror()
-    device = mirrorCtrl.GalilDevice35M3(mirror=mirror, host=GalilHost, port=GalilPort)
-    actor = mirrorCtrl.MirrorCtrl(device=device, userPort=UserPort)
-    return actor
+sys.path.insert(1,'../bin/')
+import Prim25m
+import Sec25m
+import Sec35m
+import Tert35m
 
-class ActorTests(unittest.TestCase):
-    """Tests for actor
-    """
-#     def testParser(self):
-#         with open('./data/rawGalilReplies.txt', 'r') as f:
-#             RawGalilReplies = f.readlines()
-#         from twisted.internet import reactor
-#         time.sleep(4) # wait for prev test to shut down...
-#         actor = makeActor()
-#         parser = actor.galilDev.parseLine
-#         for line in RawGalilReplies:
-#             out = parser(line)
-#             print 'out: ', out
-#         reactor.stop()
-#         self.assertEqual(0, 0, 'they are equal')
+# wanna look? uncomment
+# Prim25m.Mirror.plotMirror()
+# Sec25m.Mirror.plotMirror()
+# Sec35m.Mirror.plotMirror()
+# Tert35m.Mirror.plotMirror()
+
+FakeGalilPort = 8000
+FakeGalilHost = 'localhost'
+Sec25mUserPort = 2532
+
+
+class FakeGalilProtocol(ProcessProtocol):
+    def outReceived(self, data):
+        print 'outReceived:', data
+        self.deferred.callback('')
+    def errReceived(self, data):
+        print 'gotta error:', data    
+    def connectionMade(self):
+        print 'connection made!'
         
-    def testCmds(self):
-        """This test starts up the actor and fakeGalil, then sends commands
-        to the actor via telnet, then listens for a ":" in the reply, signaling
-        that the command finished properly.
-        
-        note: lots of sleep time to allow for startup and shutdown of actors,
-        connections to ports, etc.
+class FakeActorProtocol(ProcessProtocol):
+    def outReceived(self, data):
+        print 'outReceived:', data
+        self.deferred.callback('')
+    def errReceived(self, data):
+        print 'gotta error:', data    
+    def connectionMade(self):
+        print 'connection made!'
+
+# set up a protocol and factory to talk to the mirrorCtrl and parse the replies
+class Commander(LineReceiver):
+    """Sends line to Mirror Controller, parses replies using
+    standard opscore parser
+    """
+    replyParser = ReplyParser()
+    
+    def connectionMade(self):
+        print 'connected!'
+            
+    def lineReceived(self, line):
         """
-        from twisted.internet import reactor
-        global isOK
-        isOK = 1
-        # start up the fake galil
-        tGal = multiprocessing.Process(target=fakeGalil.main, args=(GalilPort,))
-        tGal.start()
-        time.sleep(1)
-        # set up actor
-        actor = makeActor()
-        # list of commands you want to test
+        parse reply into keywords and values
+        """
+        print 'data in!: ', line
+        if ':' in line:
+            print 'end!'
+            #self.deferred.callback('')
+    
+    def writeSomething(self, cmd, deferred):
+        """write a command
+        """
+        self.deferred = deferred
+        self.transport.write(cmd)
+    
+    
+#     def sendLine(self, line):
+#         """send a command to the mirror controller
+#         """
+#         self.transport.write(line)
+
+
+class CommanderFactory(ClientFactory):
+    def buildProtocol(self, addr):
+        p = Commander()
+        p.factory = self
+        return p
+    def startedConnecting(self, connector):
+        print 'started connecting'
+    def clientConnectionFailed(self, connector, reason):
+        print 'connection failed %s' % reason
+    def clientConnectionLost(self, connector, reason):
+        print 'connection lost %s' % reason
+
+
+def non_block_read(output):
+    fd = output.stdout.fileno()
+    fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+    fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+    try:
+        return output.stdout.read()
+    except:
+        return ""
+
+class TestRunner(object):
+    def __init__(self, sendList):
+        self.sendList = sendList
+        self.deferred = Deferred()
+        self.deferred.addCallback(self.sendLine)
+        self.factory = ChatFactory(self.deferred)
+        self.conn = reactor.connectTCP('localhost',
+                                  Sec25mUserPort,
+                                  self.factory)
+    def sendLine(self, humDee):
+        """Send a line to the actor
+        """
+        line = self.sendList[0]
+        #self.factory.protocol.sendLine(line)
+        #print 'conn', help(self.conn._makeTrasport)
+        self.conn.transport.write(line)
+        #LineReceiver.sendLine(self.factory.protocol, line)
+        #self.factory.protocol.sendLine(line)
+
+
+class MirrorCtrlTestCase(unittest.TestCase):
+    """A series of tests using twisted's trial unittesting.  Simulates
+    communication over a network.
+    """
+    timeout = 30 # ten seconds before timeout
+#     def setUp(self):
+#         self.deferred = None
+#         self.deferred = Deferred()
+#         self.deferred.addCallback(self.actorConnected)
+#         d1 = Deferred()
+#         d1.addCallback(self.connectActor)        
+#         #Begin a fakeGalil before each session
+#         self.processProtocol = FakeGalilProtocol()
+#         self.processProtocol.deferred = d1
+#         self.actorProtocol = FakeActorProtocol()
+#         self.actorProtocol.deferred = self.deferred
+#         cmd = ['python', "/Users/csayres/Desktop/TCC/mirror/tests/fakeGalil.py"]
+#         reactor.spawnProcess(self.processProtocol, cmd[0], cmd,
+#             env=os.environ
+#             )
+#         return self.deferred
+
+    def setUp(self):
+        self.setUpGalil()
+        self.setUpActor()
+        #return self.setUpCommander()
+        #self.addCleanup(self.cmdConn.disconnect)
+        #self.addCleanup(self.actor.server._basicClose())
+    
+#    def tearDown(self):
+    
+#         d = defer.maybeDeferred(self.serverPort.stopListening)
+#         self.clientConnection.disconnect()
+#         return defer.gatherResults([d,
+#                                     self.clientDisconnected,
+#                                     self.serverDisconnected])
+        #self.cmdConn.disconnect()
+
+#        self.actor.server._basicClose()
+#        self.serverPort.stopListening()
+#        if self.client is not None:
+
+    def setUpGalil(self):
+        factory = ServerFactory()
+        factory.protocol = fakeGalil.FakeGalilProtocol
+        self.serverPort = reactor.listenTCP(0, factory, interface="localhost")
+        self.addCleanup(self.serverPort.stopListening)
+        print 'Galil starting up on port: %s' % self.serverPort.getHost().port
+    
+    def setUpActor(self):
+        device = mirrorCtrl.GalilDevice25M2(
+            mirror = Sec25m.Mirror,
+            host = "localhost",
+            port = self.serverPort.getHost().port,
+        )
+        self.actor = mirrorCtrl.MirrorCtrl(
+            device = device,
+            userPort = Sec25mUserPort
+            )
+        self.addCleanup(self.actor.server._basicClose)
+        print 'Actor starting up on port: %s' % Sec25mUserPort   
+            
+    def setUpCommander(self):
+        #self.cmdFactory = CommanderFactory()
+        creator = ClientCreator(reactor, Commander)
+        def cb(client):
+            print 'client starting'
+            self.client = client
+            self.addCleanup(self.client.transport.loseConnection)
+        return creator.connectTCP('localhost', Sec25mUserPort).addCallback(cb)
+        
+
+    def actorConnected(self, foo):
+        """
+        """
+        print 'actor is connected'
+
+    def commanderConnected(self, foo):
+        """
+        """
+        print 'commander is connected'
+
+    def connectActor(self, foo):
+        """Connect the actor when ready
+        """
+        cmd = ['python', "/Users/csayres/Desktop/TCC/mirror/bin/Sec25m.py"]
+        reactor.spawnProcess(self.actorProtocol, cmd[0], cmd,
+            env=os.environ
+            )
+            
+    def testCmds(self):
+        """Test a series of commands, wait for successful completion
+        """
+        #d = Deferred()
         cmdStrs = [
             "move 4,4,4",
             "home A,B,C",
@@ -103,14 +231,10 @@ class ActorTests(unittest.TestCase):
             "showparams",
             "stop"
             ]
-        # send commands from different thread
-        # actor must run in main thread
-        thread.start_new_thread(lambda: doCmdTest(reactor, cmdStrs), ())
-        # start up the actor instance
-        reactor.run()
-        tGal.terminate()
-        self.assertEqual(1, isOK, 'failed on cmd %s' % cmdStrs[Iter])
-
-
-if __name__ == '__main__':
-    unittest.main()
+        #for cmd in cmdStrs[0]:
+        #self.client.writeSomething(cmdStrs[0], d)
+        print 'cmd sent: ', cmdStrs[0]
+        #return d
+        #self.testRunner = TestRunner(cmdStrs)
+        #return self.testRunner.deferred
+               

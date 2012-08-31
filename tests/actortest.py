@@ -3,7 +3,7 @@
 Intended for communication via telnet"""
 
 import numpy
-import mirror
+import mirrorCtrl
 import sys
 from data import genMirrors
 UserPort = 1025
@@ -20,7 +20,8 @@ if (len(sys.argv) > 1):
         
 # .makeMirror takes an mirId arguement wich is used in the instrument ICC to tailor functionality
 # between different mirrors
-Mir = genMirrors.Sec25().makeMirror(name='Tert') # this matches hard coded (faked) replies from twistedGalil
-
+mir = genMirrors.Sec25().makeMirror(name='Tert') # this matches hard coded (faked) replies from twistedGalil
+mirDev = mirrorCtrl.GalilDevice35M3(mir, ControllerAddr, ControllerPort)
 if __name__ == "__main__":
-    mirror.runGalil(Mir, mirror.GalilDevice35M3, UserPort, ControllerAddr, ControllerPort)
+    #mirrorCtrl.runMirrorCtrl(Mir, mirrorCtrl.GalilDevice35M3, UserPort, ControllerAddr, ControllerPort)
+    mirrorCtrl.runMirrorCtrl(mirDev, UserPort)

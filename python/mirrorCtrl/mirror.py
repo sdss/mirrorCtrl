@@ -8,6 +8,8 @@ import math
 
 import numpy
 import scipy.optimize  
+import matplotlib.pyplot
+import mpl_toolkits.mplot3d
 
 import link
 
@@ -80,6 +82,63 @@ class MirrorBase(object):
                 else:
                     self.encoderList.append(enc)
                     
+    def plotMirror(self):
+        """ Plots links and glass when the mirror is in neutral position,
+        mostly a sanity check.
+        """
+        fig = matplotlib.pyplot.figure()
+        ax = fig.gca(projection='3d')
+        theta = numpy.linspace(0., 2 * numpy.pi, 100)
+        z = numpy.zeros(100)
+        fig.hold()
+        
+        # plot the mirror black concentric circles
+        for r in numpy.linspace(0., self.mirRad, 50):
+            x = r * numpy.sin(theta)
+            y = r * numpy.cos(theta)
+            if self.mirRad < 300: # mm
+                # 3.5m M3 mirror is rotated about x by -45 deg
+                phi = 90. * math.pi / 180.0
+                cosP = math.cos(phi)
+                sinP = math.sin(phi)
+                stack = numpy.vstack((x,y,z))
+                stack = stack.T
+                rotMat = numpy.array([ [1., 0., 0.],
+                                       [0., cosP, sinP],
+                                       [0., -sinP, cosP] ])
+                stackRot = numpy.dot(stack, rotMat)
+                x = stackRot[:,0]
+                y = stackRot[:,1]
+                z = stackRot[:,2]
+            ax.plot(x, y, z, 'k')
+        
+        # plot actuators blue
+        for act in self.actuatorList:
+            x = numpy.array([act.mirPos[0], act.basePos[0]])  
+            y = numpy.array([act.mirPos[1], act.basePos[1]]) 
+            z = numpy.array([act.mirPos[2], act.basePos[2]])   
+            ax.plot(x, y, z, 'bo-')
+        
+        # plot encoders cyan
+        for act in self.encoderList:
+            x = numpy.array([act.mirPos[0], act.basePos[0]])  
+            y = numpy.array([act.mirPos[1], act.basePos[1]]) 
+            z = numpy.array([act.mirPos[2], act.basePos[2]])   
+            ax.plot(x, y, z, 'co-')
+        
+        # plot fixed links red
+        for act in self.fixedLinkList:
+            x = numpy.array([act.mirPos[0], act.basePos[0]])  
+            y = numpy.array([act.mirPos[1], act.basePos[1]]) 
+            z = numpy.array([act.mirPos[2], act.basePos[2]])   
+            ax.plot(x, y, z, 'ro-')
+        
+        xyrange=(-1.5 * self.mirRad, 1.5 * self.mirRad)
+        zrange = (-3 * self.mirRad, 2 * self.mirRad)
+        matplotlib.pyplot.xlim(xyrange)
+        matplotlib.pyplot.ylim(xyrange)
+        ax.set_zlim(xyrange)        
+        matplotlib.pyplot.show()                    
     
     @property
     def numAdjOrient(self):

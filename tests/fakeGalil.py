@@ -8,9 +8,9 @@ DefaultPort = 8000
 
 # Copyright (c) Twisted Matrix Laboratories.
 # See LICENSE for details.
-
 import re
 import sys
+#sys.path.insert(1, '/Users/csayres/APO/ROPackage/python/')
 from twisted.internet import reactor, protocol, defer
 from twisted.protocols.basic import LineReceiver
 from RO.Comm.TwistedTimer import Timer
@@ -143,11 +143,12 @@ class FakeGalilProtocol(LineReceiver):
 
 def main(port):
     """Run a fake mirror controller Galil on the specified port"""
-    print "Starting fake Galil on port %s" % (port,)
+    #print "Starting fake Galil on port %s" % (port,)
     factory = protocol.ServerFactory()
     factory.protocol = FakeGalilProtocol
     reactor.listenTCP(port, factory)
-    reactor.run()
+    print "Starting fake Galil on port %s" % (port,)
+    #reactor.run()
 
 
 # this only runs if the module was *not* imported

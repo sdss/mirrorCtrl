@@ -5,7 +5,7 @@ import subprocess
 import itertools
 
 galilPorts = range(8000,8003)
-actorPorts = range(1025,1028)
+actorPorts = range(3532,3535) # matches pytcc/examples/mirDevice.py
 
 procs = []
 
@@ -18,7 +18,7 @@ def cleanup():
 try:
     for port in galilPorts:
         # start up the fake Galils on their own ports
-        procs.append(subprocess.Popen(["python", "twistedGalil.py", str(port)]))    
+        procs.append(subprocess.Popen(["python", "fakeGalil.py", str(port)]))    
     for actPort, galPort in itertools.izip(actorPorts, galilPorts):
         procs.append(subprocess.Popen(["python", "actorTest.py", str(actPort), str(galPort)]))
 except Exception as e:
