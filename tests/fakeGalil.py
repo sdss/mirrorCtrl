@@ -1,88 +1,52 @@
 #!/usr/bin/env python
 """Fake 3.5m M3 Galil.
 
-It is primitive: it responds to each command with a canned set of replies
-and thus ignores command arguments (e.g. A=).
+To do:
+- Handle command collisions (handling a new command while another is running) correctly --
+  study how a real Galil does it!
+- Support XQ#STOP
+- Add proper support for different mirrors:
+  - Set nAxes appropriate (3-6)
+  - Include correct mirror-specific info in status and other command output
+- Support waking up homed or not homed.
+  That supports unit testing.
 """
 DefaultPort = 8000
 
-# Copyright (c) Twisted Matrix Laboratories.
-# See LICENSE for details.
-
 import re
 import sys
+import numpy
 from twisted.internet import reactor, protocol, defer
 from twisted.protocols.basic import LineReceiver
 from RO.Comm.TwistedTimer import Timer
 
 Debug = True
 
-ReplyDict = dict(
-    move = """0020.7,  0021.0,  0021.0,  0003.5,  0003.4 max sec for move
-           -001192321,  000648641, -000475989,  000014310, -000000017 target position
-           -001194727,  000649299, -000475794,  000014384,  000000041 final position
-           OK""",
+MAXINT = 2147483647
 
-    home = """: 0362.7,  0362.7,  0362.7,  0000.0,  0000.0 max sec to find reverse limit switch
-            Reverse limit switch not depressed for axes:  0,  1,  0,  0,  0 - trying again
-             0000.2,  0362.7,  0000.2,  0000.0,  0000.0 max sec to find reverse limit switch
-             0300.1,  0300.1,  0300.1,  0000.0,  0000.0 max sec to find home switch
-             0008.2,  0008.2,  0008.2,  0000.0,  0000.0 sec to move away from home switch
-            Finding next full step
-             041,  006.6 microsteps, sec to find full step
-            -000006732,  000014944,  000003741,  999999999,  999999999 position error
-             1,  1,  1,  0,  0 axis homed
-            -007250000, -007250000, -007250000,  999999999,  999999999 commanded position
-            -007249995, -007249995, -007249982,  999999999,  999999999 actual position
-             02.10, 5 software version, NAXES number of axes
-             1, 1, 01 DOAUX aux status? MOFF motors off when idle? NCORR # corrections
-             00.10, 00.00, 30.00 WTIME, ENCTIME, LSTIME
-            -007250000, -007250000, -007250000,  000000000, -002510000 
-             007250000,  007250000,  007250000,  000000000,  002510000 RNGx/2 forward limits
-             000050000,  000050000,  000050000,  000050000,  000082000 SPDx speed
-             000005000,  000005000,  000005000,  000005000,  000004000 HMSPDx homing speed
-             000500000,  000500000,  000500000,  000500000,  000164000 ACCx acceleration
-             000000000,  000000000,  000000000,  000000000,  000000000 MINCORRx min correction
-             001000000,  001000000,  001000000,  000000000,  000074000 MAXCORRx max correction
-             000000050,  000000050,  000000050,  000000050,  000000001 ST_FSx microsteps/full step
-             000400000,  000400000,  000400000,  000000000,  000041000 MARGx dist betw hard & soft rev lim
-             000000000,  000000000,  000000000,  000000000,  000000000 INDSEP index encoder pulse separation
-            -0003.1496, -0003.1496, -0003.1496,  0000.0000,  0095.5733 ENCRESx encoder resolution (microsteps/tick)
-             02.00 version of M3-specific additions
-             01 000007000 off-on-error?, error limit for tertiary rotation
-             06.0 05.0 00.1 time to close rotation clamp, open clamp, turn on at-slot sensor (sec)
-             15.1 00.5 02.0 max time, poll time, addtl run time for primary mirror cover motion (sec)
-             10.0 time for primary mirror eyelid motion (sec)
-             0000.0,  0000.0,  0000.0,  0000.0,  0000.0 sec to finish move
-            OK""",
-
-    status = """1,  1,  1,  1,  1 axis homed
-        -001176643,  000679110, -000447314,  000014042, -000000129 commanded position
-        -001192236,  000648745, -000475977,  000014310, -000000017 actual position
-        00008196,  00008196,  00008196,  00008196,  00008196 status word
-        OK""",
-
-    showpar = """02.10, 5 software version, NAXES number of axes
-        1, 0, 01 DOAUX aux status? MOFF motors off when idle? NCORR # corrections
-        00.10, 00.00, 30.00 WTIME, ENCTIME, LSTIME
-        -007250000, -007250000, -007250000, -000095000, -000095000 -RNGx/2 reverse limits
-        007250000,  007250000,  007250000,  000095000,  000095000 RNGx/2 forward limits
-        000050000,  000050000,  000050000,  000005000,  000005000 SPDx speed
-        000005000,  000005000,  000005000,  000000500,  000000500 HMSPDx homing speed
-        000500000,  000500000,  000500000,  000050000,  000050000 ACCx acceleration
-        000000000,  000000000,  000000000,  000000000,  000000000 MINCORRx min correction
-        001000000,  001000000,  001000000,  000015000,  000015000 MAXCORRx max correction
-        000000050,  000000050,  000000050,  000000050,  000000050 ST_FSx microsteps/full step
-        000400000,  000400000,  000400000,  000005000,  000005000 MARGx dist betw hard & soft rev lim
-        000000000,  000000000,  000000000,  000000000,  000000000 INDSEP index encoder pulse separation
-        -0003.1496, -0003.1496, -0003.1496,  0001.5750,  0001.5750 ENCRESx encoder resolution (microsteps/tick)
-        OK""",
-)
+MaxCmdTime = 2.0 # maximum time any command can take; sec
 
 class FakeGalilProtocol(LineReceiver):
     def __init__(self, *args, **kwargs):
         self.replyTimer = Timer()
-        self.replyList = None
+        self.nAxes = 5
+
+        self.isHomed = numpy.array([1]*6, dtype=int)
+        self.cmdPos = numpy.array([0]*6, dtype=int)
+        self.measPos = numpy.array([0]*6, dtype=int)
+        self.userNums = numpy.array([MAXINT]*6, dtype=int)
+
+        self.range = numpy.array([3842048]*3 + [190000]*3, dtype=int)
+        self.speed = numpy.array([50000]*3 + [5000]*3, dtype=int)
+        self.homeSpeed = numpy.array([5000]*3 + [500]*3, dtype=int)
+        self.accel =  numpy.array([500000]*3 + [50000]*3, dtype=int)
+        self.minCorr = numpy.array([0]*6, dtype=int)
+        self.maxCorr = numpy.array([1000000]*3 + [15000]*3, dtype=int)
+        self.st_fs = numpy.array([50]*6, dtype=int)
+        self.marg = numpy.array([400000]*3 + [5000]*3, dtype=int)
+        self.indSep = numpy.array([0]*6, dtype=int)
+        self.encRes =  numpy.array([-3.1496]*3 + [1.5750]*3, dtype=float)
+        
     
     def echo(self, line):
         self.transport.write(line + ":")
@@ -91,55 +55,174 @@ class FakeGalilProtocol(LineReceiver):
         """As soon as any data is received, look at it and write something back."""
         if Debug:
             print "received: %r" % (line,)
-        line = line.lower()
         cmdList = [c.strip() for c in line.split(";") if c.strip()]
         for cmd in cmdList:
             self.processCmd(cmd)
         
     def processCmd(self, cmd):
         if Debug:
-            print "processCmd(cmd=%r); replyList=%r" % (cmd, self.replyList)
+            print "processCmd(cmd=%r)" % (cmd,)
         self.echo(cmd)
-        if cmd in ("st", "rs"):
-            self.replyList = None
+        if cmd in ("ST", "RS"):
+            self.replyTimer.cancel()
             return
-
-        if self.replyList:
+        
+        cmdMatch = re.match(r"([A-F]) *= *MAXINT$", cmd)
+        if cmdMatch:
+            axisChar = cmdMatch.groups()[0]
+            ind = ord(axisChar) - ord("A")
+            self.userNums[ind] = MAXINT
+            return
+            
+        cmdMatch = re.match(r"([A-F]) *= *(\d+)$", cmd)
+        if cmdMatch:
+            axis = cmdMatch.groups()[0]
+            val = int(cmdMatch.groups()[1])
+            ind = ord(axis) - ord("A")
+            self.userNums[ind] = val
+            return
+            
+        cmdMatch = re.match(r"XQ *#([A-Z]+)", cmd)
+        if not cmdMatch:
+            return
+        
+        if self.replyTimer.isActive:
             # Reject new command; but what does the Galil really do?
             # It probably accepts non-XQ commands such as A=value, but what about XQ commands?
             self.sendLine("? Busy")
             self.sendLine("OK")
             return
-            
-        cmdMatch = re.match(r"xq *#([a-z]+)", cmd)
-        if not cmdMatch:
-            return
 
         cmdVerb = cmdMatch.groups()[0]
 
-        try:
-            reply = ReplyDict[cmdVerb]
-        except Exception:
-            self.sendLine("? Unrecognized command %s" % (cmdVerb,))
-            self.sendLine("OK")
-            return
+        if cmdVerb == "MOVE":
+            newCmdPos = numpy.where(self.userNums == MAXINT, self.cmdPos, self.userNums)
+            self.moveStart(newCmdPos)
+
+        elif cmdVerb == "MOVEREL":
+            deltaPos = numpy.where(self.userNums == MAXINT, 0, self.userNums)
+            newCmdPos = self.cmdPos + deltaPos
+            self.move(newCmdPos)
         
-        self.replyList = [""] + [r.strip() for r in reply.split("\n") if r.strip()]
-        self.replyTimer.start(0.001, self.writeBack)
+        elif cmdVerb == "STATUS":
+            self.showStatus()
+            self.done()
+        
+        elif cmdVerb == "SHOWPAR":
+            self.showParams()
+            self.done()
+        
+        elif cmdVerb == "HOME":
+            self.homeStart()            
+
+        else:
+            self.sendLine("? Unrecognized command %s" % (cmdVerb,))
+            self.done()
+    
+    def homeStart(self):
+        """Start homing"""
+        cmdPos = numpy.where(self.userNums == MAXINT, self.cmdPos, self.cmdPos - self.range)
+        deltaPos = numpy.where(self.userNums == MAXINT, 0.0, -self.range)
+        deltaTimeArr = deltaPos / numpy.array(self.speed, dtype=float)
+        moveTime = min(deltaTimeArr.max(), MaxCmdTime)
+        
+        self.sendLine(self.formatArr("%6.1f", deltaTimeArr, "max sec to find reverse limit switch"))
+        
+        self.replyTimer.start(moveTime, self.homeFoundHome)
+        
+    def homeFoundHome(self):
+        """Home, second step: found reverse limit, now move away
+        """
+        deltaPos = numpy.where(self.userNums == MAXINT, 0.0, self.marg)
+        deltaTimeArr = deltaPos / numpy.array(self.homeSpeed, dtype=float)
+        moveTime = min(deltaTimeArr.max(), MaxCmdTime)
+
+        self.sendLine(self.formatArr("%6.1f", deltaTimeArr, "max sec to move away from home switch"))
+
+        self.replyTimer.start(moveTime, self.homeMovedAway)
+
+    def homeMovedAway(self):
+        """Home third step: moved away from limit switch"""
+        self.sendLine("Finding next full step")
+        self.replyTimer.start(0.1, self.homeDone)
+        
+    def homeDone(self):
+        """Homing finished"""
+        posErr = numpy.where(self.userNums == MAXINT, 999999999,
+            numpy.array(numpy.random.normal(0, self.maxCorr / 10.0, 6), dtype=int))
+
+        for msgStr in [
+            "041,  006.6 microsteps, sec to find full step",
+            self.formatArr("%09d", posErr, "position error"),
+        ]:
+            self.sendLine(msgStr)
+        self.showStatus()
+        self.showParams()
+        self.done()
+    
+    def resetUserNums(self):
+        self.userNums[:] = MAXINT
+    
+    def formatArr(self, fmtStr, arr, suffix):
+        return ", ".join([fmtStr % val for val in arr[0:self.nAxes]]) + " " + suffix
+    
+    def showStatus(self):
+        for msgStr in [
+            self.formatArr("%d", self.isHomed, "axis homed"),
+            self.formatArr("%09d", self.cmdPos, "commanded position"),
+            self.formatArr("%09d", self.measPos, "actual position"),
+        ]:
+            self.sendLine(msgStr)
+    
+    def showParams(self):
+        for msgStr in [
+            "02.10, %d software version, NAXES number of axes" % (self.nAxes,),
+            "1, 0, 01 DOAUX aux status? MOFF motors off when idle? NCORR # corrections",
+            "00.10, 00.00, 30.00 WTIME, ENCTIME, LSTIME",
+            self.formatArr("%09d", - self.range / 2, "-RNGx/2 reverse limits"),
+            self.formatArr("%09d", self.range / 2, "RNGx/2 reverse limits"),
+            self.formatArr("%09d", self.speed, "SPDx speed"),
+            self.formatArr("%09d", self.homeSpeed, "HMSPDx homing speed"),
+            self.formatArr("%09d", self.accel, "ACCx acceleration"),
+            self.formatArr("%09d", self.minCorr, "MINCORRx min correction"),
+            self.formatArr("%09d", self.maxCorr, "MAXCORRx max correction"),
+            self.formatArr("%09d", self.st_fs, "ST_FSx microsteps/full step"),
+            self.formatArr("%09d", self.speed, "speed"),
+            self.formatArr("%09d", self.marg, "MARGx dist betw hard & soft rev lim"),
+            self.formatArr("%09d", self.indSep, "INDSEP index encoder pulse separation"),
+            self.formatArr("%09.4f", self.encRes, "ENCRESx encoder resolution (microsteps/tick)"),
+        ]:
+            self.sendLine(msgStr)
+    
+    def moveStart(self, newCmdPos):
+        """Start moving to the specified newCmdPos
+        """
+        deltaPos = newCmdPos - self.cmdPos
+        deltaTimeArr = deltaPos / numpy.array(self.speed, dtype=float)
+        moveTime = min(deltaTimeArr.max(), MaxCmdTime)
+        self.cmdPos = newCmdPos
+        self.measPos = newCmdPos + numpy.array(numpy.random.normal(0, 100, 6), dtype=int)
+
+        self.sendLine(self.formatArr("%4.1f", deltaTimeArr, "max sec for move"))
+        self.sendLine(self.formatArr("%09d", self.cmdPos, "target position"))
+        self.replyTimer.start(moveTime, self.moveDone)
+    
+    def moveDone(self):
+        self.sendLine(self.formatArr("%09d", self.measPos, "final position"))
+        self.done()
+    
+    def done(self):
+        """Call when an XQ command is finished
+        
+        Reset userNums (A-F) and print OK
+        """
+        self.resetUserNums()
+        self.sendLine("OK")
     
     def sendLine(self, line):
         if Debug:
             print "sending: %r" % (line,)
         LineReceiver.sendLine(self, line)
-        
-    def writeBack(self):
-        if not self.replyList:
-            return
-        
-        nextReply = self.replyList.pop(0)
-        self.sendLine(nextReply)
-        if self.replyList:
-            self.replyTimer.start(0.25, self.writeBack)
 
 def main(port):
     """Run a fake mirror controller Galil on the specified port"""
