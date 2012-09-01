@@ -12,6 +12,7 @@ To do:
 - Perhaps support waking up homed or not homed.
   That provides more realistic normal operation (it should wake up not homed)
   while allowing fast unit testing (wake up homed, as it does now).
+- Figure out how to set status more realistically.
 """
 DefaultPort = 8000
 
@@ -48,7 +49,7 @@ class FakeGalilProtocol(LineReceiver):
         self.marg = numpy.array([400000]*3 + [5000]*3, dtype=int)
         self.indSep = numpy.array([0]*6, dtype=int)
         self.encRes =  numpy.array([-3.1496]*3 + [1.5750]*3, dtype=float)
-        
+        self.status =  numpy.array([8196*6], dtype=int)
     
     def echo(self, line):
         self.sendLine(line + ":") # not quite right, but maybe close
@@ -173,6 +174,7 @@ class FakeGalilProtocol(LineReceiver):
             self.formatArr("%d", self.isHomed, "axis homed"),
             self.formatArr("%09d", self.cmdPos, "commanded position"),
             self.formatArr("%09d", self.measPos, "actual position"),
+            self.formatArr("%09d", self.status, "status word"),
         ]:
             self.sendLine(msgStr)
     
