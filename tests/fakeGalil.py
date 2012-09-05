@@ -231,7 +231,7 @@ def main(port):
     factory.protocol = FakeGalilProtocol
     reactor.listenTCP(port, factory)
     print "Starting fake Galil on port %s" % (port,)
-    #reactor.run()
+    reactor.run()
 
 
 # this only runs if the module was *not* imported
