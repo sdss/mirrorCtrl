@@ -2,7 +2,7 @@
 """2.5m primary mirror controller
 """
 import mirrorCtrl
-from mirrorCtrl.devices.device25mPrim import Mirror
+from mirrorCtrl.mirrors.mir25mPrim import Mirror
 
 UserPort = 2531
 

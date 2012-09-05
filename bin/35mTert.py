@@ -2,7 +2,7 @@
 """3.5m tertiary mirror controller
 """
 import mirrorCtrl
-from mirrorCtrl.devices.device35mTert import Mirror
+from mirrorCtrl.mirrors.mir35mTert import Mirror
 
 UserPort = 3532
 
