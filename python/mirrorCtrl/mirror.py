@@ -27,7 +27,8 @@ ZeroOrientation = Orientation(0, 0, 0, 0, 0, 0)
 #     return 
 
 class MirrorBase(object):
-    def __init__(self, actuatorList, fixedLinkList, encoderList, name=None):
+    def __init__(self, actuatorList, fixedLinkList,
+        encoderList=None, minCorrList=None, maxCorrList=None, name=None):
         """Construct a MirrorBase
 
         Inputs:
@@ -36,8 +37,14 @@ class MirrorBase(object):
         - encoderList:  Encoders associated with actuators. None if there are no encoders,
                         else a list of items: each an encoder or None if the associated
                         actuator has no encoder.
-        - fixAxes: List of orientation axes that are fixed. Integer values [0:5].
-                        Must be specified if fixed length links are present.
+        - minCorrList: if encoderList is not None: specifies the maximum encoder error to correct (mm);
+            must have the same number of elements as encoderList;
+            if encoderList[i] is None then minCorrList[i] is ignored.
+            If encoderList is None then this argument is entirely ignored.
+        - maxCorrList: if encoderList is not None: specifies the maximum encoder error to correct (mm);
+            must have the same number of elements as encoderList;
+            if encoderList[i] is None then minCorrList[i] is ignored.
+            If encoderList is None then this argument is entirely ignored.
         - name: Mirror name, if you care to specify. Choose from 'Prim', 'Sec', or 'Tert'
                 this is read by the actor and used to generate appriate keywords
         
@@ -49,6 +56,7 @@ class MirrorBase(object):
         if len(actuatorList) + len(fixedLinkList) != 6:
             raise RuntimeError("Need exactly 6 actuators + fixed-length links; %s + %s supplied" % \
                  (len(actuatorList), len(fixedLinkList)))
+
         self.actuatorList = actuatorList
         
         # be sure to use a list for self._fixedAxes so it can be used to index numpy arrays
@@ -65,22 +73,34 @@ class MirrorBase(object):
                                  % (len(fixedLinkList)))
         self.fixedLinkList = fixedLinkList    
 
-        self.hasEncoders = False
-        if not encoderList:
+        if encoderList is None:
+            self.hasEncoders = False
             self.encoderList = actuatorList
         else:
             self.hasEncoders = True
             if len(encoderList) != len(actuatorList):
                 raise RuntimeError("encoderList must contain %s encoders; has %s" % \
                     (len(actuatorList), len(encoderList)))
+            if len(minCorrList) != len(encoderList):
+                raise RuntimeError("len(encoderList) = %d != %d = len(minCorrList)" % (len(encoderList), len(minCorrList)))
+            if len(maxCorrList) != len(encoderList):
+                raise RuntimeError("len(encoderList) = %d != %d = len(maxCorrList)" % (len(encoderList), len(maxCorrList)))
         
             # Populate encoderList with encoders, using actuators in place of 'None' encoder.
             self.encoderList = []
-            for enc, act in itertools.izip(encoderList, actuatorList):
+            self.minCorrList = []
+            self.maxCorrList = []
+            for enc, act, minCorr, maxCorr in itertools.izip(encoderList, actuatorList, minCorrList, maxCorrList):
                 if enc == None:
                     self.encoderList.append(act)
+                    self.minCorrList.append(0)
+                    self.maxCorrList.append(0)
                 else:
                     self.encoderList.append(enc)
+                    self.minCorrList.append(minCorr)
+                    self.maxCorrList.append(maxCorr)
+            self.minCorrList = numpy.array(self.minCorrList, dtype=float)
+            self.maxCorrList = numpy.array(self.minCorrList, dtype=float)
                     
     def plotMirror(self):
         """ Plots links and glass when the mirror is in neutral position,
@@ -385,10 +405,6 @@ class MirrorBase(object):
     def _minOrientErr(self, minOrient, givPhys, physMult, linkList, fitAxes=None, fullOrient=None):
         """Compute physical error given desired orientation and actual physical.
         
-        If fixAxes is defined, only orientations for those axes are found. 
-        In this case a fullOrient(6) is needed to define the orientation values that are held 
-        constant (the fitter won't touch these).
-        
         Inputs: 
         - minOrient: an orientation to be solved for. If it is less than 6 elements, then fitAxes
                         must to be specified and must be the same length as minOrient.
@@ -476,19 +492,38 @@ class MirrorBase(object):
 class DirectMirror(MirrorBase):
     """A mirror supported by 6 actuators or fixed links connected directly to the mirrorCtrl.
     """
-    def __init__(self, actuatorList, fixedLinkList, encoderList = None, name=None):
-        """
+    def __init__(self, actuatorList, fixedLinkList, encoderList, minCorrList, maxCorrList, name=None):
+        """Construct a Direct mirror
+
         Inputs:
-        - actuatorList: List of the 6 actuators actuators and fixed links that support the mirrorCtrl.
+        - actuatorList: List of actuators that support the mirrorCtrl.
+        - fixedLinkList: List of fixed-length links that support the mirror
         - encoderList:  Encoders associated with actuators. None if there are no encoders,
-                        else a list of 6 items: each an encoder or None if the associated
+                        else a list of items: each an encoder or None if the associated
                         actuator has no encoder.
+        - minCorrList: if encoderList is not None: specifies the maximum encoder error to correct;
+            must have the same number of elements as encoderList;
+            if encoderList[i] is None then minCorrList[i] is ignored.
+            If encoderList is None then this argument is entirely ignored.
+        - maxCorrList: if encoderList is not None: specifies the maximum encoder error to correct;
+            must have the same number of elements as encoderList;
+            if encoderList[i] is None then minCorrList[i] is ignored.
+            If encoderList is None then this argument is entirely ignored.
+        - name: Mirror name, if you care to specify. Choose from 'Prim', 'Sec', or 'Tert'
+                this is read by the actor and used to generate appriate keywords
         
         Two configurations are supported:
         - control piston, tip and tilt only (no translation or z rotation)
         - control piston, tip, tilt and translation (no z rotation)
         """
-        MirrorBase.__init__(self, actuatorList, fixedLinkList, encoderList, name)
+        MirrorBase.__init__(self,
+            actuatorList = actuatorList,
+            fixedLinkList = fixedLinkList,
+            encoderList = encoderList,
+            minCorrList = minCorrList,
+            maxCorrList = maxCorrList,
+            name = name,
+        )
 
     def _physFromOrient(self, orient, linkList):
         """Compute desired physical position of actuators, encoders or fixed
@@ -553,8 +588,34 @@ class TipTransMirror(MirrorBase):
     Actuators 3, 4 are attached to the linear bearing to tip it.
     Actuator 5 is an antirotation link attached to the mirrorCtrl.
     """
-    def __init__(self, ctrMirZ, ctrBaseZ, actuatorList, fixedLinkList, encoderList = None, name=None):
-        MirrorBase.__init__(self, actuatorList, fixedLinkList, encoderList, name)
+    def __init__(self, ctrMirZ, ctrBaseZ, actuatorList, fixedLinkList,
+        encoderList, minCorrList, maxCorrList, name=None):
+        """Construct a Tip-Trans Mirror
+        
+        Inputs:
+        - ctrMirZ: z position of center of mirror in neutral position
+        - ctrBaseZ: z position of center of base (ball joint)
+        - fixedLinkList: List of fixed-length links that support the mirror
+        - encoderList:  Encoders associated with actuators. None if there are no encoders,
+                        else a list of items: each an encoder or None if the associated
+                        actuator has no encoder.
+        - minCorrList: if encoderList is not None: specifies the maximum encoder error to correct;
+            must have the same number of elements as encoderList;
+            if encoderList[i] is None then minCorrList[i] is ignored.
+            If encoderList is None then this argument is entirely ignored.
+        - maxCorrList: if encoderList is not None: specifies the maximum encoder error to correct;
+            must have the same number of elements as encoderList;
+            if encoderList[i] is None then minCorrList[i] is ignored.
+            If encoderList is None then this argument is entirely ignored.
+        """
+        MirrorBase.__init__(self,
+            actuatorList = actuatorList,
+            fixedLinkList = fixedLinkList,
+            encoderList = encoderList,
+            minCorrList = minCorrList,
+            maxCorrList = maxCorrList,
+            name = name,
+        )
         self.ctrMirZ = ctrMirZ
         self.ctrBaseZ = ctrBaseZ
         if len(self.fixedLinkList) != 1:

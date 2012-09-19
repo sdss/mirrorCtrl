@@ -126,7 +126,7 @@ class FakeGalilProtocol(LineReceiver):
         """Start homing"""
         cmdPos = numpy.where(self.userNums == MAXINT, self.cmdPos, self.cmdPos - self.range)
         deltaPos = numpy.where(self.userNums == MAXINT, 0.0, -self.range)
-        deltaTimeArr = deltaPos / numpy.array(self.speed, dtype=float)
+        deltaTimeArr = numpy.abs(deltaPos / numpy.array(self.speed, dtype=float))
         moveTime = min(deltaTimeArr.max(), MaxCmdTime)
         
         self.sendLine(self.formatArr("%6.1f", deltaTimeArr, "max sec to find reverse limit switch"))

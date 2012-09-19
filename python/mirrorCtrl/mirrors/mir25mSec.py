@@ -72,12 +72,12 @@ CtrMirZ = -135.70
 CtrBaseZ = -178.40
 
 # generate a lists of link objects for mirror configuration
-actLinkList = []
-encLinkList = []
+actuatorList = []
+encoderList = []
 for i in range(5):
     baseAct = numpy.array([ActBaseX[i], ActBaseY[i], ActBaseZ[i]])
     mirAct = numpy.array([ActMirX[i], ActMirY[i], ActMirZ[i]])
-    actLinkList.append(
+    actuatorList.append(
         mirrorCtrl.AdjBaseActuator(
             baseAct, mirAct, ActMinMount[i], 
             ActMaxMount[i], ActMountScale[i], ActMountOffset[i]
@@ -94,7 +94,7 @@ for i in range(5):
         newTheta = theta + deltaTheta
         xPos = radius * numpy.cos(newTheta)
         yPos = radius * numpy.sin(newTheta)
-        encLinkList.append(
+        encoderList.append(
             mirrorCtrl.AdjLengthLink(
                 numpy.array([xPos, yPos, baseAct[2]]),
                 numpy.array([xPos, yPos, mirAct[2]]),
@@ -104,7 +104,7 @@ for i in range(5):
         )
     else:
         # transverse encoders
-        encLinkList.append(
+        encoderList.append(
             mirrorCtrl.AdjLengthLink(
                 numpy.array([baseAct[0], baseAct[1], baseAct[2] + zEncOffsetTrans]),
                 numpy.array([mirAct[0], mirAct[1], mirAct[2] + zEncOffsetTrans]),
@@ -118,10 +118,22 @@ for i in range(5):
 # note: x and y poitions were not labeled, so may be transposed
 
 # note: French's model has Z = 1 inch below glass, but I'm adopting Z = actuators' mir pos.
-fixLinkList = [] 
+fixedLinkList = [] 
 fixMirPos = numpy.array([0., -17.296 * MMPerInch, -193.0])
 fixBasePos = numpy.array([13.125 * MMPerInch, -17.296 * MMPerInch, -193.0])
-fixLinkList.append(mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos))
+fixedLinkList.append(mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos))
 
-Mirror = mirrorCtrl.TipTransMirror(CtrMirZ, CtrBaseZ, actLinkList, fixLinkList, encLinkList, Name)
+minCorrList = [4.0e-5]*3 + [0]*2 # min correction (mm); 50 actuator microsteps
+maxCorrList = [0.79]*3   + [0]*2 # max correction (mm); 1000000 actuator microsteps
+
+Mirror = mirrorCtrl.TipTransMirror(
+    ctrMirZ = CtrMirZ,
+    ctrBaseZ = CtrBaseZ,
+    actuatorList = actuatorList,
+    fixedLinkList = fixedLinkList,
+    encoderList = encoderList,
+    minCorrList = minCorrList,
+    maxCorrList = maxCorrList,
+    name = Name,
+)
 
