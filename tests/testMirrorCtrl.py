@@ -33,9 +33,9 @@ class MirActor(mirrorCtrl.MirrorCtrl):
         print 'actor server ready?: ', self.server.isReady
 
 
-class MirDev(mirrorCtrl.GalilDevice25M2):
+class MirDev(mirrorCtrl.GalilDevice25Sec):
     def __init__(self, mirror, host, port, isReady):
-        mirrorCtrl.GalilDevice25M2.__init__(self,
+        mirrorCtrl.GalilDevice25Sec.__init__(self,
         mirror = mirror,
         host = host,
         port = port,

@@ -26,7 +26,7 @@ from RO.SeqUtil import asSequence
 from twistedActor import TCPDevice, CommandError, UserCmd
 from twisted.internet import reactor
 
-__all__ = ["GalilDevice", "GalilDevice25M2", "GalilDevice35M3"]
+__all__ = ["GalilDevice", "GalilDevice25Sec", "GalilDevice35Tert"]
 
 MMPerMicron = 1 / 1000.0        # millimeters per micron
 RadPerDeg  = math.pi / 180.0    # radians per degree
@@ -154,7 +154,7 @@ class GalilDevice(TCPDevice):
         self.currDevCmd.setState(self.currDevCmd.Done)
         self.currUserCmd = UserCmd(userID=0, cmdStr="")
         self.currUserCmd.setState(self.currUserCmd.Done)
-        self.parsedKeyList = None
+        self.parsedKeyList = []
         self.nAct = len(self.mirror.actuatorList)
         self.validAxisList =  ('A', 'B', 'C', 'D', 'E', 'F')[0:self.nAct]
         # dictionary of axis name: index, e.g. A: 0, B: 1..., F: 5
@@ -391,7 +391,7 @@ class GalilDevice(TCPDevice):
             self.currDevCmd.setState(self.currDevCmd.Failed, textMsg=replyStr)
             if not self.currUserCmd.isDone:
                 self.currUserCmd.setState(self.currUserCmd.Failed, textMsg=replyStr)
-            self._clrDevCmd()
+            self._clearDevCmd()
             return
         if okLineRegEx.match(replyStr):
             # command finished
@@ -425,27 +425,6 @@ class GalilDevice(TCPDevice):
                     # even if they contain only one value
                     self.actOnKey(key, dat)
                     self.parsedKeyList.append(key)
-    
-    def devCmdCallback(self, dumDevCmd=None):
-        """Device command callback
-        """
-        print "devCmdCallback(); currDevCmd=%r; _userCmdNextStep=%s" % (self.currDevCmd, self._userCmdNextStep)
-        if self.currDevCmd.didFail:
-            self._userCmdNextStep = None
-            if not self.currUserCmd.isDone:
-                self.currUserCmd.setState(self.currUserCmd.Failed,
-                    textMsg="Galil command %s failed" % (self.currDevCmd.cmdStr,))
-            
-        if not self.currDevCmd.isDone:
-            return
-
-        userCmdNextStep, self._userCmdNextStep = self._userCmdNextStep, None
-        if userCmdNextStep:
-            # start next step of user command
-            userCmdNextStep()
-        else:
-            # nothing more to do; user command must be finished!
-            self.currUserCmd.setState(self.currUserCmd.Done)
 
     def cmdHome(self, axisList, userCmd):
         """Home the specified actuators
@@ -472,18 +451,11 @@ class GalilDevice(TCPDevice):
                 newHoming[ind] = 1
         if badAxisList:
             raise CommandError("Invalid axes %s not in %s" % (badAxisList, self.validAxisList))
-
-        # compute command string, e.g. A=1; B=MAXINT; C=...; XQ#HOME
-        # explicitly set non-homed axes to MAXINT just to be sure old values are not left around
-        argList = []
-        axisSet = set(axisList)
-        for axis in self.validAxisList:
-            if axis in axisSet:
-                argList.append("%s=1" % (axis,))
-            else:
-                argList.append("%s=MAXINT" % (axis,))
-        cmdStr = "; ".join(argList) + "; XQ #HOME"
-
+        
+        cmdStr = self.formatGalilCommand(
+            valueList = [doHome if doHome else None for doHome in newHoming],
+            cmd = "XQ #HOME",
+        )
         self.status.homing = newHoming
             
         self.writeToUsers(">", "Text = Homing Actuators: %s" % (", ".join(str(v) for v in axisList)), cmd = userCmd)
@@ -507,10 +479,10 @@ class GalilDevice(TCPDevice):
         self.status.cmdMount = numpy.asarray(mount, dtype=float) # this will change upon iteration
         self.status.desOrient = numpy.asarray(adjOrient, dtype=float) # initial guess for fitter
         # format Galil command
-        cmdMoveStr = self._galCmdFromMount(mount)
+        cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
         self.status.desOrientAge.startTimer()
         updateStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "cmdMount", "maxIter"])
-        self.startDevCmd(cmdMoveStr, callFunc=self._moveCallback)
+        self.startDevCmd(cmdMoveStr, callFunc=self._moveIter)
 
     def cmdReset(self, userCmd):
         """Reset the Galil to its power-on state. All axes will have to be re-homed. Stop is gentler!
@@ -584,24 +556,24 @@ class GalilDevice(TCPDevice):
         - cmdStr: command to send to the Galil
         - timeLim: time limit for command, in seconds
         - callFunc: function to call when the command finishes; receives no arguments
-            (note: devCmdCallback is called by the device command and is responsible
+            (note: _devCmdCallback is called by the device command and is responsible
             for calling callFunc, which is stored in _userCmdNextStep)
         """
         print "startDevCmd(cmdStr=%s); userCmd state=%s" % (cmdStr, self.currUserCmd.state)
         if not self.currDevCmd.isDone:
             # this should never happen, but...just in case
-            raise RuntimeError("Cannot start new command, there is a cmd currently running")
+            raise RuntimeError("Cannot start new device command: %s is running" % (self.currDevCmd,))
         
         self._userCmdNextStep = callFunc
-        devCmd = self.cmdClass(cmdStr, timeLim = timeLim, callFunc=self.devCmdCallback)
+        devCmd = self.cmdClass(cmdStr, timeLim = timeLim, callFunc=self._devCmdCallback)
         self.currDevCmd = devCmd
-        self.parsedKeyList=[]
+        self.parsedKeyList = []
         try:
             self.conn.writeLine(devCmd.cmdStr)
             devCmd.setState(devCmd.Running)
         except Exception, e:
             devCmd.setState(devCmd.Failed, textMsg=strFromException(e))
-            self._clrDevCmd()
+            self._clearDevCmd()
     
     def startUserCmd(self, userCmd, doCancel=False, timeLim=5):
         """Start a new user command
@@ -636,13 +608,32 @@ class GalilDevice(TCPDevice):
             userCmd.setTimeLimit(timeLim)
         userCmd.setState(userCmd.Running)
 
-    def _actOnMove(self):
-        """Called after a move command.  This method tests if all went well with the move,
-        and commands another if wanted.
+    def _devCmdCallback(self, dumDevCmd=None):
+        """Device command callback
+        
+        startDevCmd always assigns this as the callback, which then calls and clears any user-specified callback.
+        """
+        print "_devCmdCallback(); currDevCmd=%r; _userCmdNextStep=%s" % (self.currDevCmd, self._userCmdNextStep)
+        if self.currDevCmd.didFail:
+            self._userCmdNextStep = None
+            if not self.currUserCmd.isDone:
+                self.currUserCmd.setState(self.currUserCmd.Failed,
+                    textMsg="Galil command %s failed" % (self.currDevCmd.cmdStr,))
+            
+        if not self.currDevCmd.isDone:
+            return
 
-        Outputs:
-        - True if move command succeeded;
-            False indicates move needs more iterations or move failed
+        userCmdNextStep, self._userCmdNextStep = self._userCmdNextStep, None
+        if userCmdNextStep:
+            # start next step of user command
+            userCmdNextStep()
+        else:
+            # nothing more to do; user command must be finished!
+            self.currUserCmd.setState(self.currUserCmd.Done)
+            self._clearDevCmd()
+
+    def _moveIter(self):
+        """A move device command ended; decide whether further move iterations are required and act accordingly.
         """
         # check if we got all expected information from Galil...
         if not ('max sec for move' in self.parsedKeyList):
@@ -651,52 +642,40 @@ class GalilDevice(TCPDevice):
             self.writeToUsers("w", "Text=\"Target actuator positions not received from move\"", cmd=self.currUserCmd)
         if not('final position' in self.parsedKeyList):
             # final actuator positions are needed for subsequent moves...better fail the cmd
-            self._clrDevCmd()
             self.currUserCmd.setState(self.currUserCmd.Failed, textMsg="Final actuator positions not received from move")
-            return False
+            return
 
         actErr = self.status.cmdMount - self.status.actMount
 
         # error too large to correct?
         if numpy.any(numpy.abs(actErr) > self.mirror.maxCorrList):
             self.currUserCmd.setState(self.currUserCmd.Failed, "Error too large to correct")
-            self._clrDevCmd()
-            return False
+            return
 
         # perform another iteration?
         if numpy.any(numpy.abs(actErr) > self.mirror.minCorrList) and (self.status.iter < self.status.maxIter):
-            # not within acceptable error range and more iterations are available
-            # do another move
-            # add offset to previous command
             self.status.cmdMount += actErr
             # clear or update the relevant slots before beginning a new device cmd
             self.parsedKeyList = []
             self.status.iter += 1
             self.status.duration.reset() # new timer for new move
+            self.currUserCmd.setTimeLimit(5)
             statusStr = self.status._getKeyValStr(["cmdMount", "iter"])
             self.writeToUsers("i", statusStr, cmd=self.currUserCmd)
             cmdMoveStr = self._galCmdFromMount(self.status.cmdMount)
-            self.startDevCmd(cmdMoveStr, callFunc=self._moveCallback)
-            return False
-        # no more iterations
-        return True
+            self.startDevCmd(cmdMoveStr, callFunc=self._moveIter)
+            return
 
-    def _moveCallback(self, cmd):
-        """This code is executed when a device move command changes state. Most of the work
-        is in the _actOnMove() method...
+        # done
+        self._moveEnd()
+    
+    def _moveEnd(self):
+        """The final move device command ended successfully; clean up and set self.currUserCmd state done.
 
-        Inputs:
-        - cmd: passed automatically due to twistedActor callback framework
+        Optionally perform any post-move cleanup (such as moving piezos).
+        Finally: set self.currUserCmd state done (or failed, if cleanup failed).
         """
-
-        if not cmd.isDone:
-            return
-        isDone = self._actOnMove()
-        if isDone:
-            self._clrDevCmd()
-            self.currUserCmd.setState(self.currUserCmd.Done)
-        else:
-            return
+        self.currUserCmd.setState(self.currUserCmd.Done)
 
     def _statusCallback(self):
         """Callback for status command.
@@ -711,7 +690,7 @@ class GalilDevice(TCPDevice):
             self.writeToUsers("w", "Text=\"Homed axis info not received\"", cmd=self.currUserCmd)
 
         # grab cached info that wasn't already sent to the user
-        getThese = [
+        statusStr = self.status._getKeyValStr([
             "maxDuration",
             "duration",
             "iter",
@@ -719,15 +698,14 @@ class GalilDevice(TCPDevice):
             "desOrient",
             "desOrientAge",
             "homing",
-            ]
-        statusStr = self.status._getKeyValStr(getThese)
+        ])
         self.writeToUsers("i", statusStr, cmd = self.currUserCmd)
         self.currUserCmd.setState(self.currUserCmd.Done)
 
-    def _clrDevCmd(self):
-        """Clean up device command when finished.
+    def _clearDevCmd(self):
+        """Clean up device command and associated data
         """
-        self.parsedKeyList = None
+        self.parsedKeyList = []
         self.status.iter = numpy.nan
         if not self.currDevCmd.isDone:
             # failsafe, cmd should always be done at this point.
@@ -736,27 +714,41 @@ class GalilDevice(TCPDevice):
         self.status.maxDuration = numpy.nan
         self.status.duration.reset()
 
-    def _galCmdFromMount(self, mountList):
-        """Converts mount information into a string command for a Galil
-
-        notes:
-        The actuator mechanical/positional data needs to be defined in the
-        correct order for each mirrorCtrl...no way to check if that was done once
-        we're here.
+    def formatGalilCommand(self, valueList, cmd, axisPrefix="", valFmt="%0.f", nAxes=None):
+        """Format a Galil command
+        
+        Values that are None are replaced with MAXINT
+        If len(valueList) < number of actuators, the extra axes are also set to MAXINT
+    
+        Inputs:
+        - valueList: a list of values
+        - cmd: the command (e.g. "XQ #MOVE")
+        - axisPrefix: a string prefixing each axis
+        - valFmt: value format
+        - nAxes: number of axes in command; if None use all axes
         """
-        if len(mountList) > self.nAct:
-            raise RuntimeError("Too many mount values")
-        argList = []
-        for ind, mount in enumerate(mountList):
-            # axes to move
-            argList.append("%s=%.0f" % (self.validAxisList[ind], mount))
-        for ind in range(len(mountList), self.nAct):
-            # axes to leave alone (paranoia)
-            argList.append("%s=MAXINT" % (self.validAxisList[ind],))
-        return "; ".join(argList) + '; XQ #MOVE'
+        if nAxes is None:
+            nAxes = self.nAct
+        elif nAxes > self.nAct:
+            raise RuntimeError("nAxes too big (%d > %d)" % (nAxes, self.nAct))
+        if len(valueList) > nAxes:
+            raise RuntimeError("Too many values (%d > %d)" % (len(valueList), nAxes))
+        
+        def formatValue(val):
+            if val is None:
+                return "MAXINT"
+            else:
+                return valFmt % (val,)
+        
+        # append None for missing values at end
+        fullValueList = valueList + [None]*(nAxes - len(valueList))
+        
+        argList = ["%s%s=%s" % (axisPrefix, self.validAxisList[ind], formatValue(val)) for ind, val in enumerate(fullValueList)]
+        
+        return "%s; %s" % ("; ".join(argList), cmd)
 
 
-class GalilDevice35M3(GalilDevice):
+class GalilDevice35Tert(GalilDevice):
     """A Galil Device controller that is specific to the 3.5m Tertiary mirror
     """
     def __init__(self,
@@ -786,7 +778,7 @@ class GalilDevice35M3(GalilDevice):
             ])
 
 
-class GalilDevice25M2(GalilDevice):
+class GalilDevice25Sec(GalilDevice):
     """A Galil Device controller that is specific to the 2.5m Secondary mirror
 
     note: add in piezo corrections for move, LCSTOP should be set to 1 to disable
@@ -832,39 +824,30 @@ class GalilDevice25M2(GalilDevice):
 #         else:
 #             GalilDevice.actOnKey(key, data)
 
-    def cmdMovePiezos(self):
-        """A command for moving piezos that are set in series with actuators A, B, and C.
-
-        Inputs:
-        piezoMount: 3 item list containing the ammount of required adjustment (microsteps) for A, B, C.
+    def movePiezos(self):
+        """Move piezo actuators to attempt to correct residual error
+        
+        Only axes A-C have piezo actuators.
         """
         actErr = self.status.cmdMount - self.status.actMount
-        self.status.cmdMount[0:3] = self.status.cmdMount[0:3] + actErr[0:3]
-        # only first 3 actuators have piezos
-        cmdStr = self._galPiezoCmdFromMount(self.status.cmdMount[0:3])
+        cmdStr = self.formatGalilCommand(actErr, "XQ #LMOVE", axisPrefix="LDESPOS", nAxes=3)
         self.startDevCmd(cmdStr, callFunc=self._piezoMoveCallback)
 
-    def _moveCallback(self, cmd):
+    def _moveEnd(self, cmd):
         """Overwritten from base class, to allow for a piezo move command after all the
         coarse moves have been finished.
 
         Inputs:
         - cmd: passed automatically due to twistedActor callback framework
         """
+        self.movePiezos()
 
-        if not cmd.state == "done":
-            return
-        isDone = self._actOnMove()
-        if isDone:
-            # command a piezo move
-            self._clrDevCmd()
-            self.cmdMovePiezos()
-        else:
-            return
-
-    def _piezoMoveCallback(self, cmd):
+    def _piezoMoveCallback(self, devCmd=None):
         """Called when the piezos are finished moving
         """
+        if not self.currDevCmd.isDone:
+            return
+
         if not('commanded position' in self.parsedKeyList):
             self.writeToUsers("w", "Text=\"Commanded actuator positions not received from piezo move\"", cmd=self.currUserCmd)
         if not('actual position' in self.parsedKeyList):
@@ -875,20 +858,7 @@ class GalilDevice25M2(GalilDevice):
             self.writeToUsers("w", "Text=\"Piezo status word not received from piezo move\"", cmd=self.currUserCmd)
         if not('piezo corrections (microsteps)' in self.parsedKeyList):
             self.writeToUsers("w", "Text=\"Piezo corrections not received from piezo move\"", cmd=self.currUserCmd)
-        self._clrDevCmd()
-        self.currUserCmd.setState(self.currUserCmd.Done)
-
-    def _galPiezoCmdFromMount(self, mountOffset):
-        """Converts mount information into a string command for a Galil.  Only actuators
-        A, B, and C have piezos, so no translational fine-tuning is available here.
-
-        Inputs:
-        mountList: a list of 3 mount values (microsteps) for each piezo to move.
-        """
-        if len(mountList) != 3:
-            raise RuntimeError("Must provide 3 peizo values")
-        argList = []
-        for ind, mount in enumerate(mountList):
-            # axes to move
-            argList.append("LDESPOS%s=%.0f" % (self.validAxisList[ind], mount))
-        return "; ".join(argList) + "; XQ #LMOVE"
+        if self.currDevCmd.didFail:
+            self.currUserCmd.setState(self.currUserCmd.Failed, "Piezo correction failed: %s" % (self.currDevCmd._textMsg,))
+        else:
+            self.currUserCmd.setState(self.currUserCmd.Done)
