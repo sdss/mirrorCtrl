@@ -21,7 +21,7 @@ if (len(sys.argv) > 1):
 # .makeMirror takes an mirId arguement wich is used in the instrument ICC to tailor functionality
 # between different mirrors
 mir = genMirrors.Sec25().makeMirror(name='Tert') # this matches hard coded (faked) replies from twistedGalil
-mirDev = mirrorCtrl.GalilDevice35M3(mir, ControllerAddr, ControllerPort)
+mirDev = mirrorCtrl.GalilDevice35Tert(mir, ControllerAddr, ControllerPort)
 if __name__ == "__main__":
-    #mirrorCtrl.runMirrorCtrl(Mir, mirrorCtrl.GalilDevice35M3, UserPort, ControllerAddr, ControllerPort)
+    #mirrorCtrl.runMirrorCtrl(Mir, mirrorCtrl.GalilDevice35Tert, UserPort, ControllerAddr, ControllerPort)
     mirrorCtrl.runMirrorCtrl(mirDev, UserPort)

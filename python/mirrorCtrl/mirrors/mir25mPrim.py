@@ -83,9 +83,8 @@ ActBaseY = numpy.array([864.90, -432.45, -432.45,   -9e4, -1277., 1277.])
 ActBaseZ = numpy.array([   9e4,     9e4,     9e4,   238.,   262.,  262.])
 
 # generate a lists of link objects for mirror configuration
-fixLinkList = [] # no fixed length links on SDSS primary
-encLinkList = None # no encoders on SDSS primary
-actLinkList = []
+fixedLinkList = [] # no fixed length links on SDSS primary
+actuatorList = []
 for i in range(6):
     actBasePos = numpy.array([ActBaseX[i], ActBaseY[i], ActBaseZ[i]])
     actMirPos = numpy.array([ActMirX[i], ActMirY[i], ActMirZ[i]])
@@ -94,6 +93,17 @@ for i in range(6):
     actScale = ActMountScale[i]
     actOffset = ActMountOffset[i]
     actLink = genLink(actBasePos, actMirPos, actMin, actMax, actScale, actOffset)
-    actLinkList.append(actLink)
+    actuatorList.append(actLink)
 
-Mirror = mirrorCtrl.DirectMirror(actLinkList, fixLinkList, encLinkList, Name)
+encoderList = None # no encoders on SDSS primary
+minCorrList = None
+maxCorrList = None
+
+Mirror = mirrorCtrl.DirectMirror(
+    actuatorList = actuatorList,
+    fixedLinkList = fixedLinkList,
+    encoderList = encoderList,
+    minCorrList = minCorrList,
+    maxCorrList = maxCorrList,
+    name = Name,
+)

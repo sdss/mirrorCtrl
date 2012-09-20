@@ -108,16 +108,16 @@ for actInd in range(3, 5):
     mult = -1.
 
 # generate lists of link objects for mirror configuration
-actLinkList = []
-encLinkList = []
+actuatorList = []
+encoderList = []
 for i in range(5):    
-    actLinkList.append(
+    actuatorList.append(
         mirrorCtrl.AdjBaseActuator(
             baseAct[i, :], mirAct[i, :], 
             ActMinMount[i], ActMaxMount[i], ActMountScale[i], ActMountOffset[i]
         )
     )
-    encLinkList.append(
+    encoderList.append(
         mirrorCtrl.AdjLengthLink(
             baseEnc[i, :], mirEnc[i, :], 
             ActMinMount[i], ActMaxMount[i], ActMountScale[i], ActMountOffset[i]        
@@ -131,6 +131,16 @@ linkLength = 12.36 * MMPerInch # measured
 mirRadius = 1000. # guess
 fixMirPos = numpy.array([0., mirRadius, zMirAx]) # opposite of A
 fixBasePos = numpy.array([linkLength, mirRadius, zMirAx])
-fixLinkList = [mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos)]
+fixedLinkList = [mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos)]
 
-Mirror = mirrorCtrl.DirectMirror(actLinkList, fixLinkList, encLinkList, Name)
+minCorrList = [4.0e-5]*3 + [0.0016]*2 # min correction (mm); 50 actuator microsteps for all actuators
+maxCorrList = [0.79]*3   + [0.16]*2 # max correction (mm); 1000000 actuator microsteps for A-C; 5000 for D-E
+
+Mirror = mirrorCtrl.DirectMirror(
+    actuatorList = actuatorList,
+    fixedLinkList = fixedLinkList,
+    encoderList = encoderList,
+    minCorrList = minCorrList,
+    maxCorrList = maxCorrList,
+    name = Name,
+)

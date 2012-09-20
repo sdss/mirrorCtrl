@@ -10,14 +10,13 @@ import time
 # If True: start from all zeros.
 zeroFlag = False
 
+import RO.Astro.Tm
 from data import genMirrors
 import mirrorCtrl
-sys.path.insert(1,'../bin/')
-import Prim25m
-import Sec25m
-import Sec35m
-import Tert35m
-import RO.Astro.Tm
+import mirrorCtrl.mirrors.mir25mPrim
+import mirrorCtrl.mirrors.mir25mSec
+import mirrorCtrl.mirrors.mir35mSec
+import mirrorCtrl.mirrors.mir35mTert
 
 MMPerMicron = 1 / 1000.0        # millimeters per micron
 RadPerDeg  = math.pi / 180.0    # radians per degree
@@ -79,13 +78,13 @@ for orient in orientList:
 #            genMirrors.Tert35(vers='old').makeMirror() # old semi-inf length links
 #            ]
            
-# mirrors can be viewed using the plotMirror() method, eg: Prim25m.Mirror.plotMirror()
+# mirrors can be viewed using the plotMirror() method, eg: mirrorCtrl.mirrors.mir25mPrim.Mirror.plotMirror()
 # use the non-fictitous mirrors:
 mirList = [
-    Prim25m.Mirror,
-    Sec25m.Mirror,
-    Sec35m.Mirror,
-    Tert35m.Mirror,
+    mirrorCtrl.mirrors.mir25mPrim.Mirror,
+    mirrorCtrl.mirrors.mir25mSec.Mirror,
+    mirrorCtrl.mirrors.mir35mSec.Mirror,
+    mirrorCtrl.mirrors.mir35mTert.Mirror,
 ]
 
 print 'mirList len: ', len(mirList)

@@ -11,7 +11,7 @@ GalilHost = 'localhost'
 GalilPort = 8000 # matches fakeGalil.py for testing
 
 if __name__ == "__main__":
-    device = mirrorCtrl.GalilDevice(
+    device = mirrorCtrl.GalilDevice25Sec(
         mirror = Mirror,
         host = GalilHost,
         port = GalilPort,

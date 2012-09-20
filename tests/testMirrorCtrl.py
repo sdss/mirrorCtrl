@@ -28,23 +28,24 @@ def serverConnMade(self, *args):
     d, self.factory.onConnectionMade = self.factory.onConnectionMade, None
     d.callback(self)
 
-def showReply(msgStr, *args, **kwargs):
-        print 'reply: ' + msgStr + "\n"
 
-def cb(thisConn): 
-    """Generic callback used in TCPConnection, called every time a state changes
-    thisConn must have dConn and dDisConn Deferred attributes appended for correct
-    execution.
-    """
-    state, reason = thisConn.fullState
-    print "Name %s, Connection state: %s %s\n" % (thisConn._name, state, reason)
-    if thisConn.isConnected:
-        dConn, thisConn.dConn = thisConn.dConn, None
-        dConn.callback(None)
-    if state in ('Disconnected', 'Failed'):
-        dDisConn, thisConn.dDisConn = thisConn.dDisConn, None
-        dDisConn.callback(None)
-
+class MirDev(mirrorCtrl.GalilDevice25Sec):
+    def __init__(self, mirror, host, port, isReady):
+        mirrorCtrl.GalilDevice25Sec.__init__(self,
+        mirror = mirror,
+        host = host,
+        port = port,
+        callFunc = self.getState
+        )
+        self.conn.addStateCallback(self.getState)
+        self.d1 = isReady
+        
+    def getState(self, *args, **kwargs):
+        print 'Mirror Device State: ', self.conn.state
+        if self.conn.state == 'Connected':
+            print 'mirror device connected to Galil'
+            self.d1.callback('')
+            
 
 class MirrorCtrlTestCase(unittest.TestCase):
     """A series of tests using twisted's trial unittesting.  Simulates
@@ -142,4 +143,5 @@ class MirrorCtrlTestCase(unittest.TestCase):
             cmdStr = 'status',
         )
         self.dispatcher.executeCmd(cmdVar)
+        return Deferred()
                
