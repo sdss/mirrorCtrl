@@ -4,11 +4,12 @@ Intended for communication via telnet"""
 
 import numpy
 import mirrorCtrl
+from mirrorCtrl.mirrors.mir35mTert import Mirror
 import sys
 from data import genMirrors
 UserPort = 1025
-ControllerAddr = 'localhost'
-ControllerPort = 8000 # must match in twistedGalil.py for testing
+ControllerAddr = 'tccservdev.astro.washington.edu'
+ControllerPort = 2011
 
 if (len(sys.argv) > 1):
     # ports were specified via command line
@@ -20,8 +21,8 @@ if (len(sys.argv) > 1):
         
 # .makeMirror takes an mirId arguement wich is used in the instrument ICC to tailor functionality
 # between different mirrors
-mir = genMirrors.Sec25().makeMirror(name='Tert') # this matches hard coded (faked) replies from twistedGalil
-mirDev = mirrorCtrl.GalilDevice35Tert(mir, ControllerAddr, ControllerPort)
+
+mirDev = mirrorCtrl.GalilDevice35Tert(Mirror, ControllerAddr, ControllerPort)
 if __name__ == "__main__":
     #mirrorCtrl.runMirrorCtrl(Mir, mirrorCtrl.GalilDevice35Tert, UserPort, ControllerAddr, ControllerPort)
     mirrorCtrl.runMirrorCtrl(mirDev, UserPort)

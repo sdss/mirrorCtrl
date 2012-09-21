@@ -380,12 +380,16 @@ class GalilDevice(TCPDevice):
         if self.currDevCmd.isDone:
             # ignore unsolicited input
             return
-        replyStr = replyStr.replace(":", "")
-        replyStr = replyStr.encode("ASCII", "ignore").strip(' ;\r\n')
-        if not replyStr:
+        
+        replyStr = unicode(replyStr, errors='ignore')
+        replyStr = replyStr.encode("ascii", errors = "ignore")        
+        replyStr = replyStr.replace(":", "").strip(' ;\r\n\x01\x03\x18\x00')
+        #replyStr = replyStr.strip(' ;\r\n')
+        if replyStr == "":
             # ignore blank replies
             return
-        if replyStr.startswith("?"):
+        catchGOPOS = replyStr.startswith("?GOPOS")
+        if replyStr.startswith("?") and not catchGOPOS:
             # there was an error. End current process
             self.writeToUsers("f", "Text=\"Galil Error: %s\"" % (replyStr,), cmd = self.currDevCmd)
             self.currDevCmd.setState(self.currDevCmd.Failed, textMsg=replyStr)
