@@ -5,7 +5,7 @@ from twisted.trial import unittest
 from twisted.internet.defer import Deferred, gatherResults, maybeDeferred
 from twisted.internet.protocol import ProcessProtocol, ServerFactory
 import mirrorCtrl
-import mirrorCtrl.devices.device25mSec
+import mirrorCtrl.mirrors.mir25mSec
 from twistedActor import ActorDevice
 from RO.Comm.TCPConnection import TCPConnection
 from opscore.actor import ActorDispatcher, CmdVar
@@ -18,34 +18,20 @@ FakeGalilPort = 8000
 FakeGalilHost = 'localhost'
 Sec25mUserPort = 2532
 
-def serverConnLost(self, *args):
-    print 'Galil server Connection lost!: '
-    d, self.factory.onConnectionLost = self.factory.onConnectionLost, None
-    d.callback(self)
+def showReply(msgStr, *args, **kwargs): # prints what the dispactcher sees to the screen
+    print 'reply: ' + msgStr + "\n"
 
-def serverConnMade(self, *args):
-    print 'Galil server Connection made!'
-    d, self.factory.onConnectionMade = self.factory.onConnectionMade, None
-    d.callback(self)
+def connCB(self, *args): # callback for TCP connection state change
+    print '%s Device state: %s' % (self._name, self.fullState)
+    if self.isConnected:
+        print '%s Device Connected on port %s' % (self._name, self.port)
+        d, self.connDeferred = self.connDeferred, None
+        d.callback('')
+    if self.fullState[0] == 'Disconnected':
+        d, self.disconnDeferred = self.disconnDeferred, None
+        d.callback('')
 
 
-class MirDev(mirrorCtrl.GalilDevice25Sec):
-    def __init__(self, mirror, host, port, isReady):
-        mirrorCtrl.GalilDevice25Sec.__init__(self,
-        mirror = mirror,
-        host = host,
-        port = port,
-        callFunc = self.getState
-        )
-        self.conn.addStateCallback(self.getState)
-        self.d1 = isReady
-        
-    def getState(self, *args, **kwargs):
-        print 'Mirror Device State: ', self.conn.state
-        if self.conn.state == 'Connected':
-            print 'mirror device connected to Galil'
-            self.d1.callback('')
-            
 
 class MirrorCtrlTestCase(unittest.TestCase):
     """A series of tests using twisted's trial unittesting.  Simulates
@@ -55,93 +41,71 @@ class MirrorCtrlTestCase(unittest.TestCase):
 
     def setUp(self):
         # first start up the fake galil listening
-        d1 = maybeDeferred(self.setupGalil)
-        d2 = maybeDeferred(self.setupActor)
-        d3 = maybeDeferred(self.setupCommander)
-        return gatherResults([d1, d2, d3])
+        self.setupGalil()
+        # connect an actor to it
+        d = self.setupActor()
+        # after that connection is made, connect a dispatcher to the actor
+        d.addCallback(self.setupCommander)
+        return d
         
     def tearDown(self):
-        d1 = self.teardownGalil()
-        d2 = self.teardownActor()
-        d3 = self.teardownCommander()
-        return gatherResults([d1, d2, d3])
-        
+        # don't exit until all connections are disconnected
+        # this may be unnecessary...
+        d1, d2 = self.actordisconn, self.cmddisconn
+        self.actordisconn, self.cmddisconn = None, None
+        return gatherResults([d1, d1])
+
     def setupGalil(self):
         self.factory = ServerFactory()
-        self.factory.onConnectionLost = Deferred()
-        self.factory.onConnectionMade = Deferred()
         self.factory.protocol = fakeGalil.FakeGalilProtocol
-        self.factory.protocol.connectionLost = serverConnLost
-        self.factory.protocol.connectionMade = serverConnMade
         from twisted.internet import reactor
         self.galilport = reactor.listenTCP(0, self.factory, interface="localhost")
         self.galilportnum = self.galilport.getHost().port
-        return self.factory.onConnectionMade
-    
-    def teardownGalil(self):
-        galilport, self.galilport = self.galilport, None
-        d = maybeDeferred(galilport.stopListening)
-        return gatherResults([d, self.factory.onConnectionLost])
+        self.addCleanup(self.galilport.stopListening)
         
     def setupActor(self):
-        dConn = Deferred()
-        dDisConn = Deferred()
-        mirror = mirrorCtrl.devices.device25mSec.Mirror
-        self.mirDev = mirrorCtrl.GalilDevice25M2(
+        d = Deferred()
+        self.actordisconn = Deferred()
+        mirror = mirrorCtrl.mirrors.mir25mSec.Mirror
+        self.mirDev = mirrorCtrl.GalilDevice25Sec(
             mirror = mirror,
             host = 'localhost',
-            port = self.galilportnum,
-            callFunc = None,            
+            port = self.galilportnum,            
             )
-        self.mirDev.conn._name = 'mirror ctrl'
-        self.mirDev.conn.addStateCallback(cb)
-        self.mirDev.conn.dConn = dConn
-        self.mirDev.conn.dDisConn = dDisConn
+        self.mirDev.conn.connDeferred = d
+        self.mirDev.conn.disconnDeferred = self.actordisconn
+        self.mirDev.conn._name = 'Actor'
+        self.mirDev.conn.addStateCallback(connCB) # will callback upon connection
         self.mirActor = mirrorCtrl.MirrorCtrl(
             device = self.mirDev,
             userPort = Sec25mUserPort        
             )
-        return self.mirDev.conn.dConn
+        self.addCleanup(self.mirDev.conn.disconnect)
+        self.addCleanup(self.mirActor.server.close)
+        return d
     
-    def teardownActor(self):
-        self.mirDev.conn.disconnect()
-        d = maybeDeferred(self.mirActor.server.close)
-        return gatherResults([d, self.mirDev.conn.dDisConn])
     
-    def setupCommander(self):
-        dConn = Deferred()
-        dDisConn = Deferred()    
+    def setupCommander(self, *args): # *args for the callback result that we don't care about
+        # this doesn't close cleanly
+        d = Deferred()
+        self.cmddisconn = Deferred()
         self.cmdConn = TCPConnection(
             host = 'localhost',
             port = Sec25mUserPort,
             readLines = True,
-            name = "commander",
+            name = "Commander",
         )
-        self.cmdConn.addStateCallback(cb) # state cb receives self
-        # append a deferred to keep track of
-        self.cmdConn.dConn = dConn
-        self.cmdConn.dDisConn = dDisConn
         self.dispatcher = ActorDispatcher(
             name = "mirror",
             connection = self.cmdConn,
             logFunc = showReply
         )
-        
+        self.cmdConn.connDeferred = d
+        self.cmdConn.disconnDeferred = self.cmddisconn
+        self.cmdConn.addStateCallback(connCB)
         self.cmdConn.connect()
-        return dConn
-    
-    def teardownCommander(self):
-        self.cmdConn.disconnect()
-        return self.cmdConn.dDisConn
+        self.addCleanup(self.cmdConn.disconnect)
+        return d    
                 
-    def testCmds(self):
-        print 'mir - device conn status', self.mirActor.showDevConnStatus()
-        print 'dev conn', self.mirDev.conn.fullState
-        print 'cmd conn status', self.cmdConn.fullState
-        cmdVar = CmdVar (
-            actor = "mirror",
-            cmdStr = 'status',
-        )
-        self.dispatcher.executeCmd(cmdVar)
-        return Deferred()
-               
+    def testCmds(self): 
+       print 'ready to run tests'
