@@ -14,16 +14,15 @@ To do:
   while allowing fast unit testing (wake up homed, as it does now).
 - Figure out how to set status more realistically.
 """
-DefaultPort = 8000
+__all__ = ["FakeGalilProtocol", "FakeGalilFactory"]
 
 import re
 import sys
 import numpy
-from twisted.internet import reactor, protocol, defer
+from twisted.internet import reactor
+from twisted.internet.protocol import Factory
 from twisted.protocols.basic import LineReceiver
 from RO.Comm.TwistedTimer import Timer
-
-Debug = True
 
 MAXINT = 2147483647
 
@@ -56,14 +55,14 @@ class FakeGalilProtocol(LineReceiver):
 
     def lineReceived(self, line):
         """As soon as any data is received, look at it and write something back."""
-        if Debug:
+        if self.factory.verbose:
             print "received: %r" % (line,)
         cmdList = [c.strip() for c in line.split(";") if c.strip()]
         for cmd in cmdList:
             self.processCmd(cmd)
         
     def processCmd(self, cmd):
-        if Debug:
+        if self.factory.verbose:
             print "processCmd(cmd=%r)" % (cmd,)
         self.echo(cmd)
         if cmd in ("ST", "RS"):
@@ -224,24 +223,26 @@ class FakeGalilProtocol(LineReceiver):
         self.sendLine("OK")
     
     def sendLine(self, line):
-        if Debug:
+        if self.factory.verbose:
             print "sending: %r" % (line,)
         LineReceiver.sendLine(self, line)
 
-def main(port):
-    """Run a fake mirror controller Galil on the specified port"""
-    #print "Starting fake Galil on port %s" % (port,)
-    factory = protocol.ServerFactory()
-    factory.protocol = FakeGalilProtocol
-    reactor.listenTCP(port, factory)
-    print "Starting fake Galil on port %s" % (port,)
+
+class FakeGalilFactory(Factory):
+    """Fake Galil protocol factory
+    
+    Example of use:
+        
+    from twisted.internet import reactor
+    reactor.listenTCP(port, FakeGalilFactory(verbose=False))
     reactor.run()
-
-
-# this only runs if the module was *not* imported
-if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        port = int(sys.argv[1])
-    else:
-        port = DefaultPort
-    main(port=port)
+    """
+    protocol = FakeGalilProtocol
+    
+    def __init__(self, verbose=True):
+        """Create a FakeGalilFactory
+        
+        Inputs:
+        - verbose: print input and output?
+        """
+        self.verbose = bool(verbose)
