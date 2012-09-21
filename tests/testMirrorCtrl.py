@@ -1,27 +1,19 @@
 """http://twistedmatrix.com/documents/current/core/howto/trial.html
 """
 from twisted.trial import unittest
-from twisted.internet.defer import Deferred, gatherResults, maybeDeferred
-from twisted.internet.protocol import ProcessProtocol, ServerFactory
+from twisted.internet.defer import Deferred # , gatherResults, maybeDeferred
 from twisted.internet import reactor
+
 import mirrorCtrl
 import mirrorCtrl.mirrors.mir25mSec
-from mirrorCtrl.fakeGalil import FakeGalilProtocol
-from twistedActor import ActorDevice
+from mirrorCtrl.fakeGalil import FakeGalilFactory
 from RO.Comm.TCPConnection import TCPConnection
 from opscore.actor import ActorDispatcher, CmdVar
 
-# wanna look? uncomment
-# mirrorCtrl.devices.device25mPrim.Mirror.plotMirror()
-#...
-
-FakeGalilPort = 8000
-FakeGalilHost = 'localhost'
 Sec25mUserPort = 2532
 
 def showReply(msgStr, *args, **kwargs): # prints what the dispactcher sees to the screen
     print 'reply: ' + msgStr + "\n"
-
 
 
 class MirrorCtrlTestCase(unittest.TestCase):
@@ -53,9 +45,7 @@ class MirrorCtrlTestCase(unittest.TestCase):
         """Start the fake Galil on a randomly chosen port; return the port number
         """
         print "startFakeGalil()"
-        factory = ServerFactory()
-        factory.protocol = FakeGalilProtocol
-        portObj = reactor.listenTCP(0, factory, interface="localhost")
+        portObj = reactor.listenTCP(port=0, factory=FakeGalilFactory(verbose=False))
         galilPort = portObj.getHost().port
         self.addCleanup(portObj.stopListening)
         print "Started fake Galil on port", galilPort
