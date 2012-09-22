@@ -547,7 +547,7 @@ class GalilDevice(TCPDevice):
     
     def sendStop(self):
         """Send XQ#STOP, then XQ#STATUS"""
-        self.startDevCmd("XQ#STOP", self.sendStatus)
+        self.startDevCmd("XQ#STOP", callFunc=self.sendStatus)
     
     def sendStatus(self):
         """Send device command XQ#STATUS"""
@@ -563,7 +563,8 @@ class GalilDevice(TCPDevice):
             (note: _devCmdCallback is called by the device command and is responsible
             for calling callFunc, which is stored in _userCmdNextStep)
         """
-        print "startDevCmd(cmdStr=%s); userCmd state=%s" % (cmdStr, self.currUserCmd.state)
+        print "startDevCmd(cmdStr=%s, timeLimt=%s, callFunc=%s)" % (cmdStr, timeLim, callFunc)
+        print "self.userCmd=%r" % (self.currUserCmd,)
         if not self.currDevCmd.isDone:
             # this should never happen, but...just in case
             raise RuntimeError("Cannot start new device command: %s is running" % (self.currDevCmd,))
