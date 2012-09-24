@@ -547,7 +547,7 @@ class GalilDevice(TCPDevice):
     
     def sendStop(self):
         """Send XQ#STOP, then XQ#STATUS"""
-        self.startDevCmd("XQ#STOP", self.sendStatus)
+        self.startDevCmd("XQ#STOP", callFunc = self.sendStatus)
     
     def sendStatus(self):
         """Send device command XQ#STATUS"""
