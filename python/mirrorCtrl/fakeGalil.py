@@ -19,6 +19,8 @@ __all__ = ["FakeGalilProtocol", "FakeGalilFactory"]
 import re
 import sys
 import numpy
+
+from mirrors import mir35mTert
 from twisted.internet import reactor
 from twisted.internet.protocol import Factory
 from twisted.protocols.basic import LineReceiver
@@ -52,6 +54,18 @@ class FakeGalilProtocol(LineReceiver):
     
     def echo(self, line):
         self.sendLine(line + ":") # not quite right, but maybe close
+
+    def dataReceived(self, data):
+        """Overridden from base class.  
+        
+        Tricks the LineReciever into
+        treating ';' and '\r\n' as line delimiters, like a Galil does.
+        '\r\n' is the default line delimiter.
+        """
+        print 'got Data:', data
+        data = data.replace(';', '\r\n')
+        data = data.replace('\r\n\r\n', '\r\n') # incase data was sent like ';\r\n'
+        LineReceiver.dataReceived(self, data)
 
     def lineReceived(self, line):
         """As soon as any data is received, look at it and write something back."""
@@ -91,8 +105,9 @@ class FakeGalilProtocol(LineReceiver):
         if self.replyTimer.isActive:
             # Reject new command; but what does the Galil really do?
             # It probably accepts non-XQ commands such as A=value, but what about XQ commands?
-            self.sendLine("? Busy")
-            self.sendLine("OK")
+            # answer: Galil sends a '?' for XQ commands. No reply for A=value, etc.
+            # ST will halt output mid-stream
+            self.sendLine("?")
             return
 
         cmdVerb = cmdMatch.groups()[0]
@@ -204,7 +219,11 @@ class FakeGalilProtocol(LineReceiver):
         deltaTimeArr = deltaPos / numpy.array(self.speed, dtype=float)
         moveTime = min(deltaTimeArr.max(), MaxCmdTime)
         self.cmdPos = newCmdPos
-        self.measPos = newCmdPos + numpy.array(numpy.random.normal(0, 100, 6), dtype=int)
+        # find what encoder positions this corresponds to for this mirror
+        # only use first 3 or an error is thrown, Three actuators, so three mount positions.
+        measOrient = mir35mTert.Mirror.orientFromActuatorMount(newCmdPos[0:3])
+        measMount = numpy.hstack((mir35mTert.Mirror.encoderMountFromOrient(measOrient), newCmdPos[3:])) #append last 3 'unused' axes
+        self.measPos = measMount + numpy.array(numpy.random.normal(0, 100, 6), dtype=int)
 
         self.sendLine(self.formatArr("%4.1f", deltaTimeArr, "max sec for move"))
         self.sendLine(self.formatArr("%09d", self.cmdPos, "target position"))
