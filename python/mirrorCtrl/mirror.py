@@ -37,11 +37,11 @@ class MirrorBase(object):
         - encoderList:  Encoders associated with actuators. None if there are no encoders,
                         else a list of items: each an encoder or None if the associated
                         actuator has no encoder.
-        - minCorrList: if encoderList is not None: specifies the maximum encoder error to correct (mm);
+        - minCorrList: if encoderList is not None: specifies the maximum encoder error to correct (steps);
             must have the same number of elements as encoderList;
             if encoderList[i] is None then minCorrList[i] is ignored.
             If encoderList is None then this argument is entirely ignored.
-        - maxCorrList: if encoderList is not None: specifies the maximum encoder error to correct (mm);
+        - maxCorrList: if encoderList is not None: specifies the maximum encoder error to correct (steps);
             must have the same number of elements as encoderList;
             if encoderList[i] is None then minCorrList[i] is ignored.
             If encoderList is None then this argument is entirely ignored.
@@ -100,7 +100,7 @@ class MirrorBase(object):
                     self.minCorrList.append(minCorr)
                     self.maxCorrList.append(maxCorr)
             self.minCorrList = numpy.array(self.minCorrList, dtype=float)
-            self.maxCorrList = numpy.array(self.minCorrList, dtype=float)
+            self.maxCorrList = numpy.array(self.maxCorrList, dtype=float)
                     
     def plotMirror(self):
         """ Plots links and glass when the mirror is in neutral position,
