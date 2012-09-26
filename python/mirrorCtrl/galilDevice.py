@@ -84,6 +84,7 @@ class GalilStatus(object):
         self.duration = GalilTimer()
 #        self.remainExecTime = numpy.nan
         self.actMount = [numpy.nan]*self.nAct # get rid of?
+        self.encMount = [numpy.nan]*self.nAct
         self.cmdMount = [numpy.nan]*self.nAct # updated upon iteration
         self.orient = [numpy.nan]*6 # get rid of?
         self.desOrient = [numpy.nan]*6
@@ -330,13 +331,15 @@ class GalilDevice(TCPDevice):
         elif ('actual position' == key) or ('final position' == key):
             # measured position (adjusted)
             # account for encoder --> actuator spatial difference
-            encMount = numpy.asarray(data, dtype=float)
+            self.status.encMount = numpy.asarray(data, dtype=float)
+            updateStr = self.status._getKeyValStr(["encMount"])
+            self.writeToUsers("i", updateStr, cmd=self.currUserCmd)
             # DesOrient may be nans
             if numpy.isfinite(sum(self.status.desOrient)):
                 initOrient = self.status.desOrient
             else:
                 initOrient = numpy.zeros(6)
-            orient = self.mirror.orientFromEncoderMount(encMount, initOrient)
+            orient = self.mirror.orientFromEncoderMount(self.status.encMount, initOrient)
             actMount = self.mirror.actuatorMountFromOrient(orient)
             actMount = numpy.asarray(actMount, dtype=float)
             # add these new values to status
@@ -671,7 +674,9 @@ class GalilDevice(TCPDevice):
             self.currUserCmd.setTimeLimit(5)
             statusStr = self.status._getKeyValStr(["cmdMount", "iter"])
             self.writeToUsers("i", statusStr, cmd=self.currUserCmd)
-            cmdMoveStr = self._galCmdFromMount(self.status.cmdMount)
+            # convert from numpy to simple list for command formatting
+            mount = [x for x in self.status.cmdMount]
+            cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
             self.startDevCmd(cmdMoveStr, callFunc=self._moveIter)
             return
 
