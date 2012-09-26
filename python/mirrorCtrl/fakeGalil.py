@@ -99,14 +99,14 @@ class FakeGalilProtocol(LineReceiver):
             self.replyTimer.cancel()
             return
         
-        cmdMatch = re.match(r"([A-F]) *= *MAXINT$", cmd)
+        cmdMatch = re.match(r"([A-F]) *= *(-)?MAXINT$", cmd)
         if cmdMatch:
             axisChar = cmdMatch.groups()[0]
             ind = ord(axisChar) - ord("A")
             self.userNums[ind] = MAXINT
             return
             
-        cmdMatch = re.match(r"([A-F]) *= *(\d+)$", cmd)
+        cmdMatch = re.match(r"([A-F]) *= *((-)?\d+)$", cmd)
         if cmdMatch:
             axis = cmdMatch.groups()[0]
             val = int(cmdMatch.groups()[1])
