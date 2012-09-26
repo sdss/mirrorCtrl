@@ -2,16 +2,24 @@
 """Fake 3.5m M3 Galil.
 
 To do:
-- Make command echo more realistic; see how real Galils do it.
-- Handle command collisions (receiving a new command while another is running) correctly --
+- DONE. Make command echo more realistic; see how real Galils do it.
+    answer: looks like no echo, just a ":"
+    
+- DONE. Handle command collisions (receiving a new command while another is running) correctly --
   study how a real Galil does it!
-- Support XQ#STOP; what is the correct output for that command?
+    answer: Non XQ commands have no reply, XQ Commands produce a "?"
+    
+- DONE. Support XQ#STOP; what is the correct output for that command?
+    answer: ": OK", XQ#STOP doesn't interupt
+    
 - Add proper support for different mirrors:
   - Set nAxes appropriate (3-6)
   - Include correct mirror-specific info in status and other command output
-- Perhaps support waking up homed or not homed.
+
+- DONE. Perhaps support waking up homed or not homed.
   That provides more realistic normal operation (it should wake up not homed)
   while allowing fast unit testing (wake up homed, as it does now).
+  
 - Figure out how to set status more realistically.
 """
 __all__ = ["FakeGalilProtocol", "FakeGalilFactory"]
@@ -31,11 +39,19 @@ MAXINT = 2147483647
 MaxCmdTime = 2.0 # maximum time any command can take; sec
 
 class FakeGalilProtocol(LineReceiver):
-    def __init__(self, *args, **kwargs):
+    lineEndPattern = re.compile(r"(\r\n|;)")
+    _buffer = ''
+    delimiter = '\r\n'
+    
+    def __init__(self, factory, *args, **kwargs):
+        self.factory = factory
         self.replyTimer = Timer()
-        self.nAxes = 5
+        self.nAxes = 3
 
-        self.isHomed = numpy.array([1]*6, dtype=int)
+        if self.factory.wakeUpHomed:
+            self.isHomed = numpy.array([1]*6, dtype=int)
+        else:
+            self.isHomed = numpy.array([0]*6, dtype=int)   
         self.cmdPos = numpy.array([0]*6, dtype=int)
         self.measPos = numpy.array([0]*6, dtype=int)
         self.userNums = numpy.array([MAXINT]*6, dtype=int)
@@ -51,34 +67,34 @@ class FakeGalilProtocol(LineReceiver):
         self.indSep = numpy.array([0]*6, dtype=int)
         self.encRes =  numpy.array([-3.1496]*3 + [1.5750]*3, dtype=float)
         self.status =  numpy.array([8196*6], dtype=int)
-    
-    def echo(self, line):
-        self.sendLine(line + ":") # not quite right, but maybe close
 
     def dataReceived(self, data):
-        """Overridden from base class.  
-        
-        Tricks the LineReciever into
-        treating ';' and '\r\n' as line delimiters, like a Galil does.
-        '\r\n' is the default line delimiter.
-        """
-        print 'got Data:', data
-        data = data.replace(';', '\r\n')
-        data = data.replace('\r\n\r\n', '\r\n') # incase data was sent like ';\r\n'
-        LineReceiver.dataReceived(self, data)
+       self._buffer += data
+       self._checkLine()
 
-    def lineReceived(self, line):
+    def _checkLine(self):
+       res = self.lineEndPattern.split(self._buffer, maxsplit=1)
+       if len(res) > 1:
+            line, sep, self._buffer = res
+            self.lineReceived(line, sep)
+    
+       if self._buffer:
+           Timer(0.000001, self._checkLine) # or reactor.callLater
+
+    def echo(self, line, delim):
+        self.sendLine(line + delim + ':') # not quite right, but maybe close
+
+    def lineReceived(self, line, delim):
         """As soon as any data is received, look at it and write something back."""
         if self.factory.verbose:
             print "received: %r" % (line,)
-        cmdList = [c.strip() for c in line.split(";") if c.strip()]
-        for cmd in cmdList:
-            self.processCmd(cmd)
+        cmd = line.strip()
+        self.processCmd(cmd, delim)
         
-    def processCmd(self, cmd):
+    def processCmd(self, cmd, delim):
         if self.factory.verbose:
             print "processCmd(cmd=%r)" % (cmd,)
-        self.echo(cmd)
+        self.echo(cmd, delim)
         if cmd in ("ST", "RS"):
             self.replyTimer.cancel()
             return
@@ -100,13 +116,14 @@ class FakeGalilProtocol(LineReceiver):
             
         cmdMatch = re.match(r"XQ *#([A-Z]+)", cmd)
         if not cmdMatch:
+            self.sendLine("?")
             return
         
         if self.replyTimer.isActive:
             # Reject new command; but what does the Galil really do?
             # It probably accepts non-XQ commands such as A=value, but what about XQ commands?
-            # answer: Galil sends a '?' for XQ commands. No reply for A=value, etc.
-            # ST will halt output mid-stream
+            #   answer: Galil sends a '?' for XQ commands. No reply for A=value, etc.
+            #   ST will halt output mid-stream
             self.sendLine("?")
             return
 
@@ -115,11 +132,13 @@ class FakeGalilProtocol(LineReceiver):
         if cmdVerb == "MOVE":
             newCmdPos = numpy.where(self.userNums == MAXINT, self.cmdPos, self.userNums)
             self.moveStart(newCmdPos)
+            
 
         elif cmdVerb == "MOVEREL":
             deltaPos = numpy.where(self.userNums == MAXINT, 0, self.userNums)
             newCmdPos = self.cmdPos + deltaPos
             self.move(newCmdPos)
+            self.sendLine(":")
         
         elif cmdVerb == "STATUS":
             self.showStatus()
@@ -130,10 +149,16 @@ class FakeGalilProtocol(LineReceiver):
             self.done()
         
         elif cmdVerb == "HOME":
-            self.homeStart()            
+            self.homeStart()
+            
+        elif cmdVerb == "STOP":
+            # hard to tell what the true Galil does, I'll just stop the timer, like an ST
+            self.replyTimer.cancel()
+            self.sendLine("OK")
 
         else:
-            self.sendLine("? Unrecognized command %s" % (cmdVerb,))
+            #self.sendLine("? Unrecognized command %s" % (cmdVerb,))
+            self.sendLine("?")
             self.done()
     
     def homeStart(self):
@@ -256,12 +281,16 @@ class FakeGalilFactory(Factory):
     reactor.listenTCP(port, FakeGalilFactory(verbose=False))
     reactor.run()
     """
-    protocol = FakeGalilProtocol
+   # protocol = FakeGalilProtocol
     
-    def __init__(self, verbose=True):
+    def buildProtocol(self, addr):
+        return FakeGalilProtocol(factory = self)
+        
+    def __init__(self, verbose=True, wakeUpHomed=True):
         """Create a FakeGalilFactory
         
         Inputs:
         - verbose: print input and output?
         """
         self.verbose = bool(verbose)
+        self.wakeUpHomed = bool(wakeUpHomed)
