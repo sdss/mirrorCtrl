@@ -246,9 +246,10 @@ class FakeGalilProtocol(LineReceiver):
         self.cmdPos = newCmdPos
         # find what encoder positions this corresponds to for this mirror
         # only use first 3 or an error is thrown, Three actuators, so three mount positions.
-        measOrient = mir35mTert.Mirror.orientFromActuatorMount(newCmdPos[0:3])
-        measMount = numpy.hstack((mir35mTert.Mirror.encoderMountFromOrient(measOrient), newCmdPos[3:])) #append last 3 'unused' axes
-        self.measPos = measMount + numpy.array(numpy.random.normal(0, 100, 6), dtype=int)
+        noisyPos = newCmdPos + numpy.array(numpy.random.normal(0, 100, 6), dtype=int)
+        measOrient = mir35mTert.Mirror.orientFromActuatorMount(noisyPos[0:3])
+        measMount = numpy.hstack((mir35mTert.Mirror.encoderMountFromOrient(measOrient), noisyPos[3:])) #append last 3 'unused' axes
+        self.measPos = measMount
 
         self.sendLine(self.formatArr("%4.1f", deltaTimeArr, "max sec for move"))
         self.sendLine(self.formatArr("%09d", self.cmdPos, "target position"))
