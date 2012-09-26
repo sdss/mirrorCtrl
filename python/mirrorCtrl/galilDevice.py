@@ -45,6 +45,9 @@ paramRegEx = re.compile(r'^-?[A-Z]')
 timeEstRegEx = re.compile(r'^sec +to|^max +sec|^time +for')
 okLineRegEx = re.compile(r'^OK$', re.IGNORECASE)
 
+cmdEchoRegEx = re.compile(r'xq #[a-z]+$', re.IGNORECASE)
+axisEchoRegEx = re.compile(r'[A-Z]=-?(\d+)', re.IGNORECASE)
+
 MaxIter = 2
 
 class GalilTimer(object):
@@ -376,19 +379,20 @@ class GalilDevice(TCPDevice):
         - Parse status to update the model parameters
         - If a command has finished, call the appropriate command callback
         """
+        print 'Galil Reply: %r' % replyStr 
         #print "handleReply(replyStr=%r)" % (replyStr,)
         if self.currDevCmd.isDone:
             # ignore unsolicited input
             return
         
-        replyStr = unicode(replyStr, errors='ignore')
-        replyStr = replyStr.encode("ascii", errors = "ignore")        
+        #replyStr = unicode(replyStr, errors='ignore')
+        #replyStr = replyStr.encode("ascii", errors = "ignore")        
         replyStr = replyStr.replace(":", "").strip(' ;\r\n\x01\x03\x18\x00')
         #replyStr = replyStr.strip(' ;\r\n')
         if replyStr == "":
             # ignore blank replies
             return
-        catchGOPOS = replyStr.startswith("?GOPOS")
+        catchGOPOS = replyStr.startswith("?GOPOS") # only for testing bench galil
         if replyStr.startswith("?") and not catchGOPOS:
             # there was an error. End current process
             self.writeToUsers("f", "Text=\"Galil Error: %s\"" % (replyStr,), cmd = self.currDevCmd)
@@ -401,8 +405,8 @@ class GalilDevice(TCPDevice):
             # command finished
             self.currDevCmd.setState(self.currDevCmd.Done)
             return
-        cmdEchoRegEx = re.compile(r'xq #[a-z]+$', re.IGNORECASE)
-        if cmdEchoRegEx.search(replyStr):
+        cmdEcho = cmdEchoRegEx.search(replyStr) or axisEchoRegEx.search(replyStr)
+        if cmdEcho:
             # this is just the command echo, ignore it
             return
         if not startsWithNumRegEx.match(replyStr):
