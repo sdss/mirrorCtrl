@@ -123,8 +123,11 @@ fixMirPos = numpy.array([0., -17.296 * MMPerInch, -193.0])
 fixBasePos = numpy.array([13.125 * MMPerInch, -17.296 * MMPerInch, -193.0])
 fixedLinkList.append(mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos))
 
-minCorrList = [4.0e-5]*3 + [0]*2 # min correction (mm); 50 actuator microsteps
-maxCorrList = [0.79]*3   + [0]*2 # max correction (mm); 1000000 actuator microsteps
+# minCorrList = [4.0e-5]*3 + [0]*2 # min correction (mm); 50 actuator microsteps
+# maxCorrList = [0.79]*3   + [0]*2 # max correction (mm); 1000000 actuator microsteps
+
+minCorrList = [50]*5 # min correction (microsteps)
+maxCorrList = [1000000]*3   + [0]*2 # max correction (microsteps)
 
 Mirror = mirrorCtrl.TipTransMirror(
     ctrMirZ = CtrMirZ,

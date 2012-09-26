@@ -133,8 +133,12 @@ fixMirPos = numpy.array([0., mirRadius, zMirAx]) # opposite of A
 fixBasePos = numpy.array([linkLength, mirRadius, zMirAx])
 fixedLinkList = [mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos)]
 
-minCorrList = [4.0e-5]*3 + [0.0016]*2 # min correction (mm); 50 actuator microsteps for all actuators
-maxCorrList = [0.79]*3   + [0.16]*2 # max correction (mm); 1000000 actuator microsteps for A-C; 5000 for D-E
+# minCorrList = [4.0e-5]*3 + [0.0016]*2 # min correction (mm); 50 actuator microsteps for all actuators
+# maxCorrList = [0.79]*3   + [0.16]*2 # max correction (mm); 1000000 actuator microsteps for A-C; 5000 for D-E
+
+minCorrList = [50]*5 # min correction (microsteps)
+maxCorrList = [microsteps]*3   + [5000]*2 # max correction (microsteps)
+
 
 Mirror = mirrorCtrl.DirectMirror(
     actuatorList = actuatorList,
