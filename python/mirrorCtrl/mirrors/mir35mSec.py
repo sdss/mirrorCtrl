@@ -137,7 +137,7 @@ fixedLinkList = [mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos)]
 # maxCorrList = [0.79]*3   + [0.16]*2 # max correction (mm); 1000000 actuator microsteps for A-C; 5000 for D-E
 
 minCorrList = [50]*5 # min correction (microsteps)
-maxCorrList = [microsteps]*3   + [5000]*2 # max correction (microsteps)
+maxCorrList = [1000000]*3   + [5000]*2 # max correction (microsteps)
 
 
 Mirror = mirrorCtrl.DirectMirror(
