@@ -45,7 +45,7 @@ paramRegEx = re.compile(r'^-?[A-Z]')
 timeEstRegEx = re.compile(r'^sec +to|^max +sec|^time +for')
 okLineRegEx = re.compile(r'^OK$', re.IGNORECASE)
 
-cmdEchoRegEx = re.compile(r'xq #[a-z]+$', re.IGNORECASE)
+cmdEchoRegEx = re.compile(r'xq *#[a-z]+$', re.IGNORECASE)
 axisEchoRegEx = re.compile(r'[A-Z]=-?(\d+)', re.IGNORECASE)
 
 MaxIter = 2
