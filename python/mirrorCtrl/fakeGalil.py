@@ -66,7 +66,7 @@ class FakeGalilProtocol(LineReceiver):
         self.marg = numpy.array([400000]*3 + [5000]*3, dtype=int)
         self.indSep = numpy.array([0]*6, dtype=int)
         self.encRes =  numpy.array([-3.1496]*3 + [1.5750]*3, dtype=float)
-        self.status =  numpy.array([8196*6], dtype=int)
+        self.status =  numpy.array([8196*6]*3, dtype=int)
 
     def dataReceived(self, data):
        self._buffer += data
