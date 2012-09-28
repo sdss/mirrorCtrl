@@ -5,12 +5,12 @@ from twisted.internet.defer import Deferred # , gatherResults, maybeDeferred
 from twisted.internet import reactor
 
 import mirrorCtrl
-import mirrorCtrl.mirrors.mir25mSec
+import mirrorCtrl.mirrors.mir35mTert
 from mirrorCtrl.fakeGalil import FakeGalilFactory
 from RO.Comm.TCPConnection import TCPConnection
-from opscore.actor import ActorDispatcher, CmdVar
+from opscore.actor import ActorDispatcher, CmdVar, AllCodes
 
-Sec25mUserPort = 2532
+Tert35mUserPort = 2532
 
 def showReply(msgStr, *args, **kwargs): # prints what the dispactcher sees to the screen
     print 'reply: ' + msgStr + "\n"
@@ -55,8 +55,8 @@ class MirrorCtrlTestCase(unittest.TestCase):
         """Start mirror controller
         """
         print "startMirrorCtrl(galilPort=%r)" % (galilPort,)
-        mirror = mirrorCtrl.mirrors.mir25mSec.Mirror
-        self.mirDev = mirrorCtrl.GalilDevice25Sec(
+        mirror = mirrorCtrl.mirrors.mir35mTert.Mirror
+        self.mirDev = mirrorCtrl.GalilDevice35Tert(
             mirror = mirror,
             host = 'localhost',
             port = galilPort,            
@@ -71,7 +71,7 @@ class MirrorCtrlTestCase(unittest.TestCase):
         self.mirDev.conn.addStateCallback(connCallback)
         self.mirActor = mirrorCtrl.MirrorCtrl(
             device = self.mirDev,
-            userPort = Sec25mUserPort        
+            userPort = Tert35mUserPort        
             )
         self.addCleanup(self.mirDev.conn.disconnect)
         self.addCleanup(self.mirActor.server.close)
@@ -83,7 +83,7 @@ class MirrorCtrlTestCase(unittest.TestCase):
         # this doesn't close cleanly
         self.cmdConn = TCPConnection(
             host = 'localhost',
-            port = Sec25mUserPort,
+            port = Tert35mUserPort,
             readLines = True,
             name = "Commander",
         )
@@ -104,6 +104,29 @@ class MirrorCtrlTestCase(unittest.TestCase):
         self.cmdConn.connect()
         self.addCleanup(self.cmdConn.disconnect)
         return d    
+
+
                 
     def testCmds(self): 
-       print 'ready to run tests'
+        print 'ready to run tests'
+        self.d = Deferred()
+
+        cmdStr = 'move 1,2,3'
+        cmdVar = CmdVar (
+            actor = "mirror",
+            cmdStr = cmdStr,
+            callFunc = self.cmdCB,
+            callCodes = AllCodes,
+        )
+        #cmdVar.addCallback(cmdCB)
+        self.dispatcher.executeCmd(cmdVar)
+        return self.d
+
+    def cmdCB(self, cmd):
+        """Callback function for cmdVars
+        """
+        print 'BAM % s' % cmd.cmdStr
+        if cmd.isDone:
+            print 'command done!'
+            d, self.d = self.d, None
+            d.callback('success')

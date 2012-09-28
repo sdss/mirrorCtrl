@@ -382,7 +382,7 @@ class GalilDevice(TCPDevice):
         - Parse status to update the model parameters
         - If a command has finished, call the appropriate command callback
         """
-        print 'Galil Reply: %r' % replyStr 
+        #print 'Galil Reply: %r' % replyStr 
         #print "handleReply(replyStr=%r)" % (replyStr,)
         if self.currDevCmd.isDone:
             # ignore unsolicited input
@@ -570,8 +570,8 @@ class GalilDevice(TCPDevice):
             (note: _devCmdCallback is called by the device command and is responsible
             for calling callFunc, which is stored in _userCmdNextStep)
         """
-        print "startDevCmd(cmdStr=%s, timeLimt=%s, callFunc=%s)" % (cmdStr, timeLim, callFunc)
-        print "self.userCmd=%r" % (self.currUserCmd,)
+        #print "startDevCmd(cmdStr=%s, timeLimt=%s, callFunc=%s)" % (cmdStr, timeLim, callFunc)
+        #print "self.userCmd=%r" % (self.currUserCmd,)
         if not self.currDevCmd.isDone:
             # this should never happen, but...just in case
             raise RuntimeError("Cannot start new device command: %s is running" % (self.currDevCmd,))
@@ -625,7 +625,7 @@ class GalilDevice(TCPDevice):
         
         startDevCmd always assigns this as the callback, which then calls and clears any user-specified callback.
         """
-        print "_devCmdCallback(); currDevCmd=%r; _userCmdNextStep=%s" % (self.currDevCmd, self._userCmdNextStep)
+        #print "_devCmdCallback(); currDevCmd=%r; _userCmdNextStep=%s" % (self.currDevCmd, self._userCmdNextStep)
         if self.currDevCmd.didFail:
             self._userCmdNextStep = None
             if not self.currUserCmd.isDone:
@@ -643,6 +643,7 @@ class GalilDevice(TCPDevice):
             # nothing more to do; user command must be finished!
             self.currUserCmd.setState(self.currUserCmd.Done)
             self._clearDevCmd()
+        #print "_devCmdCallback(); self.userCmd=%r" % (self.currUserCmd,)
 
     def _moveIter(self):
         """A move device command ended; decide whether further move iterations are required and act accordingly.
@@ -683,11 +684,13 @@ class GalilDevice(TCPDevice):
         # done
         self._moveEnd()
     
-    def _moveEnd(self):
+    def _moveEnd(self, *args):
         """The final move device command ended successfully; clean up and set self.currUserCmd state done.
 
         Optionally perform any post-move cleanup (such as moving piezos).
         Finally: set self.currUserCmd state done (or failed, if cleanup failed).
+        
+        note: *args for callbackability...
         """
         self.currUserCmd.setState(self.currUserCmd.Done)
 
