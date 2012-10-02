@@ -9,6 +9,8 @@ import numpy
 
 from twistedActor import Actor, CommandError, UserCmd
 
+Version = 0.1
+
 DefaultMaxUsers = 5
 
 MMPerMicron = 1 / 1000.0        # millimeters per micron
@@ -36,6 +38,7 @@ class MirrorCtrl(Actor):
             userPort = userPort,
             devs = [device],
             maxUsers = maxUsers,
+            version = Version,
         )
     
     def initialConn(self):
