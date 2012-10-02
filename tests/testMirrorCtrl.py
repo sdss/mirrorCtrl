@@ -93,7 +93,7 @@ class MirrorCtrlTestCase(unittest.TestCase):
             connection = self.cmdConn,
             logFunc = showReply
         )
-
+        #self.dispatcher.delayCallbacks = True
         d = Deferred()
         def connCallback(conn, d=d):
             print "commander conn state=", conn.state
@@ -104,29 +104,28 @@ class MirrorCtrlTestCase(unittest.TestCase):
         self.cmdConn.connect()
         self.addCleanup(self.cmdConn.disconnect)
         return d    
-
-
                 
     def testCmds(self): 
         print 'ready to run tests'
         self.d = Deferred()
-
-        cmdStr = 'move 1,2,3'
-        cmdVar = CmdVar (
-            actor = "mirror",
-            cmdStr = cmdStr,
-            callFunc = self.cmdCB,
-            callCodes = AllCodes,
-        )
-        #cmdVar.addCallback(cmdCB)
-        self.dispatcher.executeCmd(cmdVar)
+        self.cmdVars = []
+        cmdStrs = ['move 1,2,3', 'showparams']
+        for cmdStr in cmdStrs:
+            cmd = CmdVar (
+                actor = "mirror",
+                cmdStr = cmdStr,
+                callFunc = self.cmdCB,
+            )
+            self.dispatcher.executeCmd(cmd)
+            self.cmdVars.append(cmd)
         return self.d
 
     def cmdCB(self, cmd):
         """Callback function for cmdVars
         """
-        print 'BAM % s' % cmd.cmdStr
-        if cmd.isDone:
-            print 'command done!'
+        print 'BAM % s' % cmd.cmdStr, 'Failed?: ', cmd.didFail
+        alldone = [cmd.isDone for cmd in self.cmdVars]
+        print 'allcmds: ', alldone
+        if not False in alldone: 
             d, self.d = self.d, None
             d.callback('success')
