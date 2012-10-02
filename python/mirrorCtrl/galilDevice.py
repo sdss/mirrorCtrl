@@ -443,7 +443,10 @@ class GalilDevice(TCPDevice):
         Inputs:
         - axisList: a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
         """
-        self.startUserCmd(userCmd)
+        running = self.startUserCmd(userCmd)
+        if running == False:
+            # command was rejected, device was busy, return empty handed
+            return
         
         if not axisList:
             axisList = self.validAxisList
@@ -469,7 +472,7 @@ class GalilDevice(TCPDevice):
         )
         self.status.homing = newHoming
             
-        self.writeToUsers(">", "Text = Homing Actuators: %s" % (", ".join(str(v) for v in axisList)), cmd = userCmd)
+        self.writeToUsers(">", "Text = \"Homing Actuators: %s\"" % (", ".join(str(v) for v in axisList)), cmd = userCmd)
         updateStr = self.status._getKeyValStr(["homing"])
         self.writeToUsers("i", updateStr, cmd=userCmd)
         self.startDevCmd(cmdStr)
@@ -480,7 +483,10 @@ class GalilDevice(TCPDevice):
         Subsequent moves are commanded until an acceptable orientation is reached (within errors).
         Cmd not tied to state of devCmd, because of subsequent moves.
         """
-        self.startUserCmd(userCmd, doCancel=False, timeLim=5)
+        running = self.startUserCmd(userCmd, doCancel=False, timeLim=5)
+        if running == False:
+            # command was rejected, device was busy, return empty handed
+            return
 
         # enable iteration for mirrors with encoders
         if self.mirror.hasEncoders:
@@ -549,7 +555,10 @@ class GalilDevice(TCPDevice):
     def cmdParams(self, userCmd):
         """Show Galil parameters
         """
-        self.startUserCmd(userCmd)
+        running = self.startUserCmd(userCmd)
+        if running == False:
+            # command was rejected, device was busy, return empty handed
+            return
         self.startDevCmd("XQ #SHOWPAR")
     
     def sendStop(self):
@@ -610,7 +619,7 @@ class GalilDevice(TCPDevice):
         else:
             if not self.currUserCmd.isDone:
                 userCmd.setState(userCmd.Failed, "Busy running user command %s" % (self.currUserCmd.cmdStr,))
-            
+                return False
             if not self.currDevCmd.isDone:
                 raise RuntimeError("Bug! A device command is running (%s) but a user command is not" % \
                     (self.currDevCmd.cmdStr,))
@@ -619,6 +628,7 @@ class GalilDevice(TCPDevice):
         if timeLim is not None:
             userCmd.setTimeLimit(timeLim)
         userCmd.setState(userCmd.Running)
+        return True
 
     def _devCmdCallback(self, dumDevCmd=None):
         """Device command callback
@@ -631,6 +641,7 @@ class GalilDevice(TCPDevice):
             if not self.currUserCmd.isDone:
                 self.currUserCmd.setState(self.currUserCmd.Failed,
                     textMsg="Galil command %s failed" % (self.currDevCmd.cmdStr,))
+            return
             
         if not self.currDevCmd.isDone:
             return
