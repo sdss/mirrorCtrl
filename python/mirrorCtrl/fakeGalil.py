@@ -87,7 +87,9 @@ class FakeGalilProtocol(Protocol):
         self.echo(cmd, delim)
         if cmd in ("ST", "RS"):
             if cmd == "RS":
-                self.isHomed[:] = self.wakeUpHomed
+                homed = numpy.array([1]*6, dtype=int)
+                notHomed = numpy.array([0]*6, dtype=int)
+                self.isHomed[:] =  homed if self.factory.wakeUpHomed else notHomed
             self.replyTimer.cancel()
             return
 
