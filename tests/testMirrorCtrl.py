@@ -109,7 +109,7 @@ class MirrorCtrlTestCase(unittest.TestCase):
         print 'ready to run tests'
         self.d = Deferred()
         self.cmdVars = []
-        cmdStrs = ['move 1,2,3', 'showparams']
+        cmdStrs = ['move 1,2,3', 'reset', 'move 1,2,3']
         for cmdStr in cmdStrs:
             cmd = CmdVar (
                 actor = "mirror",
