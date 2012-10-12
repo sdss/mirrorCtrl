@@ -89,8 +89,6 @@ class FakeGalilProtocol(Protocol):
                 notHomed = numpy.array([0]*6, dtype=int)
                 #self.isHomed[:] =  homed if self.factory.wakeUpHomed else notHomed
                 self.isHomed = notHomed
-                #self.cmdPos = numpy.array([999999999]*6, dtype=int)
-                #self.measPos = numpy.array([999999999]*6, dtype=int)
                 self.cmdPos = numpy.array([0]*6, dtype=int)
                 self.measPos = numpy.array([0]*6, dtype=int)
             self.replyTimer.cancel()
