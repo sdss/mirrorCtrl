@@ -101,17 +101,6 @@ class MirrorCtrl(Actor):
         except Exception, e:
             raise CommandError(str(e))
         return True
-        
-    def cmd_log(self, cmd):
-        """Prints raw (unparsed) Galil reply log to user
-        """
-        if not self.dev.galil.conn.isConnected:
-            raise CommandError("Device Not Connected")
-        try:
-            self.dev.galil.cmdLog(userCmd=cmd)
-        except Exception, e:
-            raise CommandError(str(e))
-        return True 
             
     def cmd_status(self, cmd):
         """Show status of Galil mirror controller

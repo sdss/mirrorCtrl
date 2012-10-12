@@ -13,14 +13,13 @@ from opscore.actor import ActorDispatcher, CmdVar, AllCodes
 Tert35mUserPort = 2532
 
 def showReply(msgStr, *args, **kwargs): # prints what the dispactcher sees to the screen
-    print 'reply: ' + msgStr + "\n"
+    print 'Keyword Reply: ' + msgStr + "\n"
 
 
 class MirrorCtrlTestCase(unittest.TestCase):
     """A series of tests using twisted's trial unittesting.  Simulates
     communication over a network.
     """
-    timeout = 10 # ten seconds before timeout
 
 
     def setUp(self):
@@ -93,7 +92,6 @@ class MirrorCtrlTestCase(unittest.TestCase):
             connection = self.cmdConn,
             logFunc = showReply
         )
-        #self.dispatcher.delayCallbacks = True
         d = Deferred()
         def connCallback(conn, d=d):
             print "commander conn state=", conn.state
@@ -105,27 +103,65 @@ class MirrorCtrlTestCase(unittest.TestCase):
         self.addCleanup(self.cmdConn.disconnect)
         return d    
                 
-    def testCmds(self): 
+    def testDispactched(self): 
         print 'ready to run tests'
         self.d = Deferred()
+        self.runIndivCmds(self.d)
+
+
+    def runIndivCmds(self, d):
+        """Dispatch a set of commands one at a time, wait for completion before
+        sending the next
+        
+        Input:
+        d = a deferred to keep track of
+        """
         self.cmdVars = []
-        cmdStrs = ['move 1,2,3', 'reset', 'move 1,2,3']
+        cmdStrs = [
+            'move 1,2,3',
+            'home A,B,C',
+            'status',
+            'showparams',
+            'stop',
+            'reset'
+        ]
         for cmdStr in cmdStrs:
             cmd = CmdVar (
                 actor = "mirror",
                 cmdStr = cmdStr,
                 callFunc = self.cmdCB,
             )
-            self.dispatcher.executeCmd(cmd)
             self.cmdVars.append(cmd)
-        return self.d
+        self.cmdIter = iter(self.cmdVars)
+        d.addBoth(self.allPass)
+        d.addBoth(self.assertEqual, True) # true is expected from allPass
+        firstCmd = self.cmdIter.next()
+        print 'Sending Cmd: ', firstCmd.cmdStr
+        self.dispatcher.executeCmd(firstCmd)
+
+
+    def allPass(self, *args):
+        """Return True if all commands on the stack passed
+        """
+        anyFail = [cmd.didFail for cmd in self.cmdVars]
+        if True in anyFail:
+            return False
+        else:
+            return True
 
     def cmdCB(self, cmd):
         """Callback function for cmdVars
         """
-        print 'BAM % s' % cmd.cmdStr, 'Failed?: ', cmd.didFail
-        alldone = [cmd.isDone for cmd in self.cmdVars]
-        print 'allcmds: ', alldone
+        alldone = [aCmd.isDone for aCmd in self.cmdVars]
         if not False in alldone: 
+            print 'All Commands Finished!'
             d, self.d = self.d, None
             d.callback('success')
+        elif cmd.isDone:
+            # move onto the next one
+            nextCmd = self.cmdIter.next()
+            print 'Sending Next Cmd: ', nextCmd.cmdStr
+            self.dispatcher.executeCmd(nextCmd)
+        else:
+            # command not done, do nothing until it is
+            pass
