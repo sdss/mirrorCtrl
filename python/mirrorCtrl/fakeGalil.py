@@ -39,11 +39,9 @@ class FakeGalilProtocol(Protocol):
         self._buffer = ''
         self.replyTimer = Timer()
         self.nAxes = 3
-
-        if self.factory.wakeUpHomed:
-            self.isHomed = numpy.array([1]*6, dtype=int)
-        else:
-            self.isHomed = numpy.array([0]*6, dtype=int)   
+        
+        homed, notHomed = numpy.array([1]*6, dtype=int), numpy.array([0]*6, dtype=int)
+        self.isHomed = homed if self.factory.wakeUpHomed else notHomed
         self.cmdPos = numpy.array([0]*6, dtype=int)
         self.measPos = numpy.array([0]*6, dtype=int)
         self.userNums = numpy.array([MAXINT]*6, dtype=int)
@@ -89,7 +87,12 @@ class FakeGalilProtocol(Protocol):
             if cmd == "RS":
                 homed = numpy.array([1]*6, dtype=int)
                 notHomed = numpy.array([0]*6, dtype=int)
-                self.isHomed[:] =  homed if self.factory.wakeUpHomed else notHomed
+                #self.isHomed[:] =  homed if self.factory.wakeUpHomed else notHomed
+                self.isHomed = notHomed
+                #self.cmdPos = numpy.array([999999999]*6, dtype=int)
+                #self.measPos = numpy.array([999999999]*6, dtype=int)
+                self.cmdPos = numpy.array([0]*6, dtype=int)
+                self.measPos = numpy.array([0]*6, dtype=int)
             self.replyTimer.cancel()
             return
 
@@ -202,10 +205,15 @@ class FakeGalilProtocol(Protocol):
         return ", ".join([fmtStr % val for val in arr[0:self.nAxes]]) + " " + suffix
     
     def showStatus(self):
+        notHomed = numpy.nonzero(self.isHomed==0)
+        cmdPos = self.cmdPos[:]
+        measPos = self.measPos[:]
+        cmdPos[notHomed] = 999999999
+        measPos[notHomed] = 999999999
         for msgStr in [
             self.formatArr(" %d", self.isHomed, "axis homed"),
-            self.formatArr("%09d", self.cmdPos, "commanded position"),
-            self.formatArr("%09d", self.measPos, "actual position"),
+            self.formatArr("%09d", cmdPos, "commanded position"),
+            self.formatArr("%09d", measPos, "actual position"),
             self.formatArr("%09d", self.status, "status word"),
         ]:
             self.sendLine(msgStr)
