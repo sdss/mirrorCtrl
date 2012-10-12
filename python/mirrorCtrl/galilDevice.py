@@ -323,7 +323,9 @@ class GalilDevice(TCPDevice):
             return
 
         elif ('commanded position' == key) or ('target position' == key):
-            self.status.cmdMount = [int(x) for x in data]
+            # in the case where cmdMount == 999999999 set to NaN
+            self.status.cmdMount = [int(x) if int(x) != 999999999 else numpy.nan for x in data]
+            #self.status.cmdMount = cmdMount if cmdMount != [999999999]*self.nAct else [numpy.nan]*self.nAct
             updateStr = self.status._getKeyValStr(["cmdMount"])
             self.writeToUsers("i", updateStr, cmd=self.currUserCmd)
             return
@@ -331,20 +333,28 @@ class GalilDevice(TCPDevice):
         elif ('actual position' == key) or ('final position' == key):
             # measured position (adjusted)
             # account for encoder --> actuator spatial difference
-            self.status.encMount = numpy.asarray(data, dtype=float)
+            #self.status.encMount = numpy.asarray(data, dtype=float)
+            # in the case where encMount == 999999999 set to NaN
+            self.status.encMount = [int(x) if int(x) != 999999999 else numpy.nan for x in data]
+            
+            #self.status.encMount = encMount if encMount != [999999999]*self.nAct else [numpy.nan]*self.nAct
             updateStr = self.status._getKeyValStr(["encMount"])
             self.writeToUsers("i", updateStr, cmd=self.currUserCmd)
             # DesOrient may be nans
-            if numpy.isfinite(sum(self.status.desOrient)):
-                initOrient = self.status.desOrient
-            else:
-                initOrient = numpy.zeros(6)
-            orient = self.mirror.orientFromEncoderMount(self.status.encMount, initOrient)
-            actMount = self.mirror.actuatorMountFromOrient(orient)
-            actMount = numpy.asarray(actMount, dtype=float)
-            # add these new values to status
-            self.status.orient = numpy.asarray(orient[:], dtype=float)
-            self.status.actMount = actMount
+            if not numpy.isfinite(sum(self.status.encMount)):
+                # encoder positons contain NaN(s)
+                # Further computations cannot be done
+                self.status.orient = [numpy.nan]*6
+                self.status.actMount = [numpy.nan]*self.nAct
+            else:    
+                # initial guess is desOrient, unless nothing is there, in which case start from zero
+                initOrient = self.status.desOrient if numpy.isfinite(sum(self.status.desOrient)) else numpy.zeros(6)
+                orient = self.mirror.orientFromEncoderMount(self.status.encMount, initOrient)
+                actMount = self.mirror.actuatorMountFromOrient(orient)
+                actMount = numpy.asarray(actMount, dtype=float)
+                # add these new values to status
+                self.status.orient = numpy.asarray(orient[:], dtype=float)
+                self.status.actMount = actMount            
             updateStr = self.status._getKeyValStr(["orient", "actMount"])
             self.writeToUsers("i", updateStr, cmd=self.currUserCmd)
             return
@@ -382,7 +392,7 @@ class GalilDevice(TCPDevice):
         - Parse status to update the model parameters
         - If a command has finished, call the appropriate command callback
         """
-        #print 'Galil Reply: %r' % replyStr 
+        print 'Galil Reply: %r' % replyStr 
         #print "handleReply(replyStr=%r)" % (replyStr,)
         if self.currDevCmd.isDone:
             # ignore unsolicited input
@@ -395,18 +405,26 @@ class GalilDevice(TCPDevice):
         if replyStr == "":
             # ignore blank replies
             return
-        catchGOPOS = replyStr.startswith("?GOPOS") # only for testing bench galil
-        if replyStr.startswith("?") and not catchGOPOS:
-            # there was an error. End current process
-            self.writeToUsers("f", "Text=\"Galil Error: %s\"" % (replyStr,), cmd = self.currDevCmd)
-            self.currDevCmd.setState(self.currDevCmd.Failed, textMsg=replyStr)
-            if not self.currUserCmd.isDone:
-                self.currUserCmd.setState(self.currUserCmd.Failed, textMsg=replyStr)
-            self._clearDevCmd()
+        catchGOPOS = replyStr.startswith("?GOPOS")
+        if catchGOPOS:
+            # catch on full step error. Report it but don't fail the command
+            self.writeToUsers("w", "Text=\"On Full Step Error: %s\"" % (replyStr,), cmd = self.currDevCmd)
+            return
+        elif replyStr.startswith("?"):
+            # set state to failing, wait for 'OK', then fully fail
+            # if cmd is failed instantly, the device could attribute the
+            # following 'OK' as a reply for a different command.
+            self.currDevCmd.setState(self.currDevCmd.Failing, textMsg=replyStr)
+            self.writeToUsers("w", "Text=\"Device Command %s Failing: %s\"" % (self.currDevCmd.cmdStr, replyStr,), cmd = self.currDevCmd)
             return
         if okLineRegEx.match(replyStr):
             # command finished
-            self.currDevCmd.setState(self.currDevCmd.Done)
+            state, foo, bar = self.currDevCmd.fullState
+            if state == self.currDevCmd.Failing:
+                # got the OK, now fail the command
+                self.currDevCmd.setState(self.currDevCmd.Failed)
+            else:
+                self.currDevCmd.setState(self.currDevCmd.Done)
             return
         cmdEcho = cmdEchoRegEx.search(replyStr) or axisEchoRegEx.search(replyStr)
         if cmdEcho:
@@ -475,7 +493,7 @@ class GalilDevice(TCPDevice):
         self.writeToUsers(">", "Text = \"Homing Actuators: %s\"" % (", ".join(str(v) for v in axisList)), cmd = userCmd)
         updateStr = self.status._getKeyValStr(["homing"])
         self.writeToUsers("i", updateStr, cmd=userCmd)
-        self.startDevCmd(cmdStr)
+        self.startDevCmd(cmdStr, errFunc=self.failStop)
 
     def cmdMove(self, orient, userCmd):
         """Accepts an orientation then commands the move.
@@ -499,7 +517,7 @@ class GalilDevice(TCPDevice):
         cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
         self.status.desOrientAge.startTimer()
         updateStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "cmdMount", "maxIter"])
-        self.startDevCmd(cmdMoveStr, callFunc=self._moveIter)
+        self.startDevCmd(cmdMoveStr, callFunc=self._moveIter, errFunc=self.failStop)
 
     def cmdReset(self, userCmd):
         """Reset the Galil to its power-on state. All axes will have to be re-homed. Stop is gentler!
@@ -568,8 +586,14 @@ class GalilDevice(TCPDevice):
     def sendStatus(self):
         """Send device command XQ#STATUS"""
         self.startDevCmd("XQ#STATUS")
+        
+    def failStop(self):
+        """Send device command XQ#STOP, then XQ#STATUS, and afterwards fail the user Cmd"""
+        def failStatus():
+            self.startDevCmd("XQ#STATUS", callFunc = self._failUserCmd)       
+        self.startDevCmd("XQ#STOP", callFunc=failStatus)
 
-    def startDevCmd(self, cmdStr, timeLim=2, callFunc=None):
+    def startDevCmd(self, cmdStr, timeLim=2, callFunc=None, errFunc=None):
         """Start a new device command, replacing self.currDevCmd
         
         Inputs:
@@ -578,6 +602,9 @@ class GalilDevice(TCPDevice):
         - callFunc: function to call when the command finishes; receives no arguments
             (note: _devCmdCallback is called by the device command and is responsible
             for calling callFunc, which is stored in _userCmdNextStep)
+        - errFunc: function to call if device command fails (eg, gailil sends a "?") before 
+            setting userCmd to failed. Intended primarily for a status query prior to user 
+            command termination.
         """
         #print "startDevCmd(cmdStr=%s, timeLimt=%s, callFunc=%s)" % (cmdStr, timeLim, callFunc)
         #print "self.userCmd=%r" % (self.currUserCmd,)
@@ -586,6 +613,7 @@ class GalilDevice(TCPDevice):
             raise RuntimeError("Cannot start new device command: %s is running" % (self.currDevCmd,))
         
         self._userCmdNextStep = callFunc
+        self._userCmdCatchFail = errFunc
         devCmd = self.cmdClass(cmdStr, timeLim = timeLim, callFunc=self._devCmdCallback)
         self.currDevCmd = devCmd
         self.parsedKeyList = []
@@ -630,18 +658,28 @@ class GalilDevice(TCPDevice):
         userCmd.setState(userCmd.Running)
         return
 
+    def _failUserCmd(self):
+        """Simply fail the current user command
+        """
+        self._userCmdNextStep = None
+        if not self.currUserCmd.isDone:
+            self.currUserCmd.setState(self.currUserCmd.Failed,
+                textMsg="Galil command %s failed" % (self.currUserCmd.cmdStr,))
+                    
     def _devCmdCallback(self, dumDevCmd=None):
         """Device command callback
         
         startDevCmd always assigns this as the callback, which then calls and clears any user-specified callback.
         """
         #print "_devCmdCallback(); currDevCmd=%r; _userCmdNextStep=%s" % (self.currDevCmd, self._userCmdNextStep)
+        #print "_devCmdCallback(); self.userCmd=%r" % (self.currUserCmd,)
         if self.currDevCmd.didFail:
-            self._userCmdNextStep = None
-            if not self.currUserCmd.isDone:
-                self.currUserCmd.setState(self.currUserCmd.Failed,
-                    textMsg="Galil command %s failed" % (self.currDevCmd.cmdStr,))
             self._clearDevCmd()
+            userCmdCatchFail, self._userCmdCatchFail = self._userCmdCatchFail, None
+            if userCmdCatchFail:
+                userCmdCatchFail() # I imagine will almost always be self.failStop()
+            else:
+                self._failUserCmd()
             return
             
         if not self.currDevCmd.isDone:
@@ -655,7 +693,7 @@ class GalilDevice(TCPDevice):
             # nothing more to do; user command must be finished!
             self.currUserCmd.setState(self.currUserCmd.Done)
             self._clearDevCmd()
-        #print "_devCmdCallback(); self.userCmd=%r" % (self.currUserCmd,)
+        #print "_devCmdCallback()END; self.userCmd=%r" % (self.currUserCmd,)
 
     def _moveIter(self):
         """A move device command ended; decide whether further move iterations are required and act accordingly.
@@ -690,7 +728,7 @@ class GalilDevice(TCPDevice):
             # convert from numpy to simple list for command formatting
             mount = [x for x in self.status.cmdMount]
             cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
-            self.startDevCmd(cmdMoveStr, callFunc=self._moveIter)
+            self.startDevCmd(cmdMoveStr, callFunc=self._moveIter, errFunc=self.failStop)
             return
 
         # done
