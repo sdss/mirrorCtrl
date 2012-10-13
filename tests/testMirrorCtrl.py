@@ -1,7 +1,7 @@
 """http://twistedmatrix.com/documents/current/core/howto/trial.html
 """
 from twisted.trial import unittest
-from twisted.internet.defer import Deferred # , gatherResults, maybeDeferred
+from twisted.internet.defer import Deferred, gatherResults#, maybeDeferred
 from twisted.internet import reactor
 
 import mirrorCtrl
@@ -16,11 +16,85 @@ def showReply(msgStr, *args, **kwargs): # prints what the dispactcher sees to th
     print 'Keyword Reply: ' + msgStr + "\n"
 
 
+class TestObj(object):
+    """Contains a command to be executed, and information on how it should terminate
+    """
+    def __init__(self, dispatcher, cmdStr, shouldFail=False, modelInfo=None):
+        """Inputs:
+        cmdStr: the string to send to the actor
+        shouldFail: bool, when the command terminates should it have failed?
+        modelInfo: a keyword dict of keywords and values expected to be on the model after
+            the termination of this command.
+        """
+        self.deferred = Deferred()
+        self.dispatcher = dispatcher
+        self.shouldFail = bool(shouldFail)
+        self.modelInfo = modelInfo
+        self.cmdVar = CmdVar (
+                actor = "mirror",
+                cmdStr = cmdStr,
+                callFunc = self.cmdCB,
+            )
+            
+    def cmdCB(self, thisCmd):
+        """called each time this command changes state
+        """
+        print self.dispatcher.model.keyVarDict
+        if self.cmdVar.isDone:
+            print 'command finished: ', self.cmdVar.cmdStr
+            deferred, self.deferred = self.deferred, None
+            deferred.callback('hell ya')
+        
+    def executeCmd(self):
+        """execute the command
+        """
+        print 'running command: ', self.cmdVar.cmdStr
+        self.dispatcher.executeCmd(self.cmdVar)
+        return self.deferred
+        
+        
+class TestCollision(object):
+    """Receives a list of TestObjs, and will send them in immediate order.
+    """
+    def __init__(self, testObjList):
+        """Inputs:
+        testObjList: must be a list of TestObj objects.
+        """
+        self.testObjList = testObjList
+        
+    def exectueCmd(self):
+        """Start all all commands in order
+        """
+        deferreds = []
+        for obj in testObjList: 
+            deferreds.append(obj.executeCmd())
+        return gatherResults(deferreds)
+        
+        
+class TestRunner(object):
+    """An object to run a series of testObjects or TestCollisions, check the return, then run the next test
+    """
+    def __init__(self, testList):
+        self.deferred = Deferred()
+        self.testList = iter(testList)
+        
+    def runTests(self):
+        try:
+            nextCmd = self.testList.next()
+        except:
+            # all tests are done
+            deferred, self.deferred = self.deferred, None
+            deferred.callback('hot like sauce')
+            return
+        d = nextCmd.executeCmd()
+        d.addCallback(self.runTests)
+        return self.deferred
+        
+        
 class MirrorCtrlTestCase(unittest.TestCase):
     """A series of tests using twisted's trial unittesting.  Simulates
     communication over a network.
     """
-
 
     def setUp(self):
         print "setUp()"
@@ -103,65 +177,16 @@ class MirrorCtrlTestCase(unittest.TestCase):
         self.addCleanup(self.cmdConn.disconnect)
         return d    
                 
-    def testDispactched(self): 
-        print 'ready to run tests'
-        self.d = Deferred()
-        self.runIndivCmds(self.d)
-
-
-    def runIndivCmds(self, d):
-        """Dispatch a set of commands one at a time, wait for completion before
-        sending the next
-        
-        Input:
-        d = a deferred to keep track of
-        """
-        self.cmdVars = []
-        cmdStrs = [
-            'move 1,2,3',
-            'home A,B,C',
-            'status',
-            'showparams',
-            'stop',
-            'reset'
-        ]
-        for cmdStr in cmdStrs:
-            cmd = CmdVar (
-                actor = "mirror",
-                cmdStr = cmdStr,
-                callFunc = self.cmdCB,
-            )
-            self.cmdVars.append(cmd)
-        self.cmdIter = iter(self.cmdVars)
-        d.addBoth(self.allPass)
-        d.addBoth(self.assertEqual, True) # true is expected from allPass
-        firstCmd = self.cmdIter.next()
-        print 'Sending Cmd: ', firstCmd.cmdStr
-        self.dispatcher.executeCmd(firstCmd)
-
-
-    def allPass(self, *args):
-        """Return True if all commands on the stack passed
-        """
-        anyFail = [cmd.didFail for cmd in self.cmdVars]
-        if True in anyFail:
-            return False
-        else:
-            return True
-
-    def cmdCB(self, cmd):
-        """Callback function for cmdVars
-        """
-        alldone = [aCmd.isDone for aCmd in self.cmdVars]
-        if not False in alldone: 
-            print 'All Commands Finished!'
-            d, self.d = self.d, None
-            d.callback('success')
-        elif cmd.isDone:
-            # move onto the next one
-            nextCmd = self.cmdIter.next()
-            print 'Sending Next Cmd: ', nextCmd.cmdStr
-            self.dispatcher.executeCmd(nextCmd)
-        else:
-            # command not done, do nothing until it is
-            pass
+    def testIt(self):
+        cmdStr = 'move 1,2,3'
+        testRunner = TestRunner(
+            testList = [
+                TestObj(
+                    dispatcher = self.dispatcher, 
+                    cmdStr = cmdStr, 
+                    shouldFail=False, 
+                    modelInfo=None
+                )
+            ]
+        )
+        return testRunner.runTests()
