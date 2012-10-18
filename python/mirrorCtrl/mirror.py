@@ -501,11 +501,11 @@ class DirectMirror(MirrorBase):
         - encoderList:  Encoders associated with actuators. None if there are no encoders,
                         else a list of items: each an encoder or None if the associated
                         actuator has no encoder.
-        - minCorrList: if encoderList is not None: specifies the maximum encoder error to correct;
+        - minCorrList: if encoderList is not None: specifies the minimum actuator error to correct;
             must have the same number of elements as encoderList;
             if encoderList[i] is None then minCorrList[i] is ignored.
             If encoderList is None then this argument is entirely ignored.
-        - maxCorrList: if encoderList is not None: specifies the maximum encoder error to correct;
+        - maxCorrList: if encoderList is not None: specifies the maximum actuator error to correct;
             must have the same number of elements as encoderList;
             if encoderList[i] is None then minCorrList[i] is ignored.
             If encoderList is None then this argument is entirely ignored.
