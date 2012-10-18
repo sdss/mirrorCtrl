@@ -249,6 +249,10 @@ class FakeGalilProtocol(Protocol):
         self.cmdPos = newCmdPos
         # get random sample between -self.noiseRange and +self.noiseRange
         noise = numpy.random.random_sample(size=newCmdPos.shape)*2.*self.noiseRange - self.noiseRange
+        if 0 in self.encRes:
+            # no noise should be added to any axis with a 0 encoder resolution
+            zeroit = numpy.nonzero(self.encRes==0)
+            noise[zeroit] = 0.
         noisyPos = newCmdPos + noise
         measOrient = self.mirror.orientFromActuatorMount(noisyPos[0:3])
         measMount = numpy.hstack((self.mirror.encoderMountFromOrient(measOrient), noisyPos[3:])) #append last 3 'unused' axes
