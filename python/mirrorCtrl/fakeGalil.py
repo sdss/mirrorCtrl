@@ -28,35 +28,36 @@ from twisted.internet.protocol import Factory, Protocol
 from RO.Comm.TwistedTimer import Timer
 
 MAXINT = 2147483647
-
 MaxCmdTime = 2.0 # maximum time any command can take; sec
 
 class FakeGalilProtocol(Protocol):
     lineEndPattern = re.compile(r"(\r\n|;)")
     
-    def __init__(self, factory):
+    def __init__(self, factory, mirror=mir35mTert.Mirror, nAxes=3):
         self.factory = factory
         self._buffer = ''
         self.replyTimer = Timer()
-        self.nAxes = 3
+        self.nAxes = nAxes
+        self.mirror = mirror
         
-        homed, notHomed = numpy.array([1]*6, dtype=int), numpy.array([0]*6, dtype=int)
+        homed, notHomed = numpy.array([1]*6, dtype=int)[0:nAxes], numpy.array([0]*6, dtype=int)[0:nAxes]
         self.isHomed = homed if self.factory.wakeUpHomed else notHomed
-        self.cmdPos = numpy.array([0]*6, dtype=int)
-        self.measPos = numpy.array([0]*6, dtype=int)
-        self.userNums = numpy.array([MAXINT]*6, dtype=int)
+        self.cmdPos = numpy.array([0]*6, dtype=int)[0:nAxes]
+        self.measPos = numpy.array([0]*6, dtype=int)[0:nAxes]
+        self.userNums = numpy.array([MAXINT]*6, dtype=int)[0:nAxes]
 
-        self.range = numpy.array([3842048]*3 + [190000]*3, dtype=int)
-        self.speed = numpy.array([50000]*3 + [5000]*3, dtype=int)
-        self.homeSpeed = numpy.array([5000]*3 + [500]*3, dtype=int)
-        self.accel =  numpy.array([500000]*3 + [50000]*3, dtype=int)
-        self.minCorr = numpy.array([0]*6, dtype=int)
-        self.maxCorr = numpy.array([1000000]*3 + [15000]*3, dtype=int)
-        self.st_fs = numpy.array([50]*6, dtype=int)
-        self.marg = numpy.array([400000]*3 + [5000]*3, dtype=int)
-        self.indSep = numpy.array([0]*6, dtype=int)
-        self.encRes =  numpy.array([-3.1496]*3 + [1.5750]*3, dtype=float)
-        self.status =  numpy.array([8196*6]*3, dtype=int)
+        self.range = numpy.array([3842048]*3 + [190000]*3, dtype=int)[0:nAxes]
+        self.speed = numpy.array([50000]*3 + [5000]*3, dtype=int)[0:nAxes]
+        self.homeSpeed = numpy.array([5000]*3 + [500]*3, dtype=int)[0:nAxes]
+        self.accel =  numpy.array([500000]*3 + [50000]*3, dtype=int)[0:nAxes]
+        self.minCorr = numpy.array([0]*6, dtype=int)[0:nAxes]
+        self.maxCorr = numpy.array([1000000]*3 + [15000]*3, dtype=int)[0:nAxes]
+        self.st_fs = numpy.array([50]*6, dtype=int)[0:nAxes]
+        self.marg = numpy.array([400000]*3 + [5000]*3, dtype=int)[0:nAxes]
+        self.indSep = numpy.array([0]*6, dtype=int)[0:nAxes]
+        self.encRes =  numpy.array([-3.1496]*3 + [1.5750]*3, dtype=float)[0:nAxes]
+        self.status =  numpy.array([8196*6]*3, dtype=int)[0:nAxes]
+        self.noiseRange = 700 # steps, +/- range for adding steps to a measurement
 
     def dataReceived(self, data):
         self._buffer += data
@@ -89,8 +90,9 @@ class FakeGalilProtocol(Protocol):
                 notHomed = numpy.array([0]*6, dtype=int)
                 #self.isHomed[:] =  homed if self.factory.wakeUpHomed else notHomed
                 self.isHomed = notHomed
-                self.cmdPos = numpy.array([0]*6, dtype=int)
-                self.measPos = numpy.array([0]*6, dtype=int)
+                self.cmdPos = numpy.array([0]*6, dtype=int)[0:nAxes]
+                self.measPos = numpy.array([0]*6, dtype=int)[0:nAxes]                
+                self.userNums = numpy.array([MAXINT]*6, dtype=int)[0:nAxes]
             self.replyTimer.cancel()
             return
 
@@ -124,6 +126,8 @@ class FakeGalilProtocol(Protocol):
         cmdVerb = cmdMatch.groups()[0]
 
         if cmdVerb == "MOVE":
+            # round user nums to nearest st_fs step
+            self.userNums = numpy.around(self.userNums/50)*50
             newCmdPos = numpy.where(self.userNums == MAXINT, self.cmdPos, self.userNums)
             self.moveStart(newCmdPos)
 
@@ -200,7 +204,7 @@ class FakeGalilProtocol(Protocol):
         self.userNums[:] = MAXINT
     
     def formatArr(self, fmtStr, arr, suffix):
-        return ", ".join([fmtStr % val for val in arr[0:self.nAxes]]) + " " + suffix
+        return ", ".join([fmtStr % val for val in arr]) + " " + suffix
     
     def showStatus(self):
         notHomed = numpy.nonzero(self.isHomed==0)
@@ -243,11 +247,11 @@ class FakeGalilProtocol(Protocol):
         deltaTimeArr = deltaPos / numpy.array(self.speed, dtype=float)
         moveTime = min(deltaTimeArr.max(), MaxCmdTime)
         self.cmdPos = newCmdPos
-        # find what encoder positions this corresponds to for this mirror
-        # only use first 3 or an error is thrown, Three actuators, so three mount positions.
-        noisyPos = newCmdPos + numpy.array(numpy.random.normal(0, 100, 6), dtype=int)
-        measOrient = mir35mTert.Mirror.orientFromActuatorMount(noisyPos[0:3])
-        measMount = numpy.hstack((mir35mTert.Mirror.encoderMountFromOrient(measOrient), noisyPos[3:])) #append last 3 'unused' axes
+        # get random sample between -self.noiseRange and +self.noiseRange
+        noise = numpy.random.random_sample(size=newCmdPos.shape)*2.*self.noiseRange - self.noiseRange
+        noisyPos = newCmdPos + noise
+        measOrient = self.mirror.orientFromActuatorMount(noisyPos[0:3])
+        measMount = numpy.hstack((self.mirror.encoderMountFromOrient(measOrient), noisyPos[3:])) #append last 3 'unused' axes
         self.measPos = measMount
 
         self.sendLine(self.formatArr("%4.1f", deltaTimeArr, "max sec for move"))
