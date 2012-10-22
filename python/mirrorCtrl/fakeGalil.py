@@ -243,6 +243,17 @@ class FakeGalilProtocol(Protocol):
     def moveStart(self, newCmdPos):
         """Start moving to the specified newCmdPos
         """
+        # first check that all axes are homed
+        # for now, assume all axes need to be homed for a move
+        # to do: allow any homed axis to move.
+        if 0 in self.isHomed:
+            unhomed = numpy.asarray(numpy.abs(self.isHomed-1), dtype=int)
+            unhomed = [str(x) for x in unhomed]
+            unhomed = ','.join(unhomed)
+            self.sendLine('?HMERR: some axes to be moved have not been homed: %s' % unhomed)
+            self.done()
+            return
+            
         deltaPos = newCmdPos - self.cmdPos
         deltaTimeArr = deltaPos / numpy.array(self.speed, dtype=float)
         moveTime = min(deltaTimeArr.max(), MaxCmdTime)
@@ -253,11 +264,16 @@ class FakeGalilProtocol(Protocol):
             # no noise should be added to any axis with a 0 encoder resolution
             zeroit = numpy.nonzero(self.encRes==0)
             noise[zeroit] = 0.
-        noisyPos = newCmdPos + noise
-        measOrient = self.mirror.orientFromActuatorMount(noisyPos[0:3])
-        #measMount = numpy.hstack((self.mirror.encoderMountFromOrient(measOrient), noisyPos[3:])) #append last 3 'unused' axes
-        measMount = self.mirror.encoderMountFromOrient(measOrient)
-        self.measPos = measMount
+        trueOrient = self.mirror.orientFromActuatorMount(newCmdPos)
+        trueEnc = self.mirror.encoderMountFromOrient(trueOrient)
+        # add noise to encoder measurement
+        noisyEnc = trueEnc + noise
+        self.measPos = noisyEnc
+#         noisyPos = newCmdPos + noise
+#         measOrient = self.mirror.orientFromActuatorMount(noisyPos[0:3])
+#         #measMount = numpy.hstack((self.mirror.encoderMountFromOrient(measOrient), noisyPos[3:])) #append last 3 'unused' axes
+#         measMount = self.mirror.encoderMountFromOrient(measOrient)
+#         self.measPos = measMount
 
         self.sendLine(self.formatArr("%4.1f", deltaTimeArr, "max sec for move"))
         self.sendLine(self.formatArr("%09d", self.cmdPos, "target position"))
@@ -297,7 +313,8 @@ class FakeGalilFactory(Factory):
         This override is required because FakeGalilProtocol needs the factory in __init__,
         but default buildProtocol only sets factory after the protocol is constructed
         """
-        return FakeGalilProtocol(factory = self)
+        self.proto = FakeGalilProtocol(factory = self)
+        return self.proto
         
     def __init__(self, verbose=True, wakeUpHomed=True):
         """Create a FakeGalilFactory
