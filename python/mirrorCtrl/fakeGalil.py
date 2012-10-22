@@ -246,7 +246,10 @@ class FakeGalilProtocol(Protocol):
         # first check that all axes are homed
         # for now, assume all axes need to be homed for a move
         # to do: allow any homed axis to move.
-        if 0 in self.isHomed:
+        deltaPos = newCmdPos - self.cmdPos
+        moveInd = numpy.nonzero(deltaPos) # True elements to be moved
+        toMove = self.isHomed[moveInd] # must be full of ones, otherwise fail the cmd
+        if 0 in toMove:
             unhomed = numpy.asarray(numpy.abs(self.isHomed-1), dtype=int)
             unhomed = [str(x) for x in unhomed]
             unhomed = ','.join(unhomed)
