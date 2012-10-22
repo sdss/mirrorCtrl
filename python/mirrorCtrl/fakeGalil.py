@@ -189,7 +189,7 @@ class FakeGalilProtocol(Protocol):
         """
         self.isHomed[:] = numpy.logical_or(self.isHomed, self.userNums != MAXINT)
         posErr = numpy.where(self.userNums == MAXINT, 999999999,
-            numpy.array(numpy.random.normal(0, self.maxCorr / 10.0, 6), dtype=int))
+            numpy.array(numpy.random.normal(0, self.maxCorr / 10.0, self.nAxes), dtype=int))
 
         for msgStr in [
             "041,  006.6 microsteps, sec to find full step",
