@@ -43,13 +43,33 @@ class MirrorCtrl(Actor):
     
     def initialConn(self):
         """Perform initial connections.  Same as Actor Base Class method, but with the
-        addition of commanding 'stop' to put the Galil in a known state upon connection.
+        addition of commanding 'stop', then 'showparams' to put the Galil in a known 
+        state upon connection.
         """
         Actor.initialConn(self)
         # get device state
-        initCmd = UserCmd()
-        initCmd.timeLimit = 10 # give it 10 seconds before timeout
-        self.cmd_stop(initCmd) # put Galil in known state   
+        def doParams(cmd, isOK):
+            if isOK:
+                paramCmd = UserCmd()
+                paramCmd.timeLimit = 10
+                self.cmd_showparams(paramCmd)
+        stopCmd = UserCmd(callFunc=doParams)
+        stopCmd.timeLimit = 10 # give it 10 seconds before timeout
+        self.cmd_stop(stopCmd) # put Galil in known state   
+
+    def processOrientation(self, orientation):
+        """Convert a user specified orientation in um and arcseconds with possibly < 5
+        fields specified into an orientation of 5 values in units of radians and mm.
+        
+        Input:
+        orientation: [Piston (um), [Tilt X ("), [Tilt Y ("), [Trans X (um), [Trans Y (um)]]]]]
+        
+        Output:
+        numpy.array([Piston (mm), Tilt X (rad), Tilt Y (rad), Trans X (rad), Trans Y (rad)])
+        """
+        orientation = numpy.hstack((orientation, numpy.zeros(5-len(orientation))))
+        return orientation * ConvertOrient
+        
     
     def cmd_move(self, cmd):
         """Move mirror to a commanded orientation, if device isn't busy. 
@@ -70,16 +90,10 @@ class MirrorCtrl(Actor):
         if not (0 < len(cmdArgList) < 6):
             raise CommandError("Must specify 1 to 5 orientation values; got %s" % (len(cmdArgList)))
         # pad extra orientations with zeros, if not specified 5.
-        if len(cmdArgList) < 5:
-            pad = numpy.zeros(5 -  len(cmdArgList))
-            cmdOrient = numpy.hstack((cmdArgList, pad))
-        else:
-            cmdOrient = cmdArgList
+        cmdOrient = self.processOrientation(cmdArgList)
         if not self.dev.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            # convert to natural units, mm and radians
-            cmdOrient = cmdOrient * ConvertOrient
             self.dev.galil.cmdMove(cmdOrient, userCmd=cmd)
         except Exception, e:
             raise CommandError(str(e))

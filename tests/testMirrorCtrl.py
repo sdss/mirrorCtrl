@@ -1,8 +1,9 @@
 """http://twistedmatrix.com/documents/current/core/howto/trial.html
 """
 from twisted.trial import unittest
-from twisted.internet.defer import Deferred, gatherResults#, maybeDeferred
+from twisted.internet.defer import Deferred, gatherResults, maybeDeferred
 from twisted.internet import reactor
+import numpy
 
 import mirrorCtrl
 import mirrorCtrl.mirrors.mir35mTert
@@ -14,6 +15,7 @@ Tert35mUserPort = 2532
 
 def showReply(msgStr, *args, **kwargs): # prints what the dispactcher sees to the screen
     print 'Keyword Reply: ' + msgStr + "\n"
+
 
 
 class TestObj(object):
@@ -29,7 +31,7 @@ class TestObj(object):
         self.deferred = Deferred()
         self.dispatcher = dispatcher
         self.shouldFail = bool(shouldFail)
-        self.modelInfo = modelInfo
+        self.modelInfo = modelInfo if modelInfo else {}
         self.cmdVar = CmdVar (
                 actor = "mirror",
                 cmdStr = cmdStr,
@@ -39,18 +41,23 @@ class TestObj(object):
     def cmdCB(self, thisCmd):
         """called each time this command changes state
         """
-        print self.dispatcher.model.keyVarDict
+        #print self.dispatcher.model.keyVarDict
         if self.cmdVar.isDone:
             print 'command finished: ', self.cmdVar.cmdStr
+            # did the command finish in the expected way?
+            result = {'cmdStr':self.cmdVar.cmdStr, 'exitOK': [self.shouldFail, self.cmdVar.didFail]}
+            # check the status of the keywords on the model, compare with expected
+            for kw, expected in self.modelInfo.iteritems():
+                result[kw] = [expected, getattr(self.dispatcher.model, kw).valueList]
             deferred, self.deferred = self.deferred, None
-            deferred.callback('hell ya')
+            deferred.callback(result)
         
     def executeCmd(self):
         """execute the command
         """
         print 'running command: ', self.cmdVar.cmdStr
         self.dispatcher.executeCmd(self.cmdVar)
-        return self.deferred
+        #return self.deferred
         
         
 class TestCollision(object):
@@ -77,17 +84,25 @@ class TestRunner(object):
     def __init__(self, testList):
         self.deferred = Deferred()
         self.testList = iter(testList)
+        self.results = []
         
-    def runTests(self):
+    def runTests(self, testResult=None):
+        """Runs one test at a time
+        Inputs:
+        testResult =  because this method is run as a callback, it must accept the callback result.
+        """
+        if testResult:
+            self.results.append(testResult)
         try:
             nextCmd = self.testList.next()
         except:
+            print 'all tests finished: '
             # all tests are done
             deferred, self.deferred = self.deferred, None
-            deferred.callback('hot like sauce')
+            deferred.callback(self.results) # accumulate results from all tests and pass em on
             return
-        d = nextCmd.executeCmd()
-        d.addCallback(self.runTests)
+        nextCmd.deferred.addCallback(self.runTests)
+        nextCmd.executeCmd()
         return self.deferred
         
         
@@ -95,7 +110,10 @@ class MirrorCtrlTestCase(unittest.TestCase):
     """A series of tests using twisted's trial unittesting.  Simulates
     communication over a network.
     """
+    #timeout=20
 
+    # 
+    Orientation = [10000, 3600, 3600] # 10 mm, 1 deg, 1 deg axes to move
     def setUp(self):
         print "setUp()"
         self.dispatcher = None
@@ -167,26 +185,109 @@ class MirrorCtrlTestCase(unittest.TestCase):
             logFunc = showReply
         )
         d = Deferred()
-        def connCallback(conn, d=d):
+        def allReady(cb):
+            # so fire the callback
+            d.callback('whooohooo')
+        def getStatus(conn):
             print "commander conn state=", conn.state
             if conn.isConnected:
-                d.callback("success")
-
-        self.cmdConn.addStateCallback(connCallback)
+                print 'Querying Device for status'
+                cmdVar = CmdVar (
+                    actor = "mirror",
+                    cmdStr = 'status',
+                    callFunc = getParams,
+                )
+                self.dispatcher.executeCmd(cmdVar)
+        def getParams(cb):
+            print 'Querying Device for params'
+            cmdVar = CmdVar (
+                actor = "mirror",
+                cmdStr = 'showparams',
+                callFunc = allReady,
+            )
+            self.dispatcher.executeCmd(cmdVar)
+        self.cmdConn.addStateCallback(getStatus)
         self.cmdConn.connect()
         self.addCleanup(self.cmdConn.disconnect)
         return d    
                 
-    def testIt(self):
-        cmdStr = 'move 1,2,3'
+    def xtestIt(self):
+        self.mirDev.status.maxIter = 0
         testRunner = TestRunner(
             testList = [
                 TestObj(
                     dispatcher = self.dispatcher, 
-                    cmdStr = cmdStr, 
+                    cmdStr = 'move ' + ', '.join([str(x) for x in self.Orientation]),
                     shouldFail=False, 
-                    modelInfo=None
-                )
+                    modelInfo={
+                        'encMount': self.mirDev.mirror.encoderMountFromOrient(self.mirActor.processOrientation(self.Orientation)),
+                        'cmdMount': numpy.around(numpy.asarray(self.mirDev.mirror.actuatorMountFromOrient(self.mirActor.processOrientation(self.Orientation)))/50.)*50.,
+                        'iter': 1,
+                    }
+                ),
             ]
         )
+        testRunner.deferred.addCallback(self.doAssertions)
         return testRunner.runTests()
+        
+    def doAssertions(self, allTestResults):
+        """Loop through all results and deem them satisfactory or not
+        Inputs:
+            allTestResults: a list of dictionaries containing results from each command
+            test.  
+        """
+        print 'model gParST_FSx: ', getattr(self.dispatcher.model, 'gParST_FSx').valueList
+        print 'model status: ', getattr(self.dispatcher.model, 'status').valueList
+        for cmd in allTestResults:            
+            compare = []
+            print 'Results from cmd: ', cmd['cmdStr']
+            for kw, result in cmd.iteritems():
+                if kw=='cmdStr': 
+                    continue # skip the command string
+                print kw + ': ' + str(result)
+                
+    def testMove(self):
+        self.mirDev.status.maxIter = 0
+        self.deferred = Deferred()
+        orientation = [10000, 3600, 3600]
+        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])
+        encMount = self.mirDev.mirror.encoderMountFromOrient(
+            self.mirActor.processOrientation(orientation)
+            )
+        # round to nearest 50 like the 3.5m Tert Galil
+        cmdMount = numpy.around(numpy.asarray(
+            self.mirDev.mirror.actuatorMountFromOrient(self.mirActor.processOrientation(orientation)))/50.
+            )*50.
+        
+        cmdVar = CmdVar (
+                actor = "mirror",
+                cmdStr = cmdStr,
+                callFunc = self.cmdCB,
+            )
+        self.deferred.addCallback(self.checkMoveResults)        
+        self.dispatcher.executeCmd(cmdVar)
+        return self.deferred
+
+    def checkMoveResults(self, *args):
+        self.assertEqual(1, self.dispatcher.model.iter.valueList[0])
+        
+    def testAgain(self):
+        return self.testMove()
+
+    def testAgain1(self):
+        return self.testMove()
+
+    def testAgain2(self):
+        return self.testMove()
+        
+    def testAgain3(self):
+        return self.testMove()
+        
+
+    def cmdCB(self, thisCmd):
+        """called each time this command changes state
+        """
+        #print self.dispatcher.model.keyVarDict
+        if thisCmd.isDone:
+            d, self.deferred=self.deferred, None
+            d.callback('hell yes')             

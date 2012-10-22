@@ -127,7 +127,7 @@ class FakeGalilProtocol(Protocol):
 
         if cmdVerb == "MOVE":
             # round user nums to nearest st_fs step
-            self.userNums = numpy.around(self.userNums/50)*50
+            self.userNums = numpy.around(self.userNums/50.)*50.
             newCmdPos = numpy.where(self.userNums == MAXINT, self.cmdPos, self.userNums)
             self.moveStart(newCmdPos)
 
@@ -255,7 +255,8 @@ class FakeGalilProtocol(Protocol):
             noise[zeroit] = 0.
         noisyPos = newCmdPos + noise
         measOrient = self.mirror.orientFromActuatorMount(noisyPos[0:3])
-        measMount = numpy.hstack((self.mirror.encoderMountFromOrient(measOrient), noisyPos[3:])) #append last 3 'unused' axes
+        #measMount = numpy.hstack((self.mirror.encoderMountFromOrient(measOrient), noisyPos[3:])) #append last 3 'unused' axes
+        measMount = self.mirror.encoderMountFromOrient(measOrient)
         self.measPos = measMount
 
         self.sendLine(self.formatArr("%4.1f", deltaTimeArr, "max sec for move"))

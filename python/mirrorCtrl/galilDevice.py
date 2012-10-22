@@ -516,7 +516,8 @@ class GalilDevice(TCPDevice):
         # format Galil command
         cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
         self.status.desOrientAge.startTimer()
-        updateStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "cmdMount", "maxIter"])
+        statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "cmdMount", "maxIter", "iter"])
+        self.writeToUsers('i', statusStr, cmd=userCmd)
         self.startDevCmd(cmdMoveStr, callFunc=self._moveIter, errFunc=self.failStop)
 
     def cmdReset(self, userCmd):
