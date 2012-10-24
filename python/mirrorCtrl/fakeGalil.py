@@ -86,13 +86,13 @@ class FakeGalilProtocol(Protocol):
         self.echo(cmd, delim)
         if cmd in ("ST", "RS"):
             if cmd == "RS":
-                homed = numpy.array([1]*6, dtype=int)
-                notHomed = numpy.array([0]*6, dtype=int)
+                homed = numpy.array([1]*6, dtype=int)[0:self.nAxes]
+                notHomed = numpy.array([0]*6, dtype=int)[0:self.nAxes]
                 #self.isHomed[:] =  homed if self.factory.wakeUpHomed else notHomed
                 self.isHomed = notHomed
-                self.cmdPos = numpy.array([0]*6, dtype=int)[0:nAxes]
-                self.measPos = numpy.array([0]*6, dtype=int)[0:nAxes]                
-                self.userNums = numpy.array([MAXINT]*6, dtype=int)[0:nAxes]
+                self.cmdPos = numpy.array([0]*6, dtype=int)[0:self.nAxes]
+                self.measPos = numpy.array([0]*6, dtype=int)[0:self.nAxes]                
+                self.userNums = numpy.array([MAXINT]*6, dtype=int)[0:self.nAxes]
             self.replyTimer.cancel()
             return
 
