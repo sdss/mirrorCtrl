@@ -392,7 +392,7 @@ class GalilDevice(TCPDevice):
         - Parse status to update the model parameters
         - If a command has finished, call the appropriate command callback
         """
-        print 'Galil Reply: %r' % replyStr 
+        #print 'Galil Reply: %r' % replyStr 
         #print "handleReply(replyStr=%r)" % (replyStr,)
         if self.currDevCmd.isDone:
             # ignore unsolicited input
@@ -607,11 +607,11 @@ class GalilDevice(TCPDevice):
             setting userCmd to failed. Intended primarily for a status query prior to user 
             command termination.
         """
-        #print "startDevCmd(cmdStr=%s, timeLimt=%s, callFunc=%s)" % (cmdStr, timeLim, callFunc)
+        print "startDevCmd(cmdStr=%s, timeLimt=%s, callFunc=%s)" % (cmdStr, timeLim, callFunc)
         #print "self.userCmd=%r" % (self.currUserCmd,)
         if not self.currDevCmd.isDone:
             # this should never happen, but...just in case
-            raise RuntimeError("Cannot start new device command: %s is running" % (self.currDevCmd,))
+            raise RuntimeError("Cannot start new device command: %s , %s is currently running" % (cmdStr, self.currDevCmd,))
         
         self._userCmdNextStep = callFunc
         self._userCmdCatchFail = errFunc
@@ -674,10 +674,12 @@ class GalilDevice(TCPDevice):
         """
         #print "_devCmdCallback(); currDevCmd=%r; _userCmdNextStep=%s" % (self.currDevCmd, self._userCmdNextStep)
         #print "_devCmdCallback(); self.userCmd=%r" % (self.currUserCmd,)
-        if self.currDevCmd.didFail:
+        if self.currDevCmd.didFail: #includes 'cancelled' state
+        #if self.currDevCmd.state == 'failed':
             self._clearDevCmd()
             userCmdCatchFail, self._userCmdCatchFail = self._userCmdCatchFail, None
-            if userCmdCatchFail:
+            if userCmdCatchFail and self.currDevCmd.state == 'failed':
+                # don't do this if cmd was 'cancelled', only if 'failed'
                 userCmdCatchFail() # I imagine will almost always be self.failStop()
             else:
                 self._failUserCmd()
