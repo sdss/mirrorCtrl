@@ -4,6 +4,7 @@ from twisted.trial import unittest
 from twisted.internet.defer import Deferred, gatherResults, maybeDeferred
 from twisted.internet import reactor
 import numpy
+import socket
 
 import mirrorCtrl
 import mirrorCtrl.mirrors.mir35mTert
@@ -12,9 +13,12 @@ from RO.Comm.TCPConnection import TCPConnection
 from opscore.actor import ActorDispatcher, CmdVar, AllCodes
 
 Tert35mUserPort = 2532
+# s = socket.socket(socket.PF_INET, socket.SOCK_STREAM)
+# s.bind(('', 0)))
+# Tert35mUserPort = s.getsockname()[1]
 
 def showReply(msgStr, *args, **kwargs): # prints what the dispactcher sees to the screen
-    return
+    #return
     print 'Keyword Reply: ' + msgStr + "\n"
     
 
@@ -510,3 +514,49 @@ class MirrorCtrlTestCase(unittest.TestCase):
         self.dispatcher.executeCmd(cmdHome)
         self.dispatcher.executeCmd(cmdMove)
         return dBoth
+
+    def testBadMove(self):
+        """Send a move command with a commanded z rotation (not allowed).
+        checks:
+        1. command fails
+        """
+        # turn off noise added by fakeGalil.  This move should not iterate.
+        self.fakeGalilFactory.proto.encRes = self.fakeGalilFactory.proto.encRes*0.
+        self.deferred = Deferred()
+        orientation = [10000, 3600, 3600, 10000, 10000, 3600]
+        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
+        cmdVar = CmdVar (
+                actor = "mirror",
+                cmdStr = cmdStr,
+                callFunc = self.cmdCB,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertTrue(cmdVar.didFail)
+        self.deferred.addCallback(checkResults)        
+        self.dispatcher.executeCmd(cmdVar)
+        return self.deferred
+
+    def testBadHome(self):
+        """Try to home non-existant axis D.
+        checks:
+        1. command fails
+        """
+        # force all axes on the fakeGalil to unhomed
+        self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
+        self.deferred = Deferred()
+        cmdStr = 'home A,B,C,D'        
+        cmdVar = CmdVar (
+                actor = "mirror",
+                cmdStr = cmdStr,
+                callFunc = self.cmdCB,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertTrue(cmdVar.didFail)
+            
+        self.deferred.addCallback(checkResults)
+        self.dispatcher.executeCmd(cmdVar)
+        return self.deferred

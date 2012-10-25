@@ -164,43 +164,44 @@ class GalilDevice(TCPDevice):
         # dictionary of axis name: index, e.g. A: 0, B: 1..., F: 5
         self.axisIndexDict = dict((axisName, ind) for ind, axisName in enumerate(self.validAxisList))
         self.status = GalilStatus(self)
-        self.expectedReplies = set([
-            'max sec for move',
-            'target position',
-            'final position',
-            'axis homed',
-            'commanded position',
-            'actual position',
-            'status word',
-            'max sec to find reverse limit switch', # homing
-            'reverse limit switch not depressed for axes:', # data follows this one
-            'trying again',
-            'max sec to find home switch',
-            'sec to move away from home switch',
-            'finding next full step',
-            'microsteps', #share line
-            'sec to find full step', # share line
-            'position error',
-            'software version', #share line
-            'NAXES number of axes', # share line
-            'DOAUX aux status?', # share line
-            'MOFF motors off when idle?', # share line
-            'NCORR # corrections', # share line
-            'WTIME', # share line
-            'ENCTIME', # share line
-            'LSTIME', # share line
-            '-RNGx/2 reverse limits',
-            'RNGx/2 forward limits',
-            'SPDx speed',
-            'HMSPDx homing speed',
-            'ACCx acceleration',
-            'MINCORRx min correction',
-            'MAXCORRx max correction',
-            'ST_FSx microsteps/full step',
-            'MARGx dist betw hard & soft rev lim',
-            'INDSEP index encoder pulse separation',
-            'ENCRESx encoder resolution (microsteps/tick)',
-            ])
+        # i think self.expectedReplies can go.
+#         self.expectedReplies = set([
+#             'max sec for move',
+#             'target position',
+#             'final position',
+#             'axis homed',
+#             'commanded position',
+#             'actual position',
+#             'status word',
+#             'max sec to find reverse limit switch', # homing
+#             'reverse limit switch not depressed for axes:', # data follows this one
+#             'trying again',
+#             'max sec to find home switch',
+#             'sec to move away from home switch',
+#             'finding next full step',
+#             'microsteps', #share line
+#             'sec to find full step', # share line
+#             'position error',
+#             'software version', #share line
+#             'NAXES number of axes', # share line
+#             'DOAUX aux status?', # share line
+#             'MOFF motors off when idle?', # share line
+#             'NCORR # corrections', # share line
+#             'WTIME', # share line
+#             'ENCTIME', # share line
+#             'LSTIME', # share line
+#             '-RNGx/2 reverse limits',
+#             'RNGx/2 forward limits',
+#             'SPDx speed',
+#             'HMSPDx homing speed',
+#             'ACCx acceleration',
+#             'MINCORRx min correction',
+#             'MAXCORRx max correction',
+#             'ST_FSx microsteps/full step',
+#             'MARGx dist betw hard & soft rev lim',
+#             'INDSEP index encoder pulse separation',
+#             'ENCRESx encoder resolution (microsteps/tick)',
+#             ])
 
     def formatAsKeyValStr(self, keyword, value):
         """Format a keyword/value pair string.
@@ -264,12 +265,13 @@ class GalilDevice(TCPDevice):
             self.writeToUsers("w", "BadGalilReply=%s, \"num descriptors do not match num values.\"" % (quoteStr(line),), cmd=self.currUserCmd)
             return
         # check to see if descriptor/s are an expected reply
-        knownReply = [(key in self.expectedReplies) for key in keys]
-        if False in knownReply:
-            # a descriptor wasn't recognized as an expected reply for this Galil/mirror
-            # report it but keep going
-            self.writeToUsers("w","BadGalilReply=%s, \"Descriptor text not recognized.\"" % (quoteStr(line),), cmd=self.currUserCmd)
-            return
+#         knownReply = [(key in self.expectedReplies) for key in keys]
+#         if False in knownReply:
+#             # a descriptor wasn't recognized as an expected reply for this Galil/mirror
+#             # report it but keep going
+#             print 'keys: ', keys
+#             self.writeToUsers("w","BadGalilReply=%s, \"Descriptor text not recognized.\"" % (quoteStr(line),), cmd=self.currUserCmd)
+#             return
         return dataMatched, keys
 
     def sendGalilParam(self, key, data):
@@ -282,8 +284,11 @@ class GalilDevice(TCPDevice):
         """
         param = key.split()[0] # in example: just keep -RNGx/2
         # format as a legal keyword swap out '-' and '/' if present
-        param = param.replace('-', '_')
-        param = param.replace('/', 'div')
+        if param == '-RNGx/2':
+            # skip it
+            return
+        elif param == 'RNGx/2':
+            param = 'HalfRNGx'
         keyword = 'GPar%s' % (param)
         outStr = self.formatAsKeyValStr(keyword, data)
         self.writeToUsers("i", outStr, cmd = self.currUserCmd)
@@ -607,7 +612,7 @@ class GalilDevice(TCPDevice):
             setting userCmd to failed. Intended primarily for a status query prior to user 
             command termination.
         """
-        print "startDevCmd(cmdStr=%s, timeLimt=%s, callFunc=%s)" % (cmdStr, timeLim, callFunc)
+        #print "startDevCmd(cmdStr=%s, timeLimt=%s, callFunc=%s)" % (cmdStr, timeLim, callFunc)
         #print "self.userCmd=%r" % (self.currUserCmd,)
         if not self.currDevCmd.isDone:
             # this should never happen, but...just in case
@@ -833,19 +838,19 @@ class GalilDevice35Tert(GalilDevice):
             port = port,
             callFunc = callFunc,
         )
-        self.expectedReplies |= set([
-            'version of M3-specific additions',
-            'off-on-error?',
-            'error limit for tertiary rotation',
-            'time to close rotation clamp',
-            'open clamp',
-            'turn on at-slot sensor (sec)',
-            'max time',
-            'poll time',
-            'addtl run time for primary mirror cover motion (sec)',
-            'time for primary mirror eyelid motion (sec)',
-            'sec to finish move'
-            ])
+#         self.expectedReplies |= set([
+#             'version of M3-specific additions',
+#             'off-on-error?',
+#             'error limit for tertiary rotation',
+#             'time to close rotation clamp',
+#             'open clamp',
+#             'turn on at-slot sensor (sec)',
+#             'max time',
+#             'poll time',
+#             'addtl run time for primary mirror cover motion (sec)',
+#             'time for primary mirror eyelid motion (sec)',
+#             'sec to finish move'
+#             ])
 
 
 class GalilDevice25Sec(GalilDevice):
@@ -866,14 +871,14 @@ class GalilDevice25Sec(GalilDevice):
             port = port,
             callFunc = callFunc,
         )
-        self.expectedReplies |= set([
-            'piezo status word',
-            'piezo corrections (microsteps)',
-            'version of M2-specific additions',
-            'min, max piezo position (microsteps)',
-            'number of steps of piezo position',
-            'resolution (microsteps/piezo ctrl bit)'
-            ])
+#         self.expectedReplies |= set([
+#             'piezo status word',
+#             'piezo corrections (microsteps)',
+#             'version of M2-specific additions',
+#             'min, max piezo position (microsteps)',
+#             'number of steps of piezo position',
+#             'resolution (microsteps/piezo ctrl bit)'
+#             ])
 
 # uncomment method below if piezoStatusWord should be it's own keyword.
 #     def actOnKey(self, key, data):
