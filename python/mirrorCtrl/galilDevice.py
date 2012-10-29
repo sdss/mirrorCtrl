@@ -397,7 +397,8 @@ class GalilDevice(TCPDevice):
         - Parse status to update the model parameters
         - If a command has finished, call the appropriate command callback
         """
-        #print 'Galil Reply: %r' % replyStr 
+        #log.msg('Galil Reply: ' + replyStr)
+        print 'Galil Reply: ' + replyStr
         #print "handleReply(replyStr=%r)" % (replyStr,)
         if self.currDevCmd.isDone:
             # ignore unsolicited input

@@ -151,7 +151,7 @@ KeysDictionary("mirror", (1,0), *(
 #         help = "Half the negative range in microsteps",
 #     ),
     Key("gParHalfRNGx",
-        Int() * (3,5),
+        Float() * (3,5),
         help = "Half the positive range in microsteps",
     ),
     Key("gParSPDx",
