@@ -26,7 +26,7 @@ from RO.SeqUtil import asSequence
 from twistedActor import TCPDevice, CommandError, UserCmd
 from twisted.internet import reactor
 
-__all__ = ["GalilDevice", "GalilDevice25Sec", "GalilDevice35Tert"]
+__all__ = ["GalilDevice", "GalilDevice25Sec"]
 
 MMPerMicron = 1 / 1000.0        # millimeters per micron
 RadPerDeg  = math.pi / 180.0    # radians per degree
@@ -164,44 +164,6 @@ class GalilDevice(TCPDevice):
         # dictionary of axis name: index, e.g. A: 0, B: 1..., F: 5
         self.axisIndexDict = dict((axisName, ind) for ind, axisName in enumerate(self.validAxisList))
         self.status = GalilStatus(self)
-        # i think self.expectedReplies can go.
-#         self.expectedReplies = set([
-#             'max sec for move',
-#             'target position',
-#             'final position',
-#             'axis homed',
-#             'commanded position',
-#             'actual position',
-#             'status word',
-#             'max sec to find reverse limit switch', # homing
-#             'reverse limit switch not depressed for axes:', # data follows this one
-#             'trying again',
-#             'max sec to find home switch',
-#             'sec to move away from home switch',
-#             'finding next full step',
-#             'microsteps', #share line
-#             'sec to find full step', # share line
-#             'position error',
-#             'software version', #share line
-#             'NAXES number of axes', # share line
-#             'DOAUX aux status?', # share line
-#             'MOFF motors off when idle?', # share line
-#             'NCORR # corrections', # share line
-#             'WTIME', # share line
-#             'ENCTIME', # share line
-#             'LSTIME', # share line
-#             '-RNGx/2 reverse limits',
-#             'RNGx/2 forward limits',
-#             'SPDx speed',
-#             'HMSPDx homing speed',
-#             'ACCx acceleration',
-#             'MINCORRx min correction',
-#             'MAXCORRx max correction',
-#             'ST_FSx microsteps/full step',
-#             'MARGx dist betw hard & soft rev lim',
-#             'INDSEP index encoder pulse separation',
-#             'ENCRESx encoder resolution (microsteps/tick)',
-#             ])
 
     def formatAsKeyValStr(self, keyword, value):
         """Format a keyword/value pair string.
@@ -824,36 +786,6 @@ class GalilDevice(TCPDevice):
         return "%s; %s" % ("; ".join(argList), cmd)
 
 
-class GalilDevice35Tert(GalilDevice):
-    """A Galil Device controller that is specific to the 3.5m Tertiary mirror
-    """
-    def __init__(self,
-        mirror,
-        host,
-        port,
-        callFunc = None,
-    ):
-        GalilDevice.__init__(self,
-            mirror = mirror,
-            host = host,
-            port = port,
-            callFunc = callFunc,
-        )
-#         self.expectedReplies |= set([
-#             'version of M3-specific additions',
-#             'off-on-error?',
-#             'error limit for tertiary rotation',
-#             'time to close rotation clamp',
-#             'open clamp',
-#             'turn on at-slot sensor (sec)',
-#             'max time',
-#             'poll time',
-#             'addtl run time for primary mirror cover motion (sec)',
-#             'time for primary mirror eyelid motion (sec)',
-#             'sec to finish move'
-#             ])
-
-
 class GalilDevice25Sec(GalilDevice):
     """A Galil Device controller that is specific to the 2.5m Secondary mirror
 
@@ -872,33 +804,66 @@ class GalilDevice25Sec(GalilDevice):
             port = port,
             callFunc = callFunc,
         )
-#         self.expectedReplies |= set([
-#             'piezo status word',
-#             'piezo corrections (microsteps)',
-#             'version of M2-specific additions',
-#             'min, max piezo position (microsteps)',
-#             'number of steps of piezo position',
-#             'resolution (microsteps/piezo ctrl bit)'
-#             ])
+        # this mirror has extra status entries
+        self.status.piezoStatus = numpy.nan
+        self.status.piezoCorr = [numpy.nan]*3 
+        
+    def actOnKey(self, key, data):
+        """An overwritten version from the base class to incorporate 2.5m Specific Keywords.
+        Takes a key parsed from self.parseLine, and chooses what to do with the data
+        
+        inputs:
+        -key: parsed descriptive string from self.parseLine
+        -data: parsed data from self.parseLine, may be a numpy array
+        """
+        # look for piezo-specific parameters
+        
+#         You get this along with an XQ#SHOWPAR:
+#         Check and try to parse these first as pPar Keys which will only be 
+#         present in the piezo-specific actorkeys keyword dictionary.
+#         
+#          01.00 version of M2-specific additions
+#         -00001676.4874,  00001676.4874 min, max piezo position (microsteps)
+#          00002705 number of steps of piezo position
+#          00000001.2400 resolution (microsteps/piezo ctrl bit)
 
-# uncomment method below if piezoStatusWord should be it's own keyword.
-#     def actOnKey(self, key, data):
-#         """An overwritten version from the base class to incorporate 2.5m Specific Keywords.
-#         Takes a key parsed from self.parseLine, and chooses what to do with the data
-#
-#         inputs:
-#         -key: parsed descriptive string from self.parseLine
-#         -data: parsed data from self.parseLine, may be a numpy array
-#         """
-#         # test for 2.5m specifics
-#         if 'piezo status word' in key:
-#             data = [int(num) for num in data]
-#             outStr = self.formatAsKeyValStr("piezoStatusWord", data)
-#             self.writeToUsers("i", outStr, cmd=self.currUserCmd)
-#             return
-#         # then run as normal
-#         else:
-#             GalilDevice.actOnKey(key, data)
+
+        if key == 'version of M2-specific additions':
+            # this is a special piezo parameter case, and can't be treated using sendParam
+            msgStr = '%s=%s' % (('pParSoftwareVersion', data[0])) #data is a single element list
+            self.writeToUsers("i", msgStr, cmd = self.currUserCmd)
+            return
+        elif key == 'min':
+            msgStr = '%s=%s' % (('pParMinPos', data[0])) #data is a single element list
+            self.writeToUsers("i", msgStr, cmd = self.currUserCmd)
+            return
+        elif key == 'max piezo position (microsteps)':
+            msgStr = '%s=%s' % (('pParMaxPos', data[0])) #data is a single element list
+            self.writeToUsers("i", msgStr, cmd = self.currUserCmd)
+            return
+        elif key == 'number of steps of piezo position':
+            msgStr = '%s=%s' % (('pParNSteps', data[0])) #data is a single element list
+            self.writeToUsers("i", msgStr, cmd = self.currUserCmd)
+            return
+        elif key == 'resolution (microsteps/piezo ctrl bit)':
+            msgStr = '%s=%s' % (('pParResolution', data[0])) #data is a single element list
+            self.writeToUsers("i", msgStr, cmd = self.currUserCmd)
+            return
+        # look for piezo-specific status
+        elif key == 'piezo corrections (microsteps)':
+            self.status.piezoCorr = [int(num) for num in data]
+            updateStr = self.status._getKeyValStr(["piezoCorr"])
+            outStr = self.formatAsKeyValStr("piezoStatusWord", data)
+            self.writeToUsers("i", updateStr, cmd=self.currUserCmd)
+            return
+        elif key == 'piezo status word':
+            self.status.piezoStatus = int(data)
+            updateStr = self.status._getKeyValStr(["piezoStatus"])
+            self.writeToUsers("i", updateStr, cmd=self.currUserCmd)
+            return
+        else:
+            # not piezo-related, try classical approach
+            GalilDevice.actOnKey(key, data)
 
     def movePiezos(self):
         """Move piezo actuators to attempt to correct residual error

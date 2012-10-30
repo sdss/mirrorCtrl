@@ -61,7 +61,7 @@ class MirrorCtrlTestCase(unittest.TestCase):
         """
         print "startMirrorCtrl(galilPort=%r)" % (galilPort,)
         mirror = mirrorCtrl.mirrors.mir35mTert.Mirror
-        self.mirDev = mirrorCtrl.GalilDevice35Tert(
+        self.mirDev = mirrorCtrl.GalilDevice(
             mirror = mirror,
             host = 'localhost',
             port = galilPort,            

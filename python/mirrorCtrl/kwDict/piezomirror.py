@@ -1,4 +1,38 @@
-KeysDictionary("mirror", (1,0), *(
+KeysDictionary("piezomirror", (1,0), *(
+
+######## Keys specific to mirror with piezos ##################
+# note: should piezo units be steps rather than microsteps?
+    Key("piezoStatus",
+        Int(invalid = "NaN"),
+        help = "1: piezo correction task halted. 2: piezo correction pause requested. 3: piezo corrections disabled",
+    ),
+    Key("piezoCorr",
+        Int(units="microsteps", invalid="NaN")*3,
+        help = "piezo Corrections (microsteps)",
+    ),
+    # piezo-specific parameters returned from XQ#SHOWPAR
+    Key("pParSoftwareVersion",
+        Float(),
+        help = "version of M2-specific additions",
+    ),
+    Key("pParMaxPos",
+        Float(units="microsteps"),
+        help = "Max piezo postion (microsteps)",
+    ),
+    Key("pParMinPos",
+        Float(units="microsteps"),
+        help = "Min piezo postion (microsteps)",
+    ),
+    Key("pParNSteps",
+        Int(),
+        help = "number of steps of piezo position",
+    ),
+    Key("pParResolution",
+        Int(units="microsteps/piezo ctrl bit"),
+        help = "resolution (microsteps/piezo ctrl bit)"
+    ),
+
+######## Keys shared by all mirrors #####################
     Key("text",
         String(),
         help = "Text message",
