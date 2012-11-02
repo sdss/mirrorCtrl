@@ -7,7 +7,7 @@ KeysDictionary("piezomirror", (1,0), *(
         help = "1: piezo correction task halted. 2: piezo correction pause requested. 3: piezo corrections disabled",
     ),
     Key("piezoCorr",
-        Int(units="microsteps", invalid="NaN")*3,
+        Float(units="microsteps", invalid="NaN")*3,
         help = "piezo Corrections (microsteps)",
     ),
     # piezo-specific parameters returned from XQ#SHOWPAR

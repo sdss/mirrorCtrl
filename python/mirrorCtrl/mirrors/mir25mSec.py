@@ -127,7 +127,7 @@ fixedLinkList.append(mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos))
 # maxCorrList = [0.79]*3   + [0]*2 # max correction (mm); 1000000 actuator microsteps
 
 minCorrList = [50]*5 # min correction (microsteps)
-maxCorrList = [1000000]*3   + [0]*2 # max correction (microsteps)
+maxCorrList = [1000000]*3   + [1000000]*2 # max correction (microsteps)
 
 Mirror = mirrorCtrl.TipTransMirror(
     ctrMirZ = CtrMirZ,

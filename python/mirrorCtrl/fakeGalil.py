@@ -22,7 +22,7 @@ import re
 import sys
 import numpy
 
-from mirrors import mir35mTert
+from mirrors import mir35mTert, mir25mSec
 from twisted.internet import reactor
 from twisted.internet.protocol import Factory, Protocol
 from RO.Comm.TwistedTimer import Timer
@@ -39,6 +39,7 @@ class FakeGalilProtocol(Protocol):
         self.replyTimer = Timer()
         self.nAxes = nAxes
         self.mirror = mirror
+        
         
         homed, notHomed = numpy.array([1]*6, dtype=int)[0:nAxes], numpy.array([0]*6, dtype=int)[0:nAxes]
         self.isHomed = homed if self.factory.wakeUpHomed else notHomed
@@ -80,9 +81,6 @@ class FakeGalilProtocol(Protocol):
         if self.factory.verbose:
             print "received: %r" % (line,)
         cmd = line.strip()
-        self.processCmd(cmd, delim)
-        
-    def processCmd(self, cmd, delim):
         self.echo(cmd, delim)
         if cmd in ("ST", "RS"):
             if cmd == "RS":
@@ -94,8 +92,11 @@ class FakeGalilProtocol(Protocol):
                 self.measPos = numpy.array([0]*6, dtype=int)[0:self.nAxes]                
                 self.userNums = numpy.array([MAXINT]*6, dtype=int)[0:self.nAxes]
             self.replyTimer.cancel()
-            return
-
+            return        
+        self.processCmd(cmd, delim)
+        
+    def processCmd(self, cmd, delim):
+    
 # Is there a use case for setting a variable to -MAXINT?
 #        cmdMatch = re.match(r"([A-F]) *= *(-)?MAXINT$", cmd)
         cmdMatch = re.match(r"([A-F]) *= *MAXINT$", cmd)
@@ -326,3 +327,65 @@ class FakeGalilFactory(Factory):
         """
         self.verbose = bool(verbose)
         self.wakeUpHomed = bool(wakeUpHomed)
+
+        
+class FakePiezoGalilProtocol(FakeGalilProtocol):
+    """A fake Galil with mock piezo behavior like the 2.5m M2 mirror
+    """
+    def __init__(self, factory, mirror=mir25mSec.Mirror, nAxes=5):
+        FakeGalilProtocol.__init__(self, factory, mirror, nAxes)
+        self.cmdPiezoPos = numpy.array([0]*3, dtype=int)
+        self.userPiezoNums = numpy.array([MAXINT]*3, dtype=int)
+    
+    def processCmd(self, cmd, delim):
+        """Overwritten from base class to handle piezo commands also
+        """
+        # piezo specifics
+        print 'cmd: ', cmd
+        cmdMatch = re.match(r"LDESPOS([A-F]) *= *((-)?\d+)$", cmd)
+        if cmdMatch:
+            axis = cmdMatch.groups()[0]
+            val = int(cmdMatch.groups()[1])
+            ind = ord(axis) - ord("A")
+            self.userPiezoNums[ind] = val
+            return
+ 
+ 
+        cmdMatch = re.match(r"XQ *#(L[A-Z]+)", cmd)
+        if cmdMatch and self.replyTimer.isActive:
+            # Busy, so reject new command
+            self.sendLine("?")
+            return
+        elif cmdMatch and cmdMatch.groups()[0] == "LMOVE":
+            # round user nums to nearest st_fs step
+            newCmdPos = numpy.where(self.userPiezoNums == MAXINT, self.cmdPiezoPos, self.userPiezoNums)
+            self.movePiezo(newCmdPos)
+        else:
+            # normal stuff
+            FakeGalilProtocol.processCmd(self, cmd, delim)
+    
+    def resetUserNums(self):
+        self.userNums[:] = MAXINT
+        self.userPiezoNums[:] = MAXINT
+
+    def movePiezo(self, piezoPos):
+        """Do a piezo move
+        """
+        self.showStatus()
+        self.sendLine("3 piezo status word")
+        self.sendLine(self.formatArr("%4.1f", piezoPos, "piezo corrections (microsteps)"))
+        #self.replyTimer.start(1, self.done())
+        self.done()
+          
+    
+class FakePiezoGalilFactory(FakeGalilFactory):
+
+    def buildProtocol(self, addr):
+        """Build a FakeGalilProtocol
+        
+        This override is required because FakeGalilProtocol needs the factory in __init__,
+        but default buildProtocol only sets factory after the protocol is constructed
+        """
+        self.proto = FakePiezoGalilProtocol(factory = self)
+        return self.proto
+        

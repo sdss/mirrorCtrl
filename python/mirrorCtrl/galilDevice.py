@@ -217,15 +217,17 @@ class GalilDevice(TCPDevice):
         # (1) 1 descriptor and 1 value for each actuator
         # or
         # (2) n descriptors and n values
-        goodMatch = [
-            (len(dataMatched) == len(keys)),
-            ((len(keys) == 1) and (len(dataMatched) == self.nAct))
-            ]
-        if not (True in goodMatch):
-            # There is confusion in the amount of descriptors and values in this particular line.
-            # report it but keep going
-            self.writeToUsers("w", "BadGalilReply=%s, \"num descriptors do not match num values.\"" % (quoteStr(line),), cmd=self.currUserCmd)
-            return
+        
+        # note: commented below because in the case of piezo's len(dataMatched) may != self.nAct
+#         goodMatch = [
+#             (len(dataMatched) == len(keys)),
+#             ((len(keys) == 1) and (len(dataMatched) == self.nAct))
+#             ]
+#         if not (True in goodMatch):
+#             # There is confusion in the amount of descriptors and values in this particular line.
+#             # report it but keep going
+#             self.writeToUsers("w", "BadGalilReply=%s, \"num descriptors do not match num values.\"" % (quoteStr(line),), cmd=self.currUserCmd)
+#             return
         # check to see if descriptor/s are an expected reply
 #         knownReply = [(key in self.expectedReplies) for key in keys]
 #         if False in knownReply:
@@ -851,30 +853,35 @@ class GalilDevice25Sec(GalilDevice):
             return
         # look for piezo-specific status
         elif key == 'piezo corrections (microsteps)':
-            self.status.piezoCorr = [int(num) for num in data]
+            self.status.piezoCorr = [float(num) for num in data]
             updateStr = self.status._getKeyValStr(["piezoCorr"])
             outStr = self.formatAsKeyValStr("piezoStatusWord", data)
             self.writeToUsers("i", updateStr, cmd=self.currUserCmd)
             return
         elif key == 'piezo status word':
-            self.status.piezoStatus = int(data)
+            self.status.piezoStatus = int(data[0])
             updateStr = self.status._getKeyValStr(["piezoStatus"])
             self.writeToUsers("i", updateStr, cmd=self.currUserCmd)
             return
         else:
             # not piezo-related, try classical approach
-            GalilDevice.actOnKey(key, data)
+            GalilDevice.actOnKey(self, key, data)
 
     def movePiezos(self):
         """Move piezo actuators to attempt to correct residual error
         
         Only axes A-C have piezo actuators.
         """
-        actErr = self.status.cmdMount - self.status.actMount
-        cmdStr = self.formatGalilCommand(actErr, "XQ #LMOVE", axisPrefix="LDESPOS", nAxes=3)
+        actErr = self.status.cmdMount[:3] - self.status.actMount[:3] # round?
+        prefix = 'LDESPOS'
+        axes = ['A', 'B', 'C']
+        argList = ["%s%s=%s" % (prefix, axes[ind], int(round(val))) for ind, val in enumerate(actErr)]
+        cmdStr = "%s; %s" % ("; ".join(argList), "XQ #LMOVE")
+        #cmdStr = self.formatGalilCommand(actErr, "XQ #LMOVE", axisPrefix="LDESPOS", nAxes=3)
+        
         self.startDevCmd(cmdStr, callFunc=self._piezoMoveCallback)
 
-    def _moveEnd(self, cmd):
+    def _moveEnd(self, *args):
         """Overwritten from base class, to allow for a piezo move command after all the
         coarse moves have been finished.
 
