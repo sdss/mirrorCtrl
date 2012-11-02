@@ -140,450 +140,450 @@ class MirrorCtrlTestBase(unittest.TestCase):
         self.addCleanup(self.cmdConn.disconnect)
         return d    
 
-# class GenericTests(MirrorCtrlTestBase):
-#     """Tests for each command, and how they behave in collisions
-#     """
-#     def setVars(self):
-#         self.userPort = Tert35mUserPort
-#         self.fakeGalilFactory = FakeGalilFactory
-#         self.mirror = mirrorCtrl.mirrors.mir35mTert.Mirror
-#         self.mirDev = mirrorCtrl.GalilDevice
-#         self.name = "mirror"
-#     
-#     def cmdCB(self, thisCmd):
-#         """called each time cmd changes state
-#         """
-#         #print self.dispatcher.model.keyVarDict
-#         if thisCmd.isDone:
-#             d, self.deferred=self.deferred, None
-#             d.callback('hell yes')                  
-#                 
-#     def testSingleMove(self):
-#         """Turns iteration off, moves once, 
-#         checks:
-#         1. command finished without failure
-#         2. only one iteration was done
-#         3. the commanded mount on the model matches the expected version, explicitly computed
-#         4. the encoder mount position on the model is within the noise range added by the fakeGalil
-#         """
-#         self.mirDev.status.maxIter = 0 # turn iteration off
-#         self.deferred = Deferred()
-#         orientation = [10000, 3600, 3600]
-#         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])
-#         encMount = self.mirDev.mirror.encoderMountFromOrient(
-#             self.mirActor.processOrientation(orientation)
-#             )
-#         # round to nearest 50 like the 3.5m Tert Galil
-#         cmdMount = numpy.around(numpy.asarray(
-#             self.mirDev.mirror.actuatorMountFromOrient(self.mirActor.processOrientation(orientation)))/50.
-#             )*50.
-#         
-#         cmdVar = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = cmdStr,
-#                 callFunc = self.cmdCB,
-#             )
-#         def checkResults(cb):
-#             """Check results after cmdVar is done
-#             """
-#             self.assertEqual(cmdVar.didFail, False)
-#             self.assertEqual(1, self.dispatcher.model.iter.valueList[0])
-#             self.assertTrue(numpy.array_equal(
-#                 cmdMount, self.dispatcher.model.cmdMount.valueList[:]
-#                 ))
-#             # encMount should be within the noise range determined
-#             # on the fake Galil
-#             noiseRng = self.fakeGalilFactory.proto.noiseRange # steps
-#             encDiff = numpy.abs(numpy.subtract(encMount, self.dispatcher.model.encMount.valueList[:]))
-#             encTruth = numpy.abs(encDiff) < noiseRng
-#             encInRange = False if False in encTruth else True
-#             self.assertTrue(encInRange)            
-#         self.deferred.addCallback(checkResults)        
-#         self.dispatcher.executeCmd(cmdVar)
-#         return self.deferred
-#         
-#     def testIterMove(self):
-#         """move with allowed iteration
-#         checks:
-#         1. command finished without failing
-#         2. the iter value on the model is > 1
-#         """
-#         self.deferred = Deferred()
-#         orientation = [10000, 3600, 3600]
-#         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
-#         cmdVar = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = cmdStr,
-#                 callFunc = self.cmdCB,
-#             )
-#         def checkResults(cb):
-#             """Check results after cmdVar is done
-#             """
-#             self.assertFalse(cmdVar.didFail)
-#             self.assertTrue(self.dispatcher.model.iter.valueList[0] > 1)
-#         self.deferred.addCallback(checkResults)        
-#         self.dispatcher.executeCmd(cmdVar)
-#         return self.deferred
-# 
-#     def testCleanMove(self):
-#         """Turn off noise added by fakeGalil so the first move goes to
-#         exactly the right spot. This should cause a move to finish without needing
-#         to iterate
-#         checks:
-#         1. command finishes without failure
-#         2. iter on the model = 1
-#         3. the maxIter on the device is > 1
-#         """
-#         # turn off noise added by fakeGalil.  This move should not iterate.
-#         self.fakeGalilFactory.proto.encRes = self.fakeGalilFactory.proto.encRes*0.
-#         self.deferred = Deferred()
-#         orientation = [10000, 3600, 3600]
-#         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
-#         cmdVar = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = cmdStr,
-#                 callFunc = self.cmdCB,
-#             )
-#         def checkResults(cb):
-#             """Check results after cmdVar is done
-#             """
-#             self.assertFalse(cmdVar.didFail)
-#             self.assertTrue(self.dispatcher.model.iter.valueList[0], 1)
-#             self.assertTrue(self.dispatcher.model.iter.valueList[0] < self.mirDev.status.maxIter)
-#         self.deferred.addCallback(checkResults)        
-#         self.dispatcher.executeCmd(cmdVar)
-#         return self.deferred
-# 
-#     def testUnHomedMove(self):
-#         """Set isHomed on the fakeGalil to all False. Try to move.
-#         checks:
-#         1. the command fails
-#         """
-#         # force all axes on the fakeGalil to unhomed
-#         self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
-#         self.deferred = Deferred()
-#         orientation = [10000, 3600, 3600]
-#         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
-#         cmdVar = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = cmdStr,
-#                 callFunc = self.cmdCB,
-#             )
-#         def checkResults(cb):
-#             """Check results after cmdVar is done
-#             """
-#             self.assertTrue(cmdVar.didFail)
-#         self.deferred.addCallback(checkResults)        
-#         self.dispatcher.executeCmd(cmdVar)
-#         return self.deferred
-#         
-#     def testHome(self):
-#         """Sets isHomed to false then tests home command.
-#         checks:
-#         1. command doesn't fail
-#         2. all axes are set to homed on the model.
-#         """
-#         # force all axes on the fakeGalil to unhomed
-#         self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
-#         self.deferred = Deferred()
-#         cmdStr = 'home A,B,C'        
-#         cmdVar = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = cmdStr,
-#                 callFunc = self.cmdCB,
-#             )
-#         def checkResults(cb):
-#             """Check results after cmdVar is done
-#             """
-#             self.assertFalse(cmdVar.didFail)
-#             self.assertFalse( 0 in self.dispatcher.model.axisHomed.valueList[:], msg=str(self.dispatcher.model.axisHomed.valueList[:]))
-#             
-#         self.deferred.addCallback(checkResults)
-#         self.dispatcher.executeCmd(cmdVar)
-#         return self.deferred
-#         
-#     def testStatus(self):
-#         """tests the status command.  Set is homed to false first to verify that most recent values
-#         are being reported.
-#         checks:
-#         1. command completes without failure
-#         2. isHomed = False for all axes.
-#         """
-#         # force all axes on the fakeGalil to unhomed
-#         self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
-#         self.deferred = Deferred()
-#         cmdStr = 'status'        
-#         cmdVar = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = cmdStr,
-#                 callFunc = self.cmdCB,
-#             )
-#         def checkResults(cb):
-#             """Check results after cmdVar is done
-#             """
-#             self.assertFalse(cmdVar.didFail)
-#             self.assertFalse( 1 in self.dispatcher.model.axisHomed.valueList[:], msg=str(self.dispatcher.model.axisHomed.valueList[:]))
-#             
-#         self.deferred.addCallback(checkResults)
-#         self.dispatcher.executeCmd(cmdVar)
-#         return self.deferred
-#         
-#     def testReset(self):
-#         """Send a reset command.
-#         checks:
-#         1. command completes without failure
-#         2. isHomed = False for all axes
-#         """
-#         self.deferred = Deferred()
-#         cmdStr = 'reset'        
-#         cmdVar = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = cmdStr,
-#                 callFunc = self.cmdCB,
-#             )
-#         def checkResults(cb):
-#             """Check results after cmdVar is done
-#             """
-#             self.assertFalse(cmdVar.didFail)
-#             self.assertFalse( 1 in self.dispatcher.model.axisHomed.valueList[:], msg=str(self.dispatcher.model.axisHomed.valueList[:]))
-#             
-#         self.deferred.addCallback(checkResults)
-#         self.dispatcher.executeCmd(cmdVar)
-#         return self.deferred
-#         
-#     def testStop(self):
-#         """Send a stop command.
-#         checks:
-#         1. command completes without failure
-#         """
-#         self.deferred = Deferred()
-#         cmdStr = 'reset'        
-#         cmdVar = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = cmdStr,
-#                 callFunc = self.cmdCB,
-#             )
-#         def checkResults(cb):
-#             """Check results after cmdVar is done
-#             """
-#             self.assertFalse(cmdVar.didFail)
-#             
-#         self.deferred.addCallback(checkResults)
-#         self.dispatcher.executeCmd(cmdVar)
-#         return self.deferred
-#         
-#     def testStopInterrupt(self):
-#         """Test that a stop command will interrupt a move command. Commands a move then a stop
-#         immediately afterwards.
-#         Checks:
-#         1. the move fails
-#         2. the stop succeeds.
-#         """          
-#         d1 = Deferred()
-#         d2 = Deferred()
-#         dBoth = gatherResults([d1,d2])
-#         def cmdCB1(thisCmd):
-#             """callback associated with first cmd
-#             """
-#             if thisCmd.isDone:
-#                 d1.callback('hell yes') 
-#         def cmdCB2(thisCmd):
-#             """callback associated with second cmd
-#             """
-#             if thisCmd.isDone:
-#                 d2.callback('hell yes') 
-#         orientation = [10000, 3600, 3600]
-#         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
-#         cmdMove = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = cmdStr,
-#                 callFunc = cmdCB1,
-#             )
-#         cmdStop = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = 'stop',
-#                 callFunc = cmdCB2,
-#             )
-#         def checkResults(cb):
-#             """Check results after cmdVar is done
-#             """
-#             self.assertTrue(cmdMove.didFail)
-#             self.assertFalse(cmdStop.didFail)            
-#         dBoth.addCallback(checkResults)        
-#         self.dispatcher.executeCmd(cmdMove)
-#         self.dispatcher.executeCmd(cmdStop)
-#         return dBoth        
-# 
-#     def testResetInterrupt(self):
-#         """Test that a reset command will interrupt a move command. Commands a move then a reset
-#         immediately afterwards.
-#         Checks:
-#         1. the move fails
-#         2. the reset succeeds.
-#         3. check that isHomed == False (due to the reset)
-#         """          
-#         d1 = Deferred()
-#         d2 = Deferred()
-#         dBoth = gatherResults([d1,d2])
-#         def cmdCB1(thisCmd):
-#             """callback associated with first cmd
-#             """
-#             if thisCmd.isDone:
-#                 d1.callback('hell yes') 
-#         def cmdCB2(thisCmd):
-#             """callback associated with second cmd
-#             """
-#             if thisCmd.isDone:
-#                 d2.callback('hell yes') 
-#         orientation = [10000, 3600, 3600]
-#         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
-#         cmdMove = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = cmdStr,
-#                 callFunc = cmdCB1,
-#             )
-#         cmdReset = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = 'reset',
-#                 callFunc = cmdCB2,
-#             )
-#         def checkResults(cb):
-#             """Check results after cmdVar is done
-#             """
-#             self.assertTrue(cmdMove.didFail)
-#             self.assertFalse(cmdReset.didFail)     
-#             self.assertFalse(1 in self.dispatcher.model.axisHomed.valueList[:], msg=str(self.dispatcher.model.axisHomed.valueList[:]))
-#         dBoth.addCallback(checkResults)        
-#         self.dispatcher.executeCmd(cmdMove)
-#         self.dispatcher.executeCmd(cmdReset)
-#         return dBoth
-#         
-#     def testStatusCollide(self):
-#         """Send a status request while a home command is executing.
-#         Check:
-#         1. Status succeeds
-#         2. Home succeeds
-#         """
-#         d1 = Deferred()
-#         d2 = Deferred()
-#         dBoth = gatherResults([d1,d2])
-#         def cmdCB1(thisCmd):
-#             """callback associated with first cmd
-#             """
-#             if thisCmd.isDone:
-#                 d1.callback('hell yes') 
-#         def cmdCB2(thisCmd):
-#             """callback associated with second cmd
-#             """
-#             if thisCmd.isDone:
-#                 d2.callback('hell yes')    
-#         cmdHome = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = 'home A,B,C',
-#                 callFunc = cmdCB1,
-#             )
-#         cmdStatus = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = 'status',
-#                 callFunc = cmdCB2,
-#             )
-#         def checkResults(cb):
-#             """Check results after cmdVar is done
-#             """
-#             self.assertFalse(cmdHome.didFail)
-#             self.assertFalse(cmdStatus.didFail)     
-#             
-#         dBoth.addCallback(checkResults)        
-#         self.dispatcher.executeCmd(cmdHome)
-#         self.dispatcher.executeCmd(cmdStatus)
-#         return dBoth
-#         
-#     def testMoveCollide(self):
-#         """Send a move command while a home command is executing
-#         Checks:
-#         1. The move command is cancelled
-#         2. The home command succeeds
-#         """
-#         d1 = Deferred()
-#         d2 = Deferred()
-#         dBoth = gatherResults([d1,d2])
-#         def cmdCB1(thisCmd):
-#             """callback associated with first cmd
-#             """
-#             if thisCmd.isDone:
-#                 d1.callback('hell yes') 
-#         def cmdCB2(thisCmd):
-#             """callback associated with second cmd
-#             """
-#             if thisCmd.isDone:
-#                 d2.callback('hell yes') 
-#         orientation = [10000, 3600, 3600]
-#         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
-#         cmdMove = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = cmdStr,
-#                 callFunc = cmdCB1,
-#             )
-#         cmdHome = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = 'home A,B,C',
-#                 callFunc = cmdCB2,
-#             )
-#         def checkResults(cb):
-#             """Check results after cmdVar is done
-#             """
-#             self.assertTrue(cmdMove.didFail)
-#             self.assertFalse(cmdHome.didFail)     
-#         dBoth.addCallback(checkResults)        
-#         self.dispatcher.executeCmd(cmdHome)
-#         self.dispatcher.executeCmd(cmdMove)
-#         return dBoth
-# 
-#     def testBadMove(self):
-#         """Send a move command with a commanded z rotation (not allowed).
-#         checks:
-#         1. command fails
-#         """
-#         # turn off noise added by fakeGalil.  This move should not iterate.
-#         self.fakeGalilFactory.proto.encRes = self.fakeGalilFactory.proto.encRes*0.
-#         self.deferred = Deferred()
-#         orientation = [10000, 3600, 3600, 10000, 10000, 3600]
-#         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
-#         cmdVar = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = cmdStr,
-#                 callFunc = self.cmdCB,
-#             )
-#         def checkResults(cb):
-#             """Check results after cmdVar is done
-#             """
-#             self.assertTrue(cmdVar.didFail)
-#         self.deferred.addCallback(checkResults)        
-#         self.dispatcher.executeCmd(cmdVar)
-#         return self.deferred
-# 
-#     def testBadHome(self):
-#         """Try to home non-existant axis D.
-#         checks:
-#         1. command fails
-#         """
-#         # force all axes on the fakeGalil to unhomed
-#         self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
-#         self.deferred = Deferred()
-#         cmdStr = 'home A,B,C,D'        
-#         cmdVar = CmdVar (
-#                 actor = self.name,
-#                 cmdStr = cmdStr,
-#                 callFunc = self.cmdCB,
-#             )
-#         def checkResults(cb):
-#             """Check results after cmdVar is done
-#             """
-#             self.assertTrue(cmdVar.didFail)
-#             
-#         self.deferred.addCallback(checkResults)
-#         self.dispatcher.executeCmd(cmdVar)
-#         return self.deferred    
+class GenericTests(MirrorCtrlTestBase):
+    """Tests for each command, and how they behave in collisions
+    """
+    def setVars(self):
+        self.userPort = Tert35mUserPort
+        self.fakeGalilFactory = FakeGalilFactory
+        self.mirror = mirrorCtrl.mirrors.mir35mTert.Mirror
+        self.mirDev = mirrorCtrl.GalilDevice
+        self.name = "mirror"
+    
+    def cmdCB(self, thisCmd):
+        """called each time cmd changes state
+        """
+        #print self.dispatcher.model.keyVarDict
+        if thisCmd.isDone:
+            d, self.deferred=self.deferred, None
+            d.callback('hell yes')                  
+                
+    def testSingleMove(self):
+        """Turns iteration off, moves once, 
+        checks:
+        1. command finished without failure
+        2. only one iteration was done
+        3. the commanded mount on the model matches the expected version, explicitly computed
+        4. the encoder mount position on the model is within the noise range added by the fakeGalil
+        """
+        self.mirDev.status.maxIter = 0 # turn iteration off
+        self.deferred = Deferred()
+        orientation = [10000, 3600, 3600]
+        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])
+        encMount = self.mirDev.mirror.encoderMountFromOrient(
+            self.mirActor.processOrientation(orientation)
+            )
+        # round to nearest 50 like the 3.5m Tert Galil
+        cmdMount = numpy.around(numpy.asarray(
+            self.mirDev.mirror.actuatorMountFromOrient(self.mirActor.processOrientation(orientation)))/50.
+            )*50.
+        
+        cmdVar = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr,
+                callFunc = self.cmdCB,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertEqual(cmdVar.didFail, False)
+            self.assertEqual(1, self.dispatcher.model.iter.valueList[0])
+            self.assertTrue(numpy.array_equal(
+                cmdMount, self.dispatcher.model.cmdMount.valueList[:]
+                ))
+            # encMount should be within the noise range determined
+            # on the fake Galil
+            noiseRng = self.fakeGalilFactory.proto.noiseRange # steps
+            encDiff = numpy.abs(numpy.subtract(encMount, self.dispatcher.model.encMount.valueList[:]))
+            encTruth = numpy.abs(encDiff) < noiseRng
+            encInRange = False if False in encTruth else True
+            self.assertTrue(encInRange)            
+        self.deferred.addCallback(checkResults)        
+        self.dispatcher.executeCmd(cmdVar)
+        return self.deferred
+        
+    def testIterMove(self):
+        """move with allowed iteration
+        checks:
+        1. command finished without failing
+        2. the iter value on the model is > 1
+        """
+        self.deferred = Deferred()
+        orientation = [10000, 3600, 3600]
+        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
+        cmdVar = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr,
+                callFunc = self.cmdCB,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertFalse(cmdVar.didFail)
+            self.assertTrue(self.dispatcher.model.iter.valueList[0] > 1)
+        self.deferred.addCallback(checkResults)        
+        self.dispatcher.executeCmd(cmdVar)
+        return self.deferred
+
+    def testCleanMove(self):
+        """Turn off noise added by fakeGalil so the first move goes to
+        exactly the right spot. This should cause a move to finish without needing
+        to iterate
+        checks:
+        1. command finishes without failure
+        2. iter on the model = 1
+        3. the maxIter on the device is > 1
+        """
+        # turn off noise added by fakeGalil.  This move should not iterate.
+        self.fakeGalilFactory.proto.encRes = self.fakeGalilFactory.proto.encRes*0.
+        self.deferred = Deferred()
+        orientation = [10000, 3600, 3600]
+        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
+        cmdVar = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr,
+                callFunc = self.cmdCB,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertFalse(cmdVar.didFail)
+            self.assertTrue(self.dispatcher.model.iter.valueList[0], 1)
+            self.assertTrue(self.dispatcher.model.iter.valueList[0] < self.mirDev.status.maxIter)
+        self.deferred.addCallback(checkResults)        
+        self.dispatcher.executeCmd(cmdVar)
+        return self.deferred
+
+    def testUnHomedMove(self):
+        """Set isHomed on the fakeGalil to all False. Try to move.
+        checks:
+        1. the command fails
+        """
+        # force all axes on the fakeGalil to unhomed
+        self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
+        self.deferred = Deferred()
+        orientation = [10000, 3600, 3600]
+        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
+        cmdVar = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr,
+                callFunc = self.cmdCB,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertTrue(cmdVar.didFail)
+        self.deferred.addCallback(checkResults)        
+        self.dispatcher.executeCmd(cmdVar)
+        return self.deferred
+        
+    def testHome(self):
+        """Sets isHomed to false then tests home command.
+        checks:
+        1. command doesn't fail
+        2. all axes are set to homed on the model.
+        """
+        # force all axes on the fakeGalil to unhomed
+        self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
+        self.deferred = Deferred()
+        cmdStr = 'home A,B,C'        
+        cmdVar = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr,
+                callFunc = self.cmdCB,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertFalse(cmdVar.didFail)
+            self.assertFalse( 0 in self.dispatcher.model.axisHomed.valueList[:], msg=str(self.dispatcher.model.axisHomed.valueList[:]))
+            
+        self.deferred.addCallback(checkResults)
+        self.dispatcher.executeCmd(cmdVar)
+        return self.deferred
+        
+    def testStatus(self):
+        """tests the status command.  Set is homed to false first to verify that most recent values
+        are being reported.
+        checks:
+        1. command completes without failure
+        2. isHomed = False for all axes.
+        """
+        # force all axes on the fakeGalil to unhomed
+        self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
+        self.deferred = Deferred()
+        cmdStr = 'status'        
+        cmdVar = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr,
+                callFunc = self.cmdCB,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertFalse(cmdVar.didFail)
+            self.assertFalse( 1 in self.dispatcher.model.axisHomed.valueList[:], msg=str(self.dispatcher.model.axisHomed.valueList[:]))
+            
+        self.deferred.addCallback(checkResults)
+        self.dispatcher.executeCmd(cmdVar)
+        return self.deferred
+        
+    def testReset(self):
+        """Send a reset command.
+        checks:
+        1. command completes without failure
+        2. isHomed = False for all axes
+        """
+        self.deferred = Deferred()
+        cmdStr = 'reset'        
+        cmdVar = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr,
+                callFunc = self.cmdCB,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertFalse(cmdVar.didFail)
+            self.assertFalse( 1 in self.dispatcher.model.axisHomed.valueList[:], msg=str(self.dispatcher.model.axisHomed.valueList[:]))
+            
+        self.deferred.addCallback(checkResults)
+        self.dispatcher.executeCmd(cmdVar)
+        return self.deferred
+        
+    def testStop(self):
+        """Send a stop command.
+        checks:
+        1. command completes without failure
+        """
+        self.deferred = Deferred()
+        cmdStr = 'reset'        
+        cmdVar = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr,
+                callFunc = self.cmdCB,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertFalse(cmdVar.didFail)
+            
+        self.deferred.addCallback(checkResults)
+        self.dispatcher.executeCmd(cmdVar)
+        return self.deferred
+        
+    def testStopInterrupt(self):
+        """Test that a stop command will interrupt a move command. Commands a move then a stop
+        immediately afterwards.
+        Checks:
+        1. the move fails
+        2. the stop succeeds.
+        """          
+        d1 = Deferred()
+        d2 = Deferred()
+        dBoth = gatherResults([d1,d2])
+        def cmdCB1(thisCmd):
+            """callback associated with first cmd
+            """
+            if thisCmd.isDone:
+                d1.callback('hell yes') 
+        def cmdCB2(thisCmd):
+            """callback associated with second cmd
+            """
+            if thisCmd.isDone:
+                d2.callback('hell yes') 
+        orientation = [10000, 3600, 3600]
+        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
+        cmdMove = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr,
+                callFunc = cmdCB1,
+            )
+        cmdStop = CmdVar (
+                actor = self.name,
+                cmdStr = 'stop',
+                callFunc = cmdCB2,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertTrue(cmdMove.didFail)
+            self.assertFalse(cmdStop.didFail)            
+        dBoth.addCallback(checkResults)        
+        self.dispatcher.executeCmd(cmdMove)
+        self.dispatcher.executeCmd(cmdStop)
+        return dBoth        
+
+    def testResetInterrupt(self):
+        """Test that a reset command will interrupt a move command. Commands a move then a reset
+        immediately afterwards.
+        Checks:
+        1. the move fails
+        2. the reset succeeds.
+        3. check that isHomed == False (due to the reset)
+        """          
+        d1 = Deferred()
+        d2 = Deferred()
+        dBoth = gatherResults([d1,d2])
+        def cmdCB1(thisCmd):
+            """callback associated with first cmd
+            """
+            if thisCmd.isDone:
+                d1.callback('hell yes') 
+        def cmdCB2(thisCmd):
+            """callback associated with second cmd
+            """
+            if thisCmd.isDone:
+                d2.callback('hell yes') 
+        orientation = [10000, 3600, 3600]
+        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
+        cmdMove = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr,
+                callFunc = cmdCB1,
+            )
+        cmdReset = CmdVar (
+                actor = self.name,
+                cmdStr = 'reset',
+                callFunc = cmdCB2,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertTrue(cmdMove.didFail)
+            self.assertFalse(cmdReset.didFail)     
+            self.assertFalse(1 in self.dispatcher.model.axisHomed.valueList[:], msg=str(self.dispatcher.model.axisHomed.valueList[:]))
+        dBoth.addCallback(checkResults)        
+        self.dispatcher.executeCmd(cmdMove)
+        self.dispatcher.executeCmd(cmdReset)
+        return dBoth
+        
+    def testStatusCollide(self):
+        """Send a status request while a home command is executing.
+        Check:
+        1. Status succeeds
+        2. Home succeeds
+        """
+        d1 = Deferred()
+        d2 = Deferred()
+        dBoth = gatherResults([d1,d2])
+        def cmdCB1(thisCmd):
+            """callback associated with first cmd
+            """
+            if thisCmd.isDone:
+                d1.callback('hell yes') 
+        def cmdCB2(thisCmd):
+            """callback associated with second cmd
+            """
+            if thisCmd.isDone:
+                d2.callback('hell yes')    
+        cmdHome = CmdVar (
+                actor = self.name,
+                cmdStr = 'home A,B,C',
+                callFunc = cmdCB1,
+            )
+        cmdStatus = CmdVar (
+                actor = self.name,
+                cmdStr = 'status',
+                callFunc = cmdCB2,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertFalse(cmdHome.didFail)
+            self.assertFalse(cmdStatus.didFail)     
+            
+        dBoth.addCallback(checkResults)        
+        self.dispatcher.executeCmd(cmdHome)
+        self.dispatcher.executeCmd(cmdStatus)
+        return dBoth
+        
+    def testMoveCollide(self):
+        """Send a move command while a home command is executing
+        Checks:
+        1. The move command is cancelled
+        2. The home command succeeds
+        """
+        d1 = Deferred()
+        d2 = Deferred()
+        dBoth = gatherResults([d1,d2])
+        def cmdCB1(thisCmd):
+            """callback associated with first cmd
+            """
+            if thisCmd.isDone:
+                d1.callback('hell yes') 
+        def cmdCB2(thisCmd):
+            """callback associated with second cmd
+            """
+            if thisCmd.isDone:
+                d2.callback('hell yes') 
+        orientation = [10000, 3600, 3600]
+        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
+        cmdMove = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr,
+                callFunc = cmdCB1,
+            )
+        cmdHome = CmdVar (
+                actor = self.name,
+                cmdStr = 'home A,B,C',
+                callFunc = cmdCB2,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertTrue(cmdMove.didFail)
+            self.assertFalse(cmdHome.didFail)     
+        dBoth.addCallback(checkResults)        
+        self.dispatcher.executeCmd(cmdHome)
+        self.dispatcher.executeCmd(cmdMove)
+        return dBoth
+
+    def testBadMove(self):
+        """Send a move command with a commanded z rotation (not allowed).
+        checks:
+        1. command fails
+        """
+        # turn off noise added by fakeGalil.  This move should not iterate.
+        self.fakeGalilFactory.proto.encRes = self.fakeGalilFactory.proto.encRes*0.
+        self.deferred = Deferred()
+        orientation = [10000, 3600, 3600, 10000, 10000, 3600]
+        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
+        cmdVar = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr,
+                callFunc = self.cmdCB,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertTrue(cmdVar.didFail)
+        self.deferred.addCallback(checkResults)        
+        self.dispatcher.executeCmd(cmdVar)
+        return self.deferred
+
+    def testBadHome(self):
+        """Try to home non-existant axis D.
+        checks:
+        1. command fails
+        """
+        # force all axes on the fakeGalil to unhomed
+        self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
+        self.deferred = Deferred()
+        cmdStr = 'home A,B,C,D'        
+        cmdVar = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr,
+                callFunc = self.cmdCB,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertTrue(cmdVar.didFail)
+            
+        self.deferred.addCallback(checkResults)
+        self.dispatcher.executeCmd(cmdVar)
+        return self.deferred    
 
 class PiezoTests(MirrorCtrlTestBase):
     """Tests a piezo mirror setup
