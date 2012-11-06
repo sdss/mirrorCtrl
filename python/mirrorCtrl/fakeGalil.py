@@ -33,31 +33,31 @@ MaxCmdTime = 2.0 # maximum time any command can take; sec
 class FakeGalilProtocol(Protocol):
     lineEndPattern = re.compile(r"(\r\n|;)")
     
-    def __init__(self, factory, mirror=mir35mTert.Mirror, nAxes=3):
+    def __init__(self, factory):
         self.factory = factory
         self._buffer = ''
         self.replyTimer = Timer()
-        self.nAxes = nAxes
-        self.mirror = mirror
+        self.mirror = self.factory.mirror        
+        self.nAxes = len(self.factory.mirror.actuatorList)
         
         
-        homed, notHomed = numpy.array([1]*6, dtype=int)[0:nAxes], numpy.array([0]*6, dtype=int)[0:nAxes]
+        homed, notHomed = numpy.array([1]*6, dtype=int)[0:self.nAxes], numpy.array([0]*6, dtype=int)[0:self.nAxes]
         self.isHomed = homed if self.factory.wakeUpHomed else notHomed
-        self.cmdPos = numpy.array([0]*6, dtype=int)[0:nAxes]
-        self.measPos = numpy.array([0]*6, dtype=int)[0:nAxes]
-        self.userNums = numpy.array([MAXINT]*6, dtype=int)[0:nAxes]
+        self.cmdPos = numpy.array([0]*6, dtype=int)[0:self.nAxes]
+        self.measPos = numpy.array([0]*6, dtype=int)[0:self.nAxes]
+        self.userNums = numpy.array([MAXINT]*6, dtype=int)[0:self.nAxes]
 
-        self.range = numpy.array([3842048]*3 + [190000]*3, dtype=int)[0:nAxes]
-        self.speed = numpy.array([50000]*3 + [5000]*3, dtype=int)[0:nAxes]
-        self.homeSpeed = numpy.array([5000]*3 + [500]*3, dtype=int)[0:nAxes]
-        self.accel =  numpy.array([500000]*3 + [50000]*3, dtype=int)[0:nAxes]
-        self.minCorr = numpy.array([0]*6, dtype=int)[0:nAxes]
-        self.maxCorr = numpy.array([1000000]*3 + [15000]*3, dtype=int)[0:nAxes]
-        self.st_fs = numpy.array([50]*6, dtype=int)[0:nAxes]
-        self.marg = numpy.array([400000]*3 + [5000]*3, dtype=int)[0:nAxes]
-        self.indSep = numpy.array([0]*6, dtype=int)[0:nAxes]
-        self.encRes =  numpy.array([-3.1496]*3 + [1.5750]*3, dtype=float)[0:nAxes]
-        self.status =  numpy.array([8196*6]*3, dtype=int)[0:nAxes]
+        self.range = numpy.array([3842048]*3 + [190000]*3, dtype=int)[0:self.nAxes]
+        self.speed = numpy.array([50000]*3 + [5000]*3, dtype=int)[0:self.nAxes]
+        self.homeSpeed = numpy.array([5000]*3 + [500]*3, dtype=int)[0:self.nAxes]
+        self.accel =  numpy.array([500000]*3 + [50000]*3, dtype=int)[0:self.nAxes]
+        self.minCorr = numpy.array([0]*6, dtype=int)[0:self.nAxes]
+        self.maxCorr = numpy.array([1000000]*3 + [15000]*3, dtype=int)[0:self.nAxes]
+        self.st_fs = numpy.array([50]*6, dtype=int)[0:self.nAxes]
+        self.marg = numpy.array([400000]*3 + [5000]*3, dtype=int)[0:self.nAxes]
+        self.indSep = numpy.array([0]*6, dtype=int)[0:self.nAxes]
+        self.encRes =  numpy.array([-3.1496]*3 + [1.5750]*3, dtype=float)[0:self.nAxes]
+        self.status =  numpy.array([8196*6]*3, dtype=int)[0:self.nAxes]
         self.noiseRange = 700 # steps, +/- range for adding steps to a measurement
 
     def dataReceived(self, data):
@@ -319,7 +319,7 @@ class FakeGalilFactory(Factory):
         self.proto = FakeGalilProtocol(factory = self)
         return self.proto
         
-    def __init__(self, verbose=True, wakeUpHomed=True):
+    def __init__(self, verbose=True, wakeUpHomed=True, mirror=mir35mTert.Mirror):
         """Create a FakeGalilFactory
         
         Inputs:
@@ -327,13 +327,14 @@ class FakeGalilFactory(Factory):
         """
         self.verbose = bool(verbose)
         self.wakeUpHomed = bool(wakeUpHomed)
+        self.mirror = mirror
 
         
 class FakePiezoGalilProtocol(FakeGalilProtocol):
     """A fake Galil with mock piezo behavior like the 2.5m M2 mirror
     """
-    def __init__(self, factory, mirror=mir25mSec.Mirror, nAxes=5):
-        FakeGalilProtocol.__init__(self, factory, mirror, nAxes)
+    def __init__(self, factory):
+        FakeGalilProtocol.__init__(self, factory)
         self.cmdPiezoPos = numpy.array([0]*3, dtype=int)
         self.userPiezoNums = numpy.array([MAXINT]*3, dtype=int)
     
@@ -379,7 +380,9 @@ class FakePiezoGalilProtocol(FakeGalilProtocol):
           
     
 class FakePiezoGalilFactory(FakeGalilFactory):
-
+    def __init__(self, verbose=True, wakeUpHomed=True, mirror=mir25mSec.Mirror):
+        FakeGalilFactory.__init__(self, verbose, wakeUpHomed, mirror)
+        
     def buildProtocol(self, addr):
         """Build a FakeGalilProtocol
         
@@ -388,4 +391,7 @@ class FakePiezoGalilFactory(FakeGalilFactory):
         """
         self.proto = FakePiezoGalilProtocol(factory = self)
         return self.proto
+        
+
+        
         
