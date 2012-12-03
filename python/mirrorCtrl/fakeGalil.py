@@ -57,7 +57,7 @@ class FakeGalilProtocol(Protocol):
         self.marg = numpy.array([400000]*3 + [5000]*3, dtype=int)[0:self.nAxes]
         self.indSep = numpy.array([0]*6, dtype=int)[0:self.nAxes]
         self.encRes =  numpy.array([-3.1496]*3 + [1.5750]*3, dtype=float)[0:self.nAxes]
-        self.status =  numpy.array([8196*6]*3, dtype=int)[0:self.nAxes]
+        self.status =  numpy.array([8196*6]*6, dtype=int)[0:self.nAxes]
         self.noiseRange = 700 # steps, +/- range for adding steps to a measurement
 
     def dataReceived(self, data):

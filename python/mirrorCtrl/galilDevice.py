@@ -362,7 +362,7 @@ class GalilDevice(TCPDevice):
         - If a command has finished, call the appropriate command callback
         """
         #log.msg('Galil Reply: ' + replyStr)
-        print 'Galil Reply: ' + replyStr
+        #print 'Galil Reply: ' + replyStr
         #print "handleReply(replyStr=%r)" % (replyStr,)
         if self.currDevCmd.isDone:
             # ignore unsolicited input
