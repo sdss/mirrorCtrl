@@ -148,7 +148,7 @@ class GalilDevice(TCPDevice):
         """
         self.mirror = mirror
         TCPDevice.__init__(self,
-            name = "galil",
+            name = 'galilDevice',
             host = host,
             port = port,
             callFunc = callFunc,
@@ -361,6 +361,7 @@ class GalilDevice(TCPDevice):
         - Parse status to update the model parameters
         - If a command has finished, call the appropriate command callback
         """
+        self.twistedLogMsg('Galil-->%s(%s)' % (self.name, replyStr))
         #log.msg('Galil Reply: ' + replyStr)
         #print 'Galil Reply: ' + replyStr
         #print "handleReply(replyStr=%r)" % (replyStr,)
@@ -589,6 +590,7 @@ class GalilDevice(TCPDevice):
         self.currDevCmd = devCmd
         self.parsedKeyList = []
         try:
+            self.twistedLogMsg("%s-->Galil(%s)" % (self.name, devCmd.cmdStr))
             self.conn.writeLine(devCmd.cmdStr)
             devCmd.setState(devCmd.Running)
         except Exception, e:

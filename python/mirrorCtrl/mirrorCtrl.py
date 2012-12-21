@@ -7,7 +7,7 @@ import math
 
 import numpy
 
-from twistedActor import Actor, CommandError, UserCmd
+from twistedActor import Actor, CommandError, UserCmd, BaseCmd
 
 Version = 0.1
 
@@ -26,6 +26,7 @@ class MirrorCtrl(Actor):
         device,
         userPort,
         maxUsers = DefaultMaxUsers,
+        name = 'MirrorCtrl',
     ):
         """Create a Galil mirror controller actor
         
@@ -34,6 +35,7 @@ class MirrorCtrl(Actor):
         - userPort  port on which to listen for client connections
         - maxUsers  maximum allowed simultaneous users
         """
+        self.name = name
         Actor.__init__(self,
             userPort = userPort,
             devs = [device],
@@ -46,16 +48,51 @@ class MirrorCtrl(Actor):
         addition of commanding 'stop', then 'showparams' to put the Galil in a known 
         state upon connection.
         """
-        Actor.initialConn(self)
-        # get device state
-        def doParams(cmd, isOK):
-            if isOK:
-                paramCmd = UserCmd()
-                paramCmd.timeLimit = 10
-                self.cmd_showparams(paramCmd)
-        stopCmd = UserCmd(callFunc=doParams)
-        stopCmd.timeLimit = 10 # give it 10 seconds before timeout
-        self.cmd_stop(stopCmd) # put Galil in known state   
+        def doPars(cmd):
+            """2nd startup callback
+            """
+            if not cmd.isDone:
+                return
+            dummyCmd3 = UserCmd(cmdStr='showparams', callFunc=None, timeLim=10)
+            self.parseAndDispatchCmd(cmd=dummyCmd3)
+                        
+        def doStatus(cmd):
+            """1st startup callback
+            """
+            if not cmd.isDone:
+                return
+            dummyCmd2 = UserCmd(cmdStr='stop', callFunc=doPars, timeLim=10)
+            self.parseAndDispatchCmd(cmd=dummyCmd2)                
+        # note, must use UserCmd
+        dummyCmd1 =  UserCmd(cmdStr='conndev', callFunc=doStatus, timeLim=10)
+        self.parseAndDispatchCmd(cmd=dummyCmd1)
+        
+        # do we want to query the galil for state immediately after connection?
+        # or wait to make sure someone's listening (the mirror device?)
+        
+#         def doParams(cmd, isOK):
+#             if isOK:
+#                 cmdStr='showparams'
+#                 paramCmd = UserCmd(cmdStr=cmdStr)
+#                 paramCmd.timeLimit = 10
+#                 self.parseAndDispatchCmd(paramCmd)
+#         def doStatus(cmd, isOK):
+#             if isOK:
+#                 cmdStr = 'stop'
+#                 stopCmd = UserCmd(cmdStr=cmdStr, callFunc=doParams)
+#                 stopCmd.timeLimit = 10
+#                 self.parseAndDispatchCmd(stopCmd)
+#                 
+# 
+#         cmdStr = 'connDev'
+#         connCmd = UserCmd(cmdStr='connDev', callFunc=doStatus)
+#         connCmd.timeLimit = 10
+#         self.parseAndDispatchCmd(connCmd)
+        
+        #get device state            
+#         stopCmd = UserCmd(callFunc=doParams)
+#         stopCmd.timeLimit = 10 # give it 10 seconds before timeout
+#        self.cmd_stop(stopCmd) # put Galil in known state   
 
     def processOrientation(self, orientation):
         """Convert a user specified orientation in um and arcseconds with possibly < 5
@@ -91,10 +128,10 @@ class MirrorCtrl(Actor):
             raise CommandError("Must specify 1 to 5 orientation values; got %s" % (len(cmdArgList)))
         # pad extra orientations with zeros, if not specified 5.
         cmdOrient = self.processOrientation(cmdArgList)
-        if not self.dev.galil.conn.isConnected:
+        if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.dev.galil.cmdMove(cmdOrient, userCmd=cmd)
+            self.dev.galilDevice.cmdMove(cmdOrient, userCmd=cmd)
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -108,10 +145,10 @@ class MirrorCtrl(Actor):
             if len(arg) != 1:
                 raise CommandError(
                     "Could not parse %s as a comma-separated list of letters" % (cmd.cmdArgs,))
-        if not self.dev.galil.conn.isConnected:
+        if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.dev.galil.cmdHome(axisList, userCmd=cmd)
+            self.dev.galilDevice.cmdHome(axisList, userCmd=cmd)
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -121,11 +158,11 @@ class MirrorCtrl(Actor):
         """
         # twistedActor status
         Actor.cmd_status(self, cmd)
-        if not self.dev.galil.conn.isConnected:
+        if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
             # additional status from Galil
-            self.dev.galil.cmdStatus(cmd)
+            self.dev.galilDevice.cmdStatus(cmd)
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -133,10 +170,10 @@ class MirrorCtrl(Actor):
     def cmd_showparams(self, cmd):
         """Show parameters of Galil mirror controller
         """
-        if not self.dev.galil.conn.isConnected:
+        if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.dev.galil.cmdParams(cmd)
+            self.dev.galilDevice.cmdParams(cmd)
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -144,10 +181,10 @@ class MirrorCtrl(Actor):
     def cmd_stop(self, cmd):
         """Abort any executing Galil command, put Galil in known state
         """
-        if not self.dev.galil.conn.isConnected:
+        if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.dev.galil.cmdStop(cmd)
+            self.dev.galilDevice.cmdStop(cmd)
         except Exception, e:
             raise CommandError(str(e))        
         return True
@@ -155,10 +192,10 @@ class MirrorCtrl(Actor):
     def cmd_reset(self, cmd):
         """Reset the Galil using an 'RS' command.
         """
-        if not self.dev.galil.conn.isConnected:
+        if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.dev.galil.cmdReset(cmd)
+            self.dev.galilDevice.cmdReset(cmd)
         except Exception, e:
             raise CommandError(str(e))        
         return True
