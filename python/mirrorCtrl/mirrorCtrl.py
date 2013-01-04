@@ -35,64 +35,65 @@ class MirrorCtrl(Actor):
         - userPort  port on which to listen for client connections
         - maxUsers  maximum allowed simultaneous users
         """
-        self.name = name
         Actor.__init__(self,
             userPort = userPort,
             devs = [device],
             maxUsers = maxUsers,
             version = Version,
+            name = name,
         )
     
-    def initialConn(self):
-        """Perform initial connections.  Same as Actor Base Class method, but with the
-        addition of commanding 'stop', then 'showparams' to put the Galil in a known 
-        state upon connection.
-        """
-        def doPars(cmd):
-            """2nd startup callback
-            """
-            if not cmd.isDone:
-                return
-            dummyCmd3 = UserCmd(cmdStr='showparams', callFunc=None, timeLim=10)
-            self.parseAndDispatchCmd(cmd=dummyCmd3)
-                        
-        def doStatus(cmd):
-            """1st startup callback
-            """
-            if not cmd.isDone:
-                return
-            dummyCmd2 = UserCmd(cmdStr='stop', callFunc=doPars, timeLim=10)
-            self.parseAndDispatchCmd(cmd=dummyCmd2)                
-        # note, must use UserCmd
-        dummyCmd1 =  UserCmd(cmdStr='conndev', callFunc=doStatus, timeLim=10)
-        self.parseAndDispatchCmd(cmd=dummyCmd1)
-        
-        # do we want to query the galil for state immediately after connection?
-        # or wait to make sure someone's listening (the mirror device?)
-        
-#         def doParams(cmd, isOK):
-#             if isOK:
-#                 cmdStr='showparams'
-#                 paramCmd = UserCmd(cmdStr=cmdStr)
-#                 paramCmd.timeLimit = 10
-#                 self.parseAndDispatchCmd(paramCmd)
-#         def doStatus(cmd, isOK):
-#             if isOK:
-#                 cmdStr = 'stop'
-#                 stopCmd = UserCmd(cmdStr=cmdStr, callFunc=doParams)
-#                 stopCmd.timeLimit = 10
-#                 self.parseAndDispatchCmd(stopCmd)
-#                 
+#     def initialConn(self):
+#         """Perform initial connections.  Same as Actor Base Class method, but with the
+#         addition of commanding 'stop', then 'showparams' to put the Galil in a known 
+#         state upon connection.
+#         """
+#         def doPars(cmd):
+#             """2nd startup callback
+#             """
+#             if not cmd.isDone:
+#                 return
+#             dummyCmd3 = UserCmd(cmdStr='showparams', callFunc=None, timeLim=10)
+#             self.parseAndDispatchCmd(cmd=dummyCmd3)
+#                         
+#         def doStatus(cmd):
+#             """1st startup callback
+#             """
+#             if not cmd.isDone:
+#                 return
+#             dummyCmd2 = UserCmd(cmdStr='stop', callFunc=doPars, timeLim=10)
+#             self.parseAndDispatchCmd(cmd=dummyCmd2)                
+#         # note, must use UserCmd
+#         dummyCmd1 =  UserCmd(cmdStr='conndev', callFunc=doStatus, timeLim=10)
+#         self.parseAndDispatchCmd(cmd=dummyCmd1)
+#         
+#         # do we want to query the galil for state immediately after connection?
+#         # or wait to make sure someone's listening (the mirror device?)
+#         
+# #         def doParams(cmd, isOK):
+# #             if isOK:
+# #                 cmdStr='showparams'
+# #                 paramCmd = UserCmd(cmdStr=cmdStr)
+# #                 paramCmd.timeLimit = 10
+# #                 self.parseAndDispatchCmd(paramCmd)
+# #         def doStatus(cmd, isOK):
+# #             if isOK:
+# #                 cmdStr = 'stop'
+# #                 stopCmd = UserCmd(cmdStr=cmdStr, callFunc=doParams)
+# #                 stopCmd.timeLimit = 10
+# #                 self.parseAndDispatchCmd(stopCmd)
+# #                 
+# # 
+# #         cmdStr = 'connDev'
+# #         connCmd = UserCmd(cmdStr='connDev', callFunc=doStatus)
+# #         connCmd.timeLimit = 10
+# #         self.parseAndDispatchCmd(connCmd)
+#         
+#         #get device state            
+# #         stopCmd = UserCmd(callFunc=doParams)
+# #         stopCmd.timeLimit = 10 # give it 10 seconds before timeout
+# #        self.cmd_stop(stopCmd) # put Galil in known state   
 # 
-#         cmdStr = 'connDev'
-#         connCmd = UserCmd(cmdStr='connDev', callFunc=doStatus)
-#         connCmd.timeLimit = 10
-#         self.parseAndDispatchCmd(connCmd)
-        
-        #get device state            
-#         stopCmd = UserCmd(callFunc=doParams)
-#         stopCmd.timeLimit = 10 # give it 10 seconds before timeout
-#        self.cmd_stop(stopCmd) # put Galil in known state   
 
     def processOrientation(self, orientation):
         """Convert a user specified orientation in um and arcseconds with possibly < 5
