@@ -25,9 +25,7 @@ def showReply(msgStr, *args, **kwargs): # prints what the dispactcher sees to th
 
         
 class MirrorCtrlTestBase(unittest.TestCase):
-    """A series of tests using twisted's trial unittesting.  Simulates
-    communication over a network.
-    """
+
     
     def setVars(self):
         """overwritten by subclasses
