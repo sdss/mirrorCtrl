@@ -1,5 +1,7 @@
+setupRequired("numpy")
 setupRequired("RO")
 setupRequired("twistedActor")
+setupOptional("matplotlib")
 
 envAppend(PATH, ${PRODUCT_DIR}/bin)
 envAppend(PYTHONPATH, ${PRODUCT_DIR}/python)
