@@ -4,10 +4,10 @@ __all__ = ["MirrorCtrl", "runMirrorCtrl"]
 
 import itertools
 import math
-
+import os
 import numpy
 
-from twistedActor import Actor, CommandError, UserCmd, BaseCmd
+from twistedActor import Actor, CommandError, UserCmd, BaseCmd, writeToLog
 
 Version = 0.1
 
@@ -35,6 +35,13 @@ class MirrorCtrl(Actor):
         - userPort  port on which to listen for client connections
         - maxUsers  maximum allowed simultaneous users
         """
+        # if TCC_LOGDIR is specified as an environment variable
+        # begin logging to it.
+        self.logging = False
+        self.logPath = os.getenv("TCC_LOGDIR")
+        if self.logPath: 
+            self.logging = True
+            
         Actor.__init__(self,
             userPort = userPort,
             devs = [device],
@@ -42,7 +49,12 @@ class MirrorCtrl(Actor):
             version = Version,
             name = name,
         )
-    
+        
+#         for dev in self.devs:
+#             dev.logMsg = self.logMsg
+            
+# removed initialConn, was seeing errors (when, for example, not everything was up and
+#                        listening)    
 #     def initialConn(self):
 #         """Perform initial connections.  Same as Actor Base Class method, but with the
 #         addition of commanding 'stop', then 'showparams' to put the Galil in a known 
@@ -94,6 +106,13 @@ class MirrorCtrl(Actor):
 # #         stopCmd.timeLimit = 10 # give it 10 seconds before timeout
 # #        self.cmd_stop(stopCmd) # put Galil in known state   
 # 
+
+    def logMsg(self, msgStr):
+        """Write a message string to the log.  
+        """
+        if self.logging:
+            writeToLog(msgStr, systemName=self.name, logPath=self.logPath) # system adds brackets
+
 
     def processOrientation(self, orientation):
         """Convert a user specified orientation in um and arcseconds with possibly < 5
