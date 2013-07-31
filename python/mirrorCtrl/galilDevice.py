@@ -472,24 +472,34 @@ class GalilDevice(TCPDevice):
         Subsequent moves are commanded until an acceptable orientation is reached (within errors).
         Cmd not tied to state of devCmd, because of subsequent moves.
         """
-        self.startUserCmd(userCmd, doCancel=False, timeLim=5)
-        if userCmd.isDone:
-            # command was rejected, device was busy, return empty handed
-            return
+        def doMove():
+            # enable iteration for mirrors with encoders
+            if self.mirror.hasEncoders:
+                self.status.iter = 1
+            # (user) commanded orient --> mount
+            mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient=True)
+            self.status.cmdMount = numpy.asarray(mount, dtype=float) # this will change upon iteration
+            self.status.desOrient = numpy.asarray(adjOrient, dtype=float) # initial guess for fitter
+            # format Galil command
+            cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
+            self.status.desOrientAge.startTimer()
+            statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "cmdMount", "maxIter", "iter"])
+            self.writeToUsers('i', statusStr, cmd=userCmd)
+            self.startDevCmd(cmdMoveStr, callFunc=self._moveIter, errFunc=self.failStop)
+        
+        if 'move' in self.currDevCmd.cmdStr.lower():
+            self.startUserCmd(userCmd, doCancel=True, timeLim=5)
+            self.conn.writeLine('ST')
+            # send ST, then XQ# Stop, and finally (when finished) send the new move
+            reactor.callLater(1, self.sendStop, doMove) # wait 1 second then command stop, then status   
+        else:    
+            self.startUserCmd(userCmd, doCancel=False, timeLim=5)
+            if userCmd.isDone:
+                # command was rejected, device was busy, return empty handed
+                return
+            else:
+                doMove()
 
-        # enable iteration for mirrors with encoders
-        if self.mirror.hasEncoders:
-            self.status.iter = 1
-        # (user) commanded orient --> mount
-        mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient=True)
-        self.status.cmdMount = numpy.asarray(mount, dtype=float) # this will change upon iteration
-        self.status.desOrient = numpy.asarray(adjOrient, dtype=float) # initial guess for fitter
-        # format Galil command
-        cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
-        self.status.desOrientAge.startTimer()
-        statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "cmdMount", "maxIter", "iter"])
-        self.writeToUsers('i', statusStr, cmd=userCmd)
-        self.startDevCmd(cmdMoveStr, callFunc=self._moveIter, errFunc=self.failStop)
 
     def cmdReset(self, userCmd):
         """Reset the Galil to its power-on state. All axes will have to be re-homed. Stop is gentler!
@@ -551,9 +561,11 @@ class GalilDevice(TCPDevice):
             return
         self.startDevCmd("XQ #SHOWPAR")
     
-    def sendStop(self):
-        """Send XQ#STOP, then XQ#STATUS"""
-        self.startDevCmd("XQ#STOP", callFunc=self.sendStatus)
+    def sendStop(self, callFunc=None):
+        """Send XQ#STOP, then execute callFunc"""
+        if callFunc == None:
+            callFunc = self.sendStatus
+        self.startDevCmd("XQ#STOP", callFunc=callFunc)
     
     def sendStatus(self):
         """Send device command XQ#STATUS"""

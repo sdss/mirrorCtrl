@@ -7,7 +7,7 @@ import math
 import os
 import numpy
 
-from twistedActor import Actor, CommandError, UserCmd, BaseCmd, writeToLog
+from twistedActor import Actor, CommandError, UserCmd, BaseCmd, writeToLog, startGlobalLogging
 
 Version = 0.1
 
@@ -20,6 +20,14 @@ RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
 
 ConvertOrient = numpy.array([MMPerMicron, RadPerArcSec, RadPerArcSec,
                              MMPerMicron, MMPerMicron], dtype = float)
+
+try:
+    LogDir = os.environ["TCC_LOG_DIR"]
+except KeyError:
+    LogDir = None
+# if LogDir is defined, start global logging
+if LogDir:
+    startGlobalLogging(LogDir)
 
 class MirrorCtrl(Actor):
     def __init__(self,
@@ -37,11 +45,9 @@ class MirrorCtrl(Actor):
         """
         # if TCC_LOGDIR is specified as an environment variable
         # begin logging to it.
-        self.logging = False
-        self.logPath = os.getenv("TCC_LOGDIR")
-        if self.logPath: 
-            self.logging = True
-            
+        self.logging = bool(LogDir)
+        # give the device logging capabilities
+        device.logMsg = self.logMsg
         Actor.__init__(self,
             userPort = userPort,
             devs = [device],
@@ -49,10 +55,6 @@ class MirrorCtrl(Actor):
             version = Version,
             name = name,
         )
-        
-#         for dev in self.devs:
-#             dev.logMsg = self.logMsg
-            
 # removed initialConn, was seeing errors (when, for example, not everything was up and
 #                        listening)    
 #     def initialConn(self):
@@ -111,7 +113,7 @@ class MirrorCtrl(Actor):
         """Write a message string to the log.  
         """
         if self.logging:
-            writeToLog(msgStr, systemName=self.name, logPath=self.logPath) # system adds brackets
+            writeToLog(msgStr, systemName=self.name, logPath=LogDir) # system adds brackets
 
 
     def processOrientation(self, orientation):

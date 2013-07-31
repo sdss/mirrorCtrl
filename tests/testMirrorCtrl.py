@@ -495,6 +495,46 @@ class GenericTests(MirrorCtrlTestBase):
         self.dispatcher.executeCmd(cmdHome)
         self.dispatcher.executeCmd(cmdStatus)
         return dBoth
+
+    def testMoveSupersede(self):
+        """Send two move commands, the second should supersede the first
+        """
+        d1 = Deferred()
+        d2 = Deferred()
+        dBoth = gatherResults([d1,d2])
+        def cmdCB1(thisCmd):
+            """callback associated with first cmd
+            """
+            if thisCmd.isDone:
+                d1.callback('hell yes') 
+        def cmdCB2(thisCmd):
+            """callback associated with second cmd
+            """
+            if thisCmd.isDone:
+                d2.callback('hell yes') 
+        orientation1 = [10000, 3600, 3600]
+        orientation2 = [num-50 for num in orientation1]
+        cmdStr1 = 'move ' + ', '.join([str(x) for x in orientation1])   
+        cmdStr2 = 'move ' + ', '.join([str(x) for x in orientation2])     
+        cmdMove1 = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr1,
+                callFunc = cmdCB1,
+            )
+        cmdMove2 = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr2,
+                callFunc = cmdCB2,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertTrue(cmdMove1.didFail)
+            self.assertFalse(cmdMove2.didFail)     
+        dBoth.addCallback(checkResults)        
+        self.dispatcher.executeCmd(cmdMove1)
+        self.dispatcher.executeCmd(cmdMove2)
+        return dBoth        
         
     def testMoveCollide(self):
         """Send a move command while a home command is executing
