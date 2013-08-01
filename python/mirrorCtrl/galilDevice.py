@@ -158,6 +158,8 @@ class GalilDevice(TCPDevice):
         self.currDevCmd.setState(self.currDevCmd.Done)
         self.currUserCmd = UserCmd(userID=0, cmdStr="")
         self.currUserCmd.setState(self.currUserCmd.Done)
+        self.queuedUserCmd = UserCmd(userID=0, cmdStr="")
+        self.queuedUserCmd.setState(self.queuedUserCmd.Done)
         self.parsedKeyList = []
         self.nAct = len(self.mirror.actuatorList)
         self.validAxisList =  ('A', 'B', 'C', 'D', 'E', 'F')[0:self.nAct]
@@ -432,47 +434,79 @@ class GalilDevice(TCPDevice):
         Inputs:
         - axisList: a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
         """
+        def doHome(cmd=None, axisList=None):
+            """cmd arg in case issued as a callback to a command
+            """
+            if (cmd!=None):
+                if not cmd.isDone:
+                    return
+                else:
+                    # set quedUserCmd to current user cmd
+                    # get the axisList which was saved in the queued cmd
+                    axisList = self.queuedUserCmd.axisList
+                    self.currUserCmd=self.queuedUserCmd
+                    # incase the previously queued command was superceeded...
+                    if self.currUserCmd.isDone:
+                        return
+            if not axisList:
+                axisList = self.validAxisList
+            else:
+                axisList = [axis.upper() for axis in axisList]
+            # compute new value of status.homing (an array of nAct 0s and 1s)
+            # and verify that all the requested axes are valid
+            newHoming = [0] * self.nAct
+            badAxisList = list()
+            for axis in axisList:
+                ind = self.axisIndexDict.get(axis)
+                if ind is None:
+                    badAxisList.append(axis)
+                else:
+                    newHoming[ind] = 1
+            if badAxisList:
+                raise CommandError("Invalid axes %s not in %s" % (badAxisList, self.validAxisList))
+        
+            cmdStr = self.formatGalilCommand(
+                valueList = [doHome if doHome else None for doHome in newHoming],
+                cmd = "XQ #HOME",
+            )
+            self.status.homing = newHoming
+            
+            self.writeToUsers(">", "Text = \"Homing Actuators: %s\"" % (", ".join(str(v) for v in axisList)), cmd = userCmd)
+            updateStr = self.status._getKeyValStr(["homing"])
+            self.writeToUsers("i", updateStr, cmd=userCmd)
+            self.startDevCmd(cmdStr, errFunc=self.failStop)
+
         self.startUserCmd(userCmd)
         if userCmd.isDone:
             # command was rejected, device was busy, return empty handed
             return
-        
-        if not axisList:
-            axisList = self.validAxisList
+        elif userCmd.state == userCmd.Ready:
+            # command not running, not done, must have been queued because a status is running.
+            # add callback to current command
+            # hack?
+            self.queuedUserCmd.axisList = axisList
+            self.currUserCmd.addCallback(doHome)
         else:
-            axisList = [axis.upper() for axis in axisList]
-
-        # compute new value of status.homing (an array of nAct 0s and 1s)
-        # and verify that all the requested axes are valid
-        newHoming = [0] * self.nAct
-        badAxisList = list()
-        for axis in axisList:
-            ind = self.axisIndexDict.get(axis)
-            if ind is None:
-                badAxisList.append(axis)
-            else:
-                newHoming[ind] = 1
-        if badAxisList:
-            raise CommandError("Invalid axes %s not in %s" % (badAxisList, self.validAxisList))
+            doHome(axisList=axisList)
         
-        cmdStr = self.formatGalilCommand(
-            valueList = [doHome if doHome else None for doHome in newHoming],
-            cmd = "XQ #HOME",
-        )
-        self.status.homing = newHoming
-            
-        self.writeToUsers(">", "Text = \"Homing Actuators: %s\"" % (", ".join(str(v) for v in axisList)), cmd = userCmd)
-        updateStr = self.status._getKeyValStr(["homing"])
-        self.writeToUsers("i", updateStr, cmd=userCmd)
-        self.startDevCmd(cmdStr, errFunc=self.failStop)
-
     def cmdMove(self, orient, userCmd):
         """Accepts an orientation then commands the move.
 
         Subsequent moves are commanded until an acceptable orientation is reached (within errors).
         Cmd not tied to state of devCmd, because of subsequent moves.
         """
-        def doMove():
+        def doMove(cmd=None):
+            """command in case issued as callback
+            """
+            if (cmd!=None):
+                if not cmd.isDone:
+                    return
+                else:
+                    # set quedUserCmd to current user cmd
+                    self.currUserCmd=self.queuedUserCmd
+                    # incase the previously queued command was superceeded...
+                    if self.currUserCmd.isDone:
+                        return
             # enable iteration for mirrors with encoders
             if self.mirror.hasEncoders:
                 self.status.iter = 1
@@ -497,6 +531,10 @@ class GalilDevice(TCPDevice):
             if userCmd.isDone:
                 # command was rejected, device was busy, return empty handed
                 return
+            elif userCmd.state == userCmd.Ready:
+                # command not running, not done, must have been queued because a status is running.
+                # add callback to current command
+                self.currUserCmd.addCallback(doMove)
             else:
                 doMove()
 
@@ -627,8 +665,15 @@ class GalilDevice(TCPDevice):
             self._userCmdNextStep = None
             if not self.currUserCmd.isDone:
                 self.currUserCmd.setState(self.currUserCmd.Cancelled, "Superseded")
+            if not self.queuedUserCmd.isDone:
+                self.queuedUserCmd.setState(self.queuedUserCmd.Cancelled, "Superseded")
             if not self.currDevCmd.isDone:
                 self.currDevCmd.setState(self.currDevCmd.Cancelled, "Superseded")
+        elif ('status' in self.currDevCmd.cmdStr.lower()) and (not self.currDevCmd.isDone):
+            # if currently running command is a status, queue this userCmd to run 
+            # immediately after status completion
+            self.queuedUserCmd = userCmd
+            return
         else:
             if not self.currUserCmd.isDone:
                 userCmd.setState(userCmd.Failed, "Busy running user command %s" % (self.currUserCmd.cmdStr,))

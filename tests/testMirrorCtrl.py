@@ -455,6 +455,131 @@ class GenericTests(MirrorCtrlTestBase):
         self.dispatcher.executeCmd(cmdMove)
         self.dispatcher.executeCmd(cmdReset)
         return dBoth
+
+    def testCmdQueueHome(self):
+        """send a status then a home, they should collide and both finish
+        """
+        d1 = Deferred()
+        d2 = Deferred()
+        dBoth = gatherResults([d1,d2])
+        def cmdCB1(thisCmd):
+            """callback associated with first cmd
+            """
+            if thisCmd.isDone:
+                d1.callback('hell yes') 
+        def cmdCB2(thisCmd):
+            """callback associated with second cmd
+            """
+            if thisCmd.isDone:
+                d2.callback('hell yes')    
+        cmdHome = CmdVar (
+                actor = self.name,
+                cmdStr = 'home A,B,C',
+                callFunc = cmdCB1,
+            )
+        cmdStatus = CmdVar (
+                actor = self.name,
+                cmdStr = 'status',
+                callFunc = cmdCB2,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertFalse(cmdHome.didFail)
+            self.assertFalse(cmdStatus.didFail)     
+            
+        dBoth.addCallback(checkResults)    
+        self.dispatcher.executeCmd(cmdStatus)    
+        self.dispatcher.executeCmd(cmdHome)
+        return dBoth
+ 
+    def testCmdQueueSuperseded(self):
+        """send a status then a home then a stop, 
+        stop should succeed rest should fail
+        """
+        d1 = Deferred()
+        d2 = Deferred()
+        d3 = Deferred()
+        dAll = gatherResults([d1,d2, d3])
+        def cmdCB1(thisCmd):
+            """callback associated with first cmd
+            """
+            if thisCmd.isDone:
+                d1.callback('hell yes') 
+        def cmdCB2(thisCmd):
+            """callback associated with second cmd
+            """
+            if thisCmd.isDone:
+                d2.callback('hell yes')    
+        def cmdCB3(thisCmd):
+            """callback associated with second cmd
+            """
+            if thisCmd.isDone:
+                d3.callback('hell yes') 
+        cmdHome = CmdVar (
+                actor = self.name,
+                cmdStr = 'home A,B,C',
+                callFunc = cmdCB1,
+            )
+        cmdStatus = CmdVar (
+                actor = self.name,
+                cmdStr = 'status',
+                callFunc = cmdCB2,
+            )
+        cmdStop = CmdVar (
+                actor = self.name,
+                cmdStr = 'stop',
+                callFunc = cmdCB3,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertTrue(cmdHome.didFail)
+            self.assertTrue(cmdStatus.didFail)
+            self.assertFalse(cmdStop.didFail)     
+            
+        dAll.addCallback(checkResults)    
+        self.dispatcher.executeCmd(cmdStatus)    
+        self.dispatcher.executeCmd(cmdHome)
+        self.dispatcher.executeCmd(cmdStop)
+        return dAll
+    
+    def testCmdQueueMove(self):
+        """send a staus then a move, they should collide and both finish
+        """
+        d1 = Deferred()
+        d2 = Deferred()
+        dBoth = gatherResults([d1,d2])
+        def cmdCB1(thisCmd):
+            """callback associated with first cmd
+            """
+            if thisCmd.isDone:
+                d1.callback('hell yes') 
+        def cmdCB2(thisCmd):
+            """callback associated with second cmd
+            """
+            if thisCmd.isDone:
+                d2.callback('hell yes')    
+        cmdMove = CmdVar (
+                actor = self.name,
+                cmdStr = 'move 10000, 3600, 3600',
+                callFunc = cmdCB1,
+            )
+        cmdStatus = CmdVar (
+                actor = self.name,
+                cmdStr = 'status',
+                callFunc = cmdCB2,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertFalse(cmdMove.didFail)
+            self.assertFalse(cmdStatus.didFail)     
+            
+        dBoth.addCallback(checkResults)    
+        self.dispatcher.executeCmd(cmdStatus)    
+        self.dispatcher.executeCmd(cmdMove)
+        return dBoth
         
     def testStatusCollide(self):
         """Send a status request while a home command is executing.
