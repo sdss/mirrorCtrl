@@ -445,10 +445,14 @@ class GalilDevice(TCPDevice):
                     # get the axisList which was saved in the queued cmd
                     axisList = self.queuedUserCmd.axisList
                     nullCmd = UserCmd(userID=0, cmdStr="")
-                    nullCmd.setState(self.queuedUserCmd.Done)
-                    self.currUserCmd, self.queuedUserCmd=self.queuedUserCmd, nullCmd
+                    nullCmd.setState(nullCmd.Done)
+                    qdCmd, self.queuedUserCmd=self.queuedUserCmd, nullCmd
                     # incase the previously queued command was superceeded...
-                    if self.currUserCmd.isDone:
+                    if qdCmd.isDone:
+                        return
+                    self.startUserCmd(qdCmd)
+                    if qdCmd.isDone:
+                        # cmd rejected
                         return
             if not axisList:
                 axisList = self.validAxisList
