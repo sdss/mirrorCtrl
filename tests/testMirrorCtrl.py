@@ -492,6 +492,159 @@ class GenericTests(MirrorCtrlTestBase):
         self.dispatcher.executeCmd(cmdStatus)    
         self.dispatcher.executeCmd(cmdHome)
         return dBoth
+
+    def testDoubleQueueMoveMove(self):
+        """send status, move, move.
+        status and 2nd move should finish, 1st move should be superseded
+        """
+        d1 = Deferred()
+        d2 = Deferred()
+        d3 = Deferred()
+        dAll = gatherResults([d1,d2, d3])
+        def cmdCB1(thisCmd):
+            """callback associated with first cmd
+            """
+            if thisCmd.isDone:
+                d1.callback('hell yes') 
+        def cmdCB2(thisCmd):
+            """callback associated with second cmd
+            """
+            if thisCmd.isDone:
+                d2.callback('hell yes')    
+        def cmdCB3(thisCmd):
+            """callback associated with second cmd
+            """
+            if thisCmd.isDone:
+                d3.callback('hell yes') 
+        cmdMove1 = CmdVar (
+                actor = self.name,
+                cmdStr = 'move 10001, 3601, 3601',
+                callFunc = cmdCB1,
+            )
+        cmdStatus = CmdVar (
+                actor = self.name,
+                cmdStr = 'status',
+                callFunc = cmdCB2,
+            )
+        cmdMove2 = CmdVar (
+                actor = self.name,
+                cmdStr = 'move 10000, 3600, 3600',
+                callFunc = cmdCB3,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertTrue(cmdMove1.didFail)
+            self.assertFalse(cmdStatus.didFail)
+            self.assertFalse(cmdMove2.didFail)     
+            
+        dAll.addCallback(checkResults)    
+        self.dispatcher.executeCmd(cmdStatus)    
+        self.dispatcher.executeCmd(cmdMove1)
+        self.dispatcher.executeCmd(cmdMove2)
+        return dAll
+
+    def testDoubleQueueMoveHome(self):
+        """send status, move, move.
+        status and 2nd move should finish, 1st move should be superseded
+        """
+        d1 = Deferred()
+        d2 = Deferred()
+        d3 = Deferred()
+        dAll = gatherResults([d1,d2, d3])
+        def cmdCB1(thisCmd):
+            """callback associated with first cmd
+            """
+            if thisCmd.isDone:
+                d1.callback('hell yes') 
+        def cmdCB2(thisCmd):
+            """callback associated with second cmd
+            """
+            if thisCmd.isDone:
+                d2.callback('hell yes')    
+        def cmdCB3(thisCmd):
+            """callback associated with second cmd
+            """
+            if thisCmd.isDone:
+                d3.callback('hell yes') 
+        cmdHome = CmdVar (
+                actor = self.name,
+                cmdStr = 'home A,B,C',
+                callFunc = cmdCB1,
+            )
+        cmdStatus = CmdVar (
+                actor = self.name,
+                cmdStr = 'status',
+                callFunc = cmdCB2,
+            )
+        cmdMove = CmdVar (
+                actor = self.name,
+                cmdStr = 'move 10000, 3600, 3600',
+                callFunc = cmdCB3,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertTrue(cmdMove.didFail)
+            self.assertFalse(cmdStatus.didFail)
+            self.assertFalse(cmdHome.didFail)     
+            
+        dAll.addCallback(checkResults)    
+        self.dispatcher.executeCmd(cmdStatus)    
+        self.dispatcher.executeCmd(cmdMove)
+        self.dispatcher.executeCmd(cmdHome)
+        return dAll
+
+    def testDoubleQueueHomeMove(self):
+        """send status, move, move.
+        status and 2nd move should finish, 1st move should be superseded
+        """
+        d1 = Deferred()
+        d2 = Deferred()
+        d3 = Deferred()
+        dAll = gatherResults([d1,d2, d3])
+        def cmdCB1(thisCmd):
+            """callback associated with first cmd
+            """
+            if thisCmd.isDone:
+                d1.callback('hell yes') 
+        def cmdCB2(thisCmd):
+            """callback associated with second cmd
+            """
+            if thisCmd.isDone:
+                d2.callback('hell yes')    
+        def cmdCB3(thisCmd):
+            """callback associated with second cmd
+            """
+            if thisCmd.isDone:
+                d3.callback('hell yes') 
+        cmdHome = CmdVar (
+                actor = self.name,
+                cmdStr = 'home A,B,C',
+                callFunc = cmdCB1,
+            )
+        cmdStatus = CmdVar (
+                actor = self.name,
+                cmdStr = 'status',
+                callFunc = cmdCB2,
+            )
+        cmdMove = CmdVar (
+                actor = self.name,
+                cmdStr = 'move 10000, 3600, 3600',
+                callFunc = cmdCB3,
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertTrue(cmdHome.didFail)
+            self.assertFalse(cmdStatus.didFail)
+            self.assertFalse(cmdMove.didFail)     
+            
+        dAll.addCallback(checkResults)    
+        self.dispatcher.executeCmd(cmdStatus)    
+        self.dispatcher.executeCmd(cmdHome)
+        self.dispatcher.executeCmd(cmdMove)
+        return dAll
  
     def testCmdQueueSuperseded(self):
         """send a status then a home then a stop, 

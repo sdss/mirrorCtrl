@@ -444,7 +444,9 @@ class GalilDevice(TCPDevice):
                     # set quedUserCmd to current user cmd
                     # get the axisList which was saved in the queued cmd
                     axisList = self.queuedUserCmd.axisList
-                    self.currUserCmd=self.queuedUserCmd
+                    nullCmd = UserCmd(userID=0, cmdStr="")
+                    nullCmd.setState(self.queuedUserCmd.Done)
+                    self.currUserCmd, self.queuedUserCmd=self.queuedUserCmd, nullCmd
                     # incase the previously queued command was superceeded...
                     if self.currUserCmd.isDone:
                         return
@@ -503,9 +505,15 @@ class GalilDevice(TCPDevice):
                     return
                 else:
                     # set quedUserCmd to current user cmd
-                    self.currUserCmd=self.queuedUserCmd
+                    nullCmd = UserCmd(userID=0, cmdStr="")
+                    nullCmd.setState(nullCmd.Done)
+                    qdCmd, self.queuedUserCmd=self.queuedUserCmd, nullCmd
                     # incase the previously queued command was superceeded...
-                    if self.currUserCmd.isDone:
+                    if qdCmd.isDone:
+                        return
+                    self.startUserCmd(qdCmd)
+                    if qdCmd.isDone:
+                        # cmd rejected
                         return
             # enable iteration for mirrors with encoders
             if self.mirror.hasEncoders:
@@ -672,6 +680,10 @@ class GalilDevice(TCPDevice):
         elif ('status' in self.currDevCmd.cmdStr.lower()) and (not self.currDevCmd.isDone):
             # if currently running command is a status, queue this userCmd to run 
             # immediately after status completion
+            # is there currently a command in the queue? if so supercede it and put this 
+            # in it's place
+            if not self.queuedUserCmd.isDone:
+                self.queuedUserCmd.setState(self.queuedUserCmd.Cancelled, "Superseded")
             self.queuedUserCmd = userCmd
             return
         else:
@@ -774,6 +786,7 @@ class GalilDevice(TCPDevice):
         
         note: *args for callbackability...
         """
+        #if not self.currUserCmd.isDone:
         self.currUserCmd.setState(self.currUserCmd.Done)
 
     def _statusCallback(self):
