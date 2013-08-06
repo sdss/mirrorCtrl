@@ -153,7 +153,13 @@ class MirrorCtrl(Actor):
         if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.dev.galilDevice.cmdMove(cmdOrient, userCmd=cmd)
+            #self.dev.galilDevice.cmdMove(cmdOrient, userCmd=cmd)
+            self.dev.galilDevice.cmdQueue.addCmd(
+                cmd, 
+                self.dev.galilDevice.cmdMove,
+                cmdOrient,
+            )
+                
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -170,7 +176,12 @@ class MirrorCtrl(Actor):
         if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.dev.galilDevice.cmdHome(axisList, userCmd=cmd)
+            #self.dev.galilDevice.cmdHome(axisList, userCmd=cmd)
+            self.dev.galilDevice.cmdQueue.addCmd(
+                cmd, 
+                self.dev.galilDevice.cmdHome,
+                axisList,
+            )
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -184,7 +195,11 @@ class MirrorCtrl(Actor):
             raise CommandError("Device Not Connected")
         try:
             # additional status from Galil
-            self.dev.galilDevice.cmdStatus(cmd)
+            #self.dev.galilDevice.cmdStatus(cmd)
+            self.dev.galilDevice.cmdQueue.addCmd(
+                cmd, 
+                self.dev.galilDevice.cmdStatus,
+            )
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -195,7 +210,11 @@ class MirrorCtrl(Actor):
         if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.dev.galilDevice.cmdParams(cmd)
+            #self.dev.galilDevice.cmdParams(cmd)
+            self.dev.galilDevice.cmdQueue.addCmd(
+                cmd, 
+                self.dev.galilDevice.cmdParams,
+            )
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -206,7 +225,11 @@ class MirrorCtrl(Actor):
         if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.dev.galilDevice.cmdStop(cmd)
+            #self.dev.galilDevice.cmdStop(cmd)
+            self.dev.galilDevice.cmdQueue.addCmd(
+                cmd, 
+                self.dev.galilDevice.cmdStop,
+            )
         except Exception, e:
             raise CommandError(str(e))        
         return True
@@ -217,7 +240,11 @@ class MirrorCtrl(Actor):
         if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.dev.galilDevice.cmdReset(cmd)
+            #self.dev.galilDevice.cmdReset(cmd)
+            self.dev.galilDevice.cmdQueue.addCmd(
+                cmd, 
+                self.dev.galilDevice.cmdReset,
+            )
         except Exception, e:
             raise CommandError(str(e))        
         return True

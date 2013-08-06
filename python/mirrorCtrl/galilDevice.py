@@ -9,6 +9,7 @@ http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.ht
 To Do:
 - ConstRMS keyword - how close the mirror can get to commanded orientation?
 - switch to pyparsing for galil replies?
+-add a quickStatus vs fullStatus command?
 
 Notes:
 Update Galil Code Constants:
@@ -23,7 +24,7 @@ import re
 import numpy
 from RO.StringUtil import quoteStr, strFromException
 from RO.SeqUtil import asSequence
-from twistedActor import TCPDevice, CommandError, UserCmd
+from twistedActor import TCPDevice, CommandError, UserCmd, CommandQueue
 from twisted.internet import reactor
 
 __all__ = ["GalilDevice", "GalilDevice25Sec"]
@@ -154,12 +155,19 @@ class GalilDevice(TCPDevice):
             callFunc = callFunc,
             cmdInfo = (),
         )
+        self.cmdQueue = CommandQueue()
+        self.cmdQueue.addRule("stop", "supersedes") # everything
+        self.cmdQueue.addRule("reset", "supersedes") # everything
+        self.cmdQueue.addRule("move", "supersedes", ["move", "status", "params"]) # move overwrites and earlier move
+        self.cmdQueue.addRule("home", "supersedes", ["status", "params"])
+        self.cmdQueue.addRule("status", "waitsfor", ["move", "home"]) # status will be queued behind these
+        self.cmdQueue.addInterrupt(self.cmdStop) # this safely interrupts the galil. 
         self.currDevCmd = self.cmdClass("")
         self.currDevCmd.setState(self.currDevCmd.Done)
-        self.currUserCmd = UserCmd(userID=0, cmdStr="")
-        self.currUserCmd.setState(self.currUserCmd.Done)
-        self.queuedUserCmd = UserCmd(userID=0, cmdStr="")
-        self.queuedUserCmd.setState(self.queuedUserCmd.Done)
+#         self.cmdQueue[0] = UserCmd(userID=0, cmdStr="")
+#         self.cmdQueue[0].setState(self.cmdQueue[0].Done)
+#         self.queuedUserCmd = UserCmd(userID=0, cmdStr="")
+#         self.queuedUserCmd.setState(self.queuedUserCmd.Done)
         self.parsedKeyList = []
         self.nAct = len(self.mirror.actuatorList)
         self.validAxisList =  ('A', 'B', 'C', 'D', 'E', 'F')[0:self.nAct]
@@ -228,7 +236,7 @@ class GalilDevice(TCPDevice):
 #         if not (True in goodMatch):
 #             # There is confusion in the amount of descriptors and values in this particular line.
 #             # report it but keep going
-#             self.writeToUsers("w", "BadGalilReply=%s, \"num descriptors do not match num values.\"" % (quoteStr(line),), cmd=self.currUserCmd)
+#             self.writeToUsers("w", "BadGalilReply=%s, \"num descriptors do not match num values.\"" % (quoteStr(line),), cmd=self.cmdQueue[0])
 #             return
         # check to see if descriptor/s are an expected reply
 #         knownReply = [(key in self.expectedReplies) for key in keys]
@@ -236,7 +244,7 @@ class GalilDevice(TCPDevice):
 #             # a descriptor wasn't recognized as an expected reply for this Galil/mirror
 #             # report it but keep going
 #             print 'keys: ', keys
-#             self.writeToUsers("w","BadGalilReply=%s, \"Descriptor text not recognized.\"" % (quoteStr(line),), cmd=self.currUserCmd)
+#             self.writeToUsers("w","BadGalilReply=%s, \"Descriptor text not recognized.\"" % (quoteStr(line),), cmd=self.cmdQueue[0])
 #             return
         return dataMatched, keys
 
@@ -257,7 +265,7 @@ class GalilDevice(TCPDevice):
             param = 'HalfRNGx'
         keyword = 'GPar%s' % (param)
         outStr = self.formatAsKeyValStr(keyword, data)
-        self.writeToUsers("i", outStr, cmd = self.currUserCmd)
+        self.writeToUsers("i", outStr, cmd = self.cmdQueue[0])
 
     def actOnKey(self, key, data):
         """Takes a key parsed from self.parseLine, and chooses what to do with the data
@@ -275,7 +283,7 @@ class GalilDevice(TCPDevice):
         elif 'software version' in key:
             # this is a special parameter case, and can't be treated using sendParam
             msgStr = 'GPar%s=%s' % (('SoftwareVersion', data[0])) #data is a single element list
-            self.writeToUsers("i", msgStr, cmd = self.currUserCmd)
+            self.writeToUsers("i", msgStr, cmd = self.cmdQueue[0])
             return
 
         elif timeEstRegEx.match(key):
@@ -287,10 +295,10 @@ class GalilDevice(TCPDevice):
             updateStr = self.status._getKeyValStr(["maxDuration"])
             # append text describing time for what
             updateStr += '; Text=%s' % (quoteStr(key),)
-            self.writeToUsers("i", updateStr, cmd=self.currUserCmd)
+            self.writeToUsers("i", updateStr, cmd=self.cmdQueue[0])
             # adjust time limits
             self.currDevCmd.setTimeLimit(maxTime + 2)
-            self.currUserCmd.setTimeLimit(maxTime + 5)
+            self.cmdQueue[0].setTimeLimit(maxTime + 5)
             return
 
         elif ('commanded position' == key) or ('target position' == key):
@@ -298,7 +306,7 @@ class GalilDevice(TCPDevice):
             self.status.cmdMount = [int(x) if int(x) != 999999999 else numpy.nan for x in data]
             #self.status.cmdMount = cmdMount if cmdMount != [999999999]*self.nAct else [numpy.nan]*self.nAct
             updateStr = self.status._getKeyValStr(["cmdMount"])
-            self.writeToUsers("i", updateStr, cmd=self.currUserCmd)
+            self.writeToUsers("i", updateStr, cmd=self.cmdQueue[0])
             return
 
         elif ('actual position' == key) or ('final position' == key):
@@ -310,7 +318,7 @@ class GalilDevice(TCPDevice):
             
             #self.status.encMount = encMount if encMount != [999999999]*self.nAct else [numpy.nan]*self.nAct
             updateStr = self.status._getKeyValStr(["encMount"])
-            self.writeToUsers("i", updateStr, cmd=self.currUserCmd)
+            self.writeToUsers("i", updateStr, cmd=self.cmdQueue[0])
             # DesOrient may be nans
             if not numpy.isfinite(sum(self.status.encMount)):
                 # encoder positons contain NaN(s)
@@ -327,27 +335,28 @@ class GalilDevice(TCPDevice):
                 self.status.orient = numpy.asarray(orient[:], dtype=float)
                 self.status.actMount = actMount            
             updateStr = self.status._getKeyValStr(["orient", "actMount"])
-            self.writeToUsers("i", updateStr, cmd=self.currUserCmd)
+            self.writeToUsers("i", updateStr, cmd=self.cmdQueue[0])
             return
 
         elif key == 'axis homed':
             data = [int(num) for num in data]
             self.status.axisHomed = data
             updateStr = self.status._getKeyValStr(["axisHomed"])
-            self.writeToUsers("i", updateStr, cmd=self.currUserCmd)
+            self.writeToUsers("i", updateStr, cmd=self.cmdQueue[0])
             return
 
         elif key == 'status word':
             data = [int(num) for num in data]
             self.status.status = data
             updateStr = self.status._getKeyValStr(["status"])
-            self.writeToUsers("i", updateStr, cmd=self.currUserCmd)
+            self.writeToUsers("i", updateStr, cmd=self.cmdQueue[0])
             return
 
         else:
             # send the remaining info back to the user
+            
             msgStr = "UnparsedReply=%s, %s" % (quoteStr(key), quoteStr(str(data)))
-            self.writeToUsers("i", msgStr, cmd=self.currUserCmd)
+            self.writeToUsers("i", msgStr, cmd=self.cmdQueue[0] or None)
             return
 
     def handleReply(self, replyStr):
@@ -406,7 +415,7 @@ class GalilDevice(TCPDevice):
         if not startsWithNumRegEx.match(replyStr):
             # line doesn't begin with a data value, eg 'Finding next full step'
             # show it to the user and return
-            self.writeToUsers("i", "UnparsedReply=\"%s\"" % (replyStr,), cmd = self.currUserCmd)
+            self.writeToUsers("i", "UnparsedReply=\"%s\"" % (replyStr,), cmd = self.cmdQueue[0] or None)
             return
         # if we made it this far, separate the data from the descriptive text
         parsedLine = self.parseLine(replyStr)
@@ -428,130 +437,172 @@ class GalilDevice(TCPDevice):
                     self.actOnKey(key, dat)
                     self.parsedKeyList.append(key)
 
-    def cmdHome(self, axisList, userCmd):
+    def cmdHome(self, axisList):#, userCmd):
         """Home the specified actuators
 
         Inputs:
         - axisList: a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
         """
-        def doHome(cmd=None, axisList=None):
-            """cmd arg in case issued as a callback to a command
-            """
-            if (cmd!=None):
-                if not cmd.isDone:
-                    return
-                else:
-                    # set quedUserCmd to current user cmd
-                    # get the axisList which was saved in the queued cmd
-                    axisList = self.queuedUserCmd.axisList
-                    nullCmd = UserCmd(userID=0, cmdStr="")
-                    nullCmd.setState(nullCmd.Done)
-                    qdCmd, self.queuedUserCmd=self.queuedUserCmd, nullCmd
-                    # incase the previously queued command was superceeded...
-                    if qdCmd.isDone:
-                        return
-                    self.startUserCmd(qdCmd)
-                    if qdCmd.isDone:
-                        # cmd rejected
-                        return
-            if not axisList:
-                axisList = self.validAxisList
-            else:
-                axisList = [axis.upper() for axis in axisList]
-            # compute new value of status.homing (an array of nAct 0s and 1s)
-            # and verify that all the requested axes are valid
-            newHoming = [0] * self.nAct
-            badAxisList = list()
-            for axis in axisList:
-                ind = self.axisIndexDict.get(axis)
-                if ind is None:
-                    badAxisList.append(axis)
-                else:
-                    newHoming[ind] = 1
-            if badAxisList:
-                raise CommandError("Invalid axes %s not in %s" % (badAxisList, self.validAxisList))
-        
-            cmdStr = self.formatGalilCommand(
-                valueList = [doHome if doHome else None for doHome in newHoming],
-                cmd = "XQ #HOME",
-            )
-            self.status.homing = newHoming
-            
-            self.writeToUsers(">", "Text = \"Homing Actuators: %s\"" % (", ".join(str(v) for v in axisList)), cmd = userCmd)
-            updateStr = self.status._getKeyValStr(["homing"])
-            self.writeToUsers("i", updateStr, cmd=userCmd)
-            self.startDevCmd(cmdStr, errFunc=self.failStop)
-
-        self.startUserCmd(userCmd)
-        if userCmd.isDone:
-            # command was rejected, device was busy, return empty handed
-            return
-        elif userCmd.state == userCmd.Ready:
-            # command not running, not done, must have been queued because a status is running.
-            # add callback to current command
-            # hack?
-            self.queuedUserCmd.axisList = axisList
-            self.currUserCmd.addCallback(doHome)
+        if not axisList:
+            axisList = self.validAxisList
         else:
-            doHome(axisList=axisList)
+            axisList = [axis.upper() for axis in axisList]
+        # compute new value of status.homing (an array of nAct 0s and 1s)
+        # and verify that all the requested axes are valid
+        newHoming = [0] * self.nAct
+        badAxisList = list()
+        for axis in axisList:
+            ind = self.axisIndexDict.get(axis)
+            if ind is None:
+                badAxisList.append(axis)
+            else:
+                newHoming[ind] = 1
+        if badAxisList:
+            raise CommandError("Invalid axes %s not in %s" % (badAxisList, self.validAxisList))
+    
+        cmdStr = self.formatGalilCommand(
+            valueList = [doHome if doHome else None for doHome in newHoming],
+            cmd = "XQ #HOME",
+        )
+        self.status.homing = newHoming
         
-    def cmdMove(self, orient, userCmd):
+        self.writeToUsers(">", "Text = \"Homing Actuators: %s\"" % (", ".join(str(v) for v in axisList)), cmd = self.cmdQueue[0])
+        updateStr = self.status._getKeyValStr(["homing"])
+        self.writeToUsers("i", updateStr, cmd=self.cmdQueue[0])
+        self.startDevCmd(cmdStr, errFunc=self.failStop)
+        
+#         def doHome(cmd=None, axisList=None):
+#             """cmd arg in case issued as a callback to a command
+#             """
+#             if (cmd!=None):
+#                 if not cmd.isDone:
+#                     return
+#                 else:
+#                     # set quedUserCmd to current user cmd
+#                     # get the axisList which was saved in the queued cmd
+#                     axisList = self.queuedUserCmd.axisList
+#                     nullCmd = UserCmd(userID=0, cmdStr="")
+#                     nullCmd.setState(nullCmd.Done)
+#                     qdCmd, self.queuedUserCmd=self.queuedUserCmd, nullCmd
+#                     # incase the previously queued command was superceeded...
+#                     if qdCmd.isDone:
+#                         return
+#                     self.startUserCmd(qdCmd)
+#                     if qdCmd.isDone:
+#                         # cmd rejected
+#                         return
+#             if not axisList:
+#                 axisList = self.validAxisList
+#             else:
+#                 axisList = [axis.upper() for axis in axisList]
+#             # compute new value of status.homing (an array of nAct 0s and 1s)
+#             # and verify that all the requested axes are valid
+#             newHoming = [0] * self.nAct
+#             badAxisList = list()
+#             for axis in axisList:
+#                 ind = self.axisIndexDict.get(axis)
+#                 if ind is None:
+#                     badAxisList.append(axis)
+#                 else:
+#                     newHoming[ind] = 1
+#             if badAxisList:
+#                 raise CommandError("Invalid axes %s not in %s" % (badAxisList, self.validAxisList))
+#         
+#             cmdStr = self.formatGalilCommand(
+#                 valueList = [doHome if doHome else None for doHome in newHoming],
+#                 cmd = "XQ #HOME",
+#             )
+#             self.status.homing = newHoming
+#             
+#             self.writeToUsers(">", "Text = \"Homing Actuators: %s\"" % (", ".join(str(v) for v in axisList)), cmd = userCmd)
+#             updateStr = self.status._getKeyValStr(["homing"])
+#             self.writeToUsers("i", updateStr, cmd=userCmd)
+#             self.startDevCmd(cmdStr, errFunc=self.failStop)
+
+#         self.startUserCmd(userCmd)
+#         if userCmd.isDone:
+#             # command was rejected, device was busy, return empty handed
+#             return
+#         elif userCmd.state == userCmd.Ready:
+#             # command not running, not done, must have been queued because a status is running.
+#             # add callback to current command
+#             # hack?
+#             self.queuedUserCmd.axisList = axisList
+#             self.cmdQueue[0].addCallback(doHome)
+#         else:
+#             doHome(axisList=axisList)
+        
+    def cmdMove(self, orient):#, userCmd):
         """Accepts an orientation then commands the move.
 
         Subsequent moves are commanded until an acceptable orientation is reached (within errors).
         Cmd not tied to state of devCmd, because of subsequent moves.
         """
-        def doMove(cmd=None):
-            """command in case issued as callback
-            """
-            if (cmd!=None):
-                if not cmd.isDone:
-                    return
-                else:
-                    # set quedUserCmd to current user cmd
-                    nullCmd = UserCmd(userID=0, cmdStr="")
-                    nullCmd.setState(nullCmd.Done)
-                    qdCmd, self.queuedUserCmd=self.queuedUserCmd, nullCmd
-                    # incase the previously queued command was superceeded...
-                    if qdCmd.isDone:
-                        return
-                    self.startUserCmd(qdCmd)
-                    if qdCmd.isDone:
-                        # cmd rejected
-                        return
-            # enable iteration for mirrors with encoders
-            if self.mirror.hasEncoders:
-                self.status.iter = 1
-            # (user) commanded orient --> mount
-            mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient=True)
-            self.status.cmdMount = numpy.asarray(mount, dtype=float) # this will change upon iteration
-            self.status.desOrient = numpy.asarray(adjOrient, dtype=float) # initial guess for fitter
-            # format Galil command
-            cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
-            self.status.desOrientAge.startTimer()
-            statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "cmdMount", "maxIter", "iter"])
-            self.writeToUsers('i', statusStr, cmd=userCmd)
-            self.startDevCmd(cmdMoveStr, callFunc=self._moveIter, errFunc=self.failStop)
-        
-        if 'move' in self.currDevCmd.cmdStr.lower():
-            self.startUserCmd(userCmd, doCancel=True, timeLim=5)
-            self.conn.writeLine('ST')
-            # send ST, then XQ# Stop, and finally (when finished) send the new move
-            reactor.callLater(1, self.sendStop, doMove) # wait 1 second then command stop, then status   
-        else:    
-            self.startUserCmd(userCmd, doCancel=False, timeLim=5)
-            if userCmd.isDone:
-                # command was rejected, device was busy, return empty handed
-                return
-            elif userCmd.state == userCmd.Ready:
-                # command not running, not done, must have been queued because a status is running.
-                # add callback to current command
-                self.currUserCmd.addCallback(doMove)
-            else:
-                doMove()
+        # enable iteration for mirrors with encoders
+        if self.mirror.hasEncoders:
+            self.status.iter = 1
+        # (user) commanded orient --> mount
+        mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient=True)
+        self.status.cmdMount = numpy.asarray(mount, dtype=float) # this will change upon iteration
+        self.status.desOrient = numpy.asarray(adjOrient, dtype=float) # initial guess for fitter
+        # format Galil command
+        cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
+        self.status.desOrientAge.startTimer()
+        statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "cmdMount", "maxIter", "iter"])
+        self.writeToUsers('i', statusStr, cmd=self.cmdQueue[0])
+        self.startDevCmd(cmdMoveStr, callFunc=self._moveIter, errFunc=self.failStop)
+
+#         def doMove(cmd=None):
+#             """command in case issued as callback
+#             """
+#             if (cmd!=None):
+#                 if not cmd.isDone:
+#                     return
+#                 else:
+#                     # set quedUserCmd to current user cmd
+#                     nullCmd = UserCmd(userID=0, cmdStr="")
+#                     nullCmd.setState(nullCmd.Done)
+#                     qdCmd, self.queuedUserCmd=self.queuedUserCmd, nullCmd
+#                     # incase the previously queued command was superceeded...
+#                     if qdCmd.isDone:
+#                         return
+#                     self.startUserCmd(qdCmd)
+#                     if qdCmd.isDone:
+#                         # cmd rejected
+#                         return
+#             # enable iteration for mirrors with encoders
+#             if self.mirror.hasEncoders:
+#                 self.status.iter = 1
+#             # (user) commanded orient --> mount
+#             mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient=True)
+#             self.status.cmdMount = numpy.asarray(mount, dtype=float) # this will change upon iteration
+#             self.status.desOrient = numpy.asarray(adjOrient, dtype=float) # initial guess for fitter
+#             # format Galil command
+#             cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
+#             self.status.desOrientAge.startTimer()
+#             statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "cmdMount", "maxIter", "iter"])
+#             self.writeToUsers('i', statusStr, cmd=userCmd)
+#             self.startDevCmd(cmdMoveStr, callFunc=self._moveIter, errFunc=self.failStop)
+#         
+#         if 'move' in self.currDevCmd.cmdStr.lower():
+#             self.startUserCmd(userCmd, doCancel=True, timeLim=5)
+#             self.conn.writeLine('ST')
+#             # send ST, then XQ# Stop, and finally (when finished) send the new move
+#             reactor.callLater(1, self.sendStop, doMove) # wait 1 second then command stop, then status   
+#         else:    
+#             self.startUserCmd(userCmd, doCancel=False, timeLim=5)
+#             if userCmd.isDone:
+#                 # command was rejected, device was busy, return empty handed
+#                 return
+#             elif userCmd.state == userCmd.Ready:
+#                 # command not running, not done, must have been queued because a status is running.
+#                 # add callback to current command
+#                 self.cmdQueue[0].addCallback(doMove)
+#             else:
+#                 doMove()
 
 
-    def cmdReset(self, userCmd):
+    def cmdReset(self):#, userCmd):
         """Reset the Galil to its power-on state. All axes will have to be re-homed. Stop is gentler!
         
         Send 'RS' to the Galil, causing it to reset to power-up state,
@@ -559,11 +610,11 @@ class GalilDevice(TCPDevice):
         send XQ#STOP to make sure it is fully reset,
         then send XQ#STATUS to report current state.
         """
-        self.startUserCmd(userCmd, doCancel=True, timeLim=10)
+        #self.startUserCmd(userCmd, doCancel=True, timeLim=10)
         self.conn.writeLine('RS')
-        reactor.callLater(3, self.sendStop) # wait 3 seconds then command stop, then status
+        reactor.callLater(2, self.sendStop) # wait 3 seconds then command stop, then status
 
-    def cmdStop(self, userCmd):
+    def cmdStop(self):#, userCmd):
         """Stop the Galil.
         
         Send 'ST' to the Galil, causing it to stop all threads,
@@ -571,11 +622,13 @@ class GalilDevice(TCPDevice):
         send XQ#STOP to make sure it is fully reset,
         then send XQ#STATUS to report current state.
         """
-        self.startUserCmd(userCmd, doCancel=True)
+        if not self.currDevCmd.isDone:
+            self._clearDevCmd()
+#        self.startUserCmd(userCmd, doCancel=True)
         self.conn.writeLine('ST')
         reactor.callLater(1, self.sendStop) # wait 1 second then command stop, then status
 
-    def cmdStatus(self, userCmd):
+    def cmdStatus(self):#, userCmd):
         """Return the Galil status to the user.
         
         If the Galil is busy then returns cached data.
@@ -595,20 +648,17 @@ class GalilDevice(TCPDevice):
                 "homing",
                 "axisHomed",
             ])
-            self.writeToUsers("i", statusStr, cmd=userCmd)
-            userCmd.setState(userCmd.Done)
+            self.writeToUsers("i", statusStr, cmd=self.cmdQueue[0])
+            #userCmd.setState(userCmd.Done)
             return
 
-        self.startUserCmd(userCmd, timeLim=5)
+        #self.startUserCmd(userCmd, timeLim=5)
         self.startDevCmd("XQ #STATUS", callFunc = self._statusCallback)
 
-    def cmdParams(self, userCmd):
+    def cmdParams(self):#, userCmd):
         """Show Galil parameters
         """
-        self.startUserCmd(userCmd)
-        if userCmd.isDone:
-            # command was rejected, device was busy, return empty handed
-            return
+        #self.startUserCmd(userCmd)
         self.startDevCmd("XQ #SHOWPAR")
     
     def sendStop(self, callFunc=None):
@@ -641,7 +691,7 @@ class GalilDevice(TCPDevice):
             command termination.
         """
         #print "startDevCmd(cmdStr=%s, timeLimt=%s, callFunc=%s)" % (cmdStr, timeLim, callFunc)
-        #print "self.userCmd=%r" % (self.currUserCmd,)
+        #print "self.userCmd=%r" % (self.cmdQueue[0],)
         if not self.currDevCmd.isDone:
             # this should never happen, but...just in case
             raise RuntimeError("Cannot start new device command: %s , %s is currently running" % (cmdStr, self.currDevCmd,))
@@ -659,58 +709,59 @@ class GalilDevice(TCPDevice):
             devCmd.setState(devCmd.Failed, textMsg=strFromException(e))
             self._clearDevCmd()
     
-    def startUserCmd(self, userCmd, doCancel=False, timeLim=5):
-        """Start a new user command
-        
-        - If a user command is already running then fail the new command or supersede the old one,
-            depending on doCancel
-        - Replace self.currUserCmd with new user command
-        - Set new comamnd's time limit and set its state to running
-        
-        Inputs:
-        - userCmd: new user command
-        - doCancel: if False then reject userCmd if busy;
-            if True then cancel current userCmd and devCmd
-        - timeLim: time limit for userCmd; if None then leave it alone
-        """
-        if doCancel:
-            self._userCmdNextStep = None
-            if not self.currUserCmd.isDone:
-                self.currUserCmd.setState(self.currUserCmd.Cancelled, "Superseded")
-            if not self.queuedUserCmd.isDone:
-                self.queuedUserCmd.setState(self.queuedUserCmd.Cancelled, "Superseded")
-            if not self.currDevCmd.isDone:
-                self.currDevCmd.setState(self.currDevCmd.Cancelled, "Superseded")
-        elif ('status' in self.currDevCmd.cmdStr.lower()) and (not self.currDevCmd.isDone):
-            # if currently running command is a status, queue this userCmd to run 
-            # immediately after status completion
-            # is there currently a command in the queue? if so supercede it and put this 
-            # in it's place
-            if not self.queuedUserCmd.isDone:
-                self.queuedUserCmd.setState(self.queuedUserCmd.Cancelled, "Superseded")
-            self.queuedUserCmd = userCmd
-            return
-        else:
-            if not self.currUserCmd.isDone:
-                userCmd.setState(userCmd.Failed, "Busy running user command %s" % (self.currUserCmd.cmdStr,))
-                return
-            if not self.currDevCmd.isDone:
-                raise RuntimeError("Bug! A device command is running (%s) but a user command is not" % \
-                    (self.currDevCmd.cmdStr,))
-        
-        self.currUserCmd = userCmd
-        if timeLim is not None:
-            userCmd.setTimeLimit(timeLim)
-        userCmd.setState(userCmd.Running)
-        return
+#     def startUserCmd(self, userCmd, doCancel=False, timeLim=5):
+#         """Start a new user command
+#         
+#         - If a user command is already running then fail the new command or supersede the old one,
+#             depending on doCancel
+#         - Replace self.cmdQueue[0] with new user command
+#         - Set new comamnd's time limit and set its state to running
+#         
+#         Inputs:
+#         - userCmd: new user command
+#         - doCancel: if False then reject userCmd if busy;
+#             if True then cancel current userCmd and devCmd
+#         - timeLim: time limit for userCmd; if None then leave it alone
+#         """
+#         if doCancel:
+#             self._userCmdNextStep = None
+#             if not self.cmdQueue[0].isDone:
+#                 self.cmdQueue[0].setState(self.cmdQueue[0].Cancelled, "Superseded")
+#             if not self.queuedUserCmd.isDone:
+#                 self.queuedUserCmd.setState(self.queuedUserCmd.Cancelled, "Superseded")
+#             if not self.currDevCmd.isDone:
+#                 self.currDevCmd.setState(self.currDevCmd.Cancelled, "Superseded")
+#         elif ('status' in self.currDevCmd.cmdStr.lower()) and (not self.currDevCmd.isDone):
+#             # if currently running command is a status, queue this userCmd to run 
+#             # immediately after status completion
+#             # is there currently a command in the queue? if so supercede it and put this 
+#             # in it's place
+#             if not self.queuedUserCmd.isDone:
+#                 self.queuedUserCmd.setState(self.queuedUserCmd.Cancelled, "Superseded")
+#             self.queuedUserCmd = userCmd
+#             return
+#         else:
+#             if not self.cmdQueue[0].isDone:
+#                 userCmd.setState(userCmd.Failed, "Busy running user command %s" % (self.cmdQueue[0].cmdStr,))
+#                 return
+#             if not self.currDevCmd.isDone:
+#                 raise RuntimeError("Bug! A device command is running (%s) but a user command is not" % \
+#                     (self.currDevCmd.cmdStr,))
+#         
+#         self.cmdQueue[0] = userCmd
+#         if timeLim is not None:
+#             userCmd.setTimeLimit(timeLim)
+#         userCmd.setState(userCmd.Running)
+#         return
 
     def _failUserCmd(self):
         """Simply fail the current user command
         """
+        self._clearDevCmd()
         self._userCmdNextStep = None
-        if not self.currUserCmd.isDone:
-            self.currUserCmd.setState(self.currUserCmd.Failed,
-                textMsg="Galil command %s failed" % (self.currUserCmd.cmdStr,))
+        if not self.cmdQueue[0].isDone:
+            self.cmdQueue[0].setState(self.cmdQueue[0].Failed,
+                textMsg="Galil command %s failed" % (self.cmdQueue[0].cmdStr,))
                     
     def _devCmdCallback(self, dumDevCmd=None):
         """Device command callback
@@ -718,7 +769,7 @@ class GalilDevice(TCPDevice):
         startDevCmd always assigns this as the callback, which then calls and clears any user-specified callback.
         """
         #print "_devCmdCallback(); currDevCmd=%r; _userCmdNextStep=%s" % (self.currDevCmd, self._userCmdNextStep)
-        #print "_devCmdCallback(); self.userCmd=%r" % (self.currUserCmd,)
+        #print "_devCmdCallback(); self.userCmd=%r" % (self.cmdQueue[0],)
         if self.currDevCmd.didFail: #includes 'cancelled' state
         #if self.currDevCmd.state == 'failed':
             self._clearDevCmd()
@@ -739,28 +790,28 @@ class GalilDevice(TCPDevice):
             userCmdNextStep()
         else:
             # nothing more to do; user command must be finished!
-            self.currUserCmd.setState(self.currUserCmd.Done)
+            self.cmdQueue[0].setState(self.cmdQueue[0].Done)
             self._clearDevCmd()
-        #print "_devCmdCallback()END; self.userCmd=%r" % (self.currUserCmd,)
+        #print "_devCmdCallback()END; self.userCmd=%r" % (self.cmdQueue[0],)
 
     def _moveIter(self):
         """A move device command ended; decide whether further move iterations are required and act accordingly.
         """
         # check if we got all expected information from Galil...
         if not ('max sec for move' in self.parsedKeyList):
-            self.writeToUsers("w", "Text=\"Move time estimates were not received from move\"", cmd=self.currUserCmd)
+            self.writeToUsers("w", "Text=\"Move time estimates were not received from move\"", cmd=self.cmdQueue[0])
         if not('target position' in self.parsedKeyList):
-            self.writeToUsers("w", "Text=\"Target actuator positions not received from move\"", cmd=self.currUserCmd)
+            self.writeToUsers("w", "Text=\"Target actuator positions not received from move\"", cmd=self.cmdQueue[0])
         if not('final position' in self.parsedKeyList):
             # final actuator positions are needed for subsequent moves...better fail the cmd
-            self.currUserCmd.setState(self.currUserCmd.Failed, textMsg="Final actuator positions not received from move")
+            self.cmdQueue[0].setState(self.cmdQueue[0].Failed, textMsg="Final actuator positions not received from move")
             return
 
         actErr = self.status.cmdMount - self.status.actMount
 
         # error too large to correct?
         if numpy.any(numpy.abs(actErr) > self.mirror.maxCorrList):
-            self.currUserCmd.setState(self.currUserCmd.Failed, "Error too large to correct")
+            self.cmdQueue[0].setState(self.cmdQueue[0].Failed, "Error too large to correct")
             return
 
         # perform another iteration?
@@ -770,9 +821,9 @@ class GalilDevice(TCPDevice):
             self.parsedKeyList = []
             self.status.iter += 1
             self.status.duration.reset() # new timer for new move
-            self.currUserCmd.setTimeLimit(5)
+            self.cmdQueue[0].setTimeLimit(5)
             statusStr = self.status._getKeyValStr(["cmdMount", "iter"])
-            self.writeToUsers("i", statusStr, cmd=self.currUserCmd)
+            self.writeToUsers("i", statusStr, cmd=self.cmdQueue[0])
             # convert from numpy to simple list for command formatting
             mount = [x for x in self.status.cmdMount]
             cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
@@ -783,27 +834,27 @@ class GalilDevice(TCPDevice):
         self._moveEnd()
     
     def _moveEnd(self, *args):
-        """The final move device command ended successfully; clean up and set self.currUserCmd state done.
+        """The final move device command ended successfully; clean up and set self.cmdQueue[0] state done.
 
         Optionally perform any post-move cleanup (such as moving piezos).
-        Finally: set self.currUserCmd state done (or failed, if cleanup failed).
+        Finally: set self.cmdQueue[0] state done (or failed, if cleanup failed).
         
         note: *args for callbackability...
         """
-        #if not self.currUserCmd.isDone:
-        self.currUserCmd.setState(self.currUserCmd.Done)
+        #if not self.cmdQueue[0].isDone:
+        self.cmdQueue[0].setState(self.cmdQueue[0].Done)
 
     def _statusCallback(self):
         """Callback for status command.
         """
         if not ('commanded position' in self.parsedKeyList):
-            self.writeToUsers("w", "Text=\"Desired actuator positions not received\"", cmd=self.currUserCmd)
+            self.writeToUsers("w", "Text=\"Desired actuator positions not received\"", cmd=self.cmdQueue[0])
         if not ('actual position' in self.parsedKeyList):
-            self.writeToUsers("w", "Text=\"Actual actuator positions not received\"", cmd=self.currUserCmd)
+            self.writeToUsers("w", "Text=\"Actual actuator positions not received\"", cmd=self.cmdQueue[0])
         if not ('status word' in self.parsedKeyList):
-            self.writeToUsers("w", "Text=\"Status word not received\"", cmd=self.currUserCmd)
+            self.writeToUsers("w", "Text=\"Status word not received\"", cmd=self.cmdQueue[0])
         if not ('axis homed' in self.parsedKeyList):
-            self.writeToUsers("w", "Text=\"Homed axis info not received\"", cmd=self.currUserCmd)
+            self.writeToUsers("w", "Text=\"Homed axis info not received\"", cmd=self.cmdQueue[0])
 
         # grab cached info that wasn't already sent to the user
         statusStr = self.status._getKeyValStr([
@@ -815,8 +866,8 @@ class GalilDevice(TCPDevice):
             "desOrientAge",
             "homing",
         ])
-        self.writeToUsers("i", statusStr, cmd = self.currUserCmd)
-        self.currUserCmd.setState(self.currUserCmd.Done)
+        self.writeToUsers("i", statusStr, cmd = self.cmdQueue[0])
+        self.cmdQueue[0].setState(self.cmdQueue[0].Done)
 
     def _clearDevCmd(self):
         """Clean up device command and associated data
@@ -909,35 +960,35 @@ class GalilDevice25Sec(GalilDevice):
         if key == 'version of M2-specific additions':
             # this is a special piezo parameter case, and can't be treated using sendParam
             msgStr = '%s=%s' % (('pParSoftwareVersion', data[0])) #data is a single element list
-            self.writeToUsers("i", msgStr, cmd = self.currUserCmd)
+            self.writeToUsers("i", msgStr, cmd = self.cmdQueue[0])
             return
         elif key == 'min':
             msgStr = '%s=%s' % (('pParMinPos', data[0])) #data is a single element list
-            self.writeToUsers("i", msgStr, cmd = self.currUserCmd)
+            self.writeToUsers("i", msgStr, cmd = self.cmdQueue[0])
             return
         elif key == 'max piezo position (microsteps)':
             msgStr = '%s=%s' % (('pParMaxPos', data[0])) #data is a single element list
-            self.writeToUsers("i", msgStr, cmd = self.currUserCmd)
+            self.writeToUsers("i", msgStr, cmd = self.cmdQueue[0])
             return
         elif key == 'number of steps of piezo position':
             msgStr = '%s=%s' % (('pParNSteps', data[0])) #data is a single element list
-            self.writeToUsers("i", msgStr, cmd = self.currUserCmd)
+            self.writeToUsers("i", msgStr, cmd = self.cmdQueue[0])
             return
         elif key == 'resolution (microsteps/piezo ctrl bit)':
             msgStr = '%s=%s' % (('pParResolution', data[0])) #data is a single element list
-            self.writeToUsers("i", msgStr, cmd = self.currUserCmd)
+            self.writeToUsers("i", msgStr, cmd = self.cmdQueue[0])
             return
         # look for piezo-specific status
         elif key == 'piezo corrections (microsteps)':
             self.status.piezoCorr = [float(num) for num in data]
             updateStr = self.status._getKeyValStr(["piezoCorr"])
             outStr = self.formatAsKeyValStr("piezoStatusWord", data)
-            self.writeToUsers("i", updateStr, cmd=self.currUserCmd)
+            self.writeToUsers("i", updateStr, cmd=self.cmdQueue[0])
             return
         elif key == 'piezo status word':
             self.status.piezoStatus = int(data[0])
             updateStr = self.status._getKeyValStr(["piezoStatus"])
-            self.writeToUsers("i", updateStr, cmd=self.currUserCmd)
+            self.writeToUsers("i", updateStr, cmd=self.cmdQueue[0])
             return
         else:
             # not piezo-related, try classical approach
@@ -973,16 +1024,16 @@ class GalilDevice25Sec(GalilDevice):
             return
 
         if not('commanded position' in self.parsedKeyList):
-            self.writeToUsers("w", "Text=\"Commanded actuator positions not received from piezo move\"", cmd=self.currUserCmd)
+            self.writeToUsers("w", "Text=\"Commanded actuator positions not received from piezo move\"", cmd=self.cmdQueue[0])
         if not('actual position' in self.parsedKeyList):
-            self.writeToUsers("w", "Text=\"Actual actuator positions not received from piezo move\"", cmd=self.currUserCmd)
+            self.writeToUsers("w", "Text=\"Actual actuator positions not received from piezo move\"", cmd=self.cmdQueue[0])
         if not('status word' in self.parsedKeyList):
-            self.writeToUsers("w", "Text=\"Status word not received from piezo move\"", cmd=self.currUserCmd)
+            self.writeToUsers("w", "Text=\"Status word not received from piezo move\"", cmd=self.cmdQueue[0])
         if not('piezo status word' in self.parsedKeyList):
-            self.writeToUsers("w", "Text=\"Piezo status word not received from piezo move\"", cmd=self.currUserCmd)
+            self.writeToUsers("w", "Text=\"Piezo status word not received from piezo move\"", cmd=self.cmdQueue[0])
         if not('piezo corrections (microsteps)' in self.parsedKeyList):
-            self.writeToUsers("w", "Text=\"Piezo corrections not received from piezo move\"", cmd=self.currUserCmd)
+            self.writeToUsers("w", "Text=\"Piezo corrections not received from piezo move\"", cmd=self.cmdQueue[0])
         if self.currDevCmd.didFail:
-            self.currUserCmd.setState(self.currUserCmd.Failed, "Piezo correction failed: %s" % (self.currDevCmd._textMsg,))
+            self.cmdQueue[0].setState(self.cmdQueue[0].Failed, "Piezo correction failed: %s" % (self.currDevCmd._textMsg,))
         else:
-            self.currUserCmd.setState(self.currUserCmd.Done)
+            self.cmdQueue[0].setState(self.cmdQueue[0].Done)
