@@ -61,7 +61,8 @@ class MirrorCtrl(Actor):
         self.cmdQueue.addRule("move", "supersedes", ["move", "status", "params"]) # move overwrites and earlier move
         self.cmdQueue.addRule("home", "supersedes", ["status", "params"])
         self.cmdQueue.addRule("status", "waitsfor", ["move", "home", "params"]) # status will be queued behind these
-        self.cmdQueue.addInterrupt(self.interruptGalil) # this safely interrupts the galil. 
+        self.cmdQueue.addRule("params", "waitsfor", ["move", "home", "status"])
+        #self.cmdQueue.addInterrupt(self.interruptGalil) # this safely interrupts the galil. 
 
     def logMsg(self, msgStr):
         """Write a message string to the log.  
@@ -159,7 +160,7 @@ class MirrorCtrl(Actor):
         else:
             # if status was queued or cancelled (not running), send 
             # a cached status
-            if not cmd.state == cmd.Ready:
+            if not cmd.isActive:
                 self.dev.galilDevice.cmdCachedStatus(cmd)
         return True
         
@@ -181,6 +182,7 @@ class MirrorCtrl(Actor):
     def cmd_stop(self, cmd):
         """Abort any executing Galil command, put Galil in known state
         """
+        
         if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
@@ -190,7 +192,7 @@ class MirrorCtrl(Actor):
                 self.dev.galilDevice.cmdStop,
             )
         except Exception, e:
-            raise CommandError(str(e))        
+            raise CommandError(str(e))     
         return True
     
     def cmd_reset(self, cmd):
@@ -208,19 +210,21 @@ class MirrorCtrl(Actor):
             raise CommandError(str(e))        
         return True
     
-    def interruptGalil(self, interruptingCmd, interruptedCmd):
-        def cancellit(cmd=None): 
-            # incase of callback   
-            print 'cancelling from outside'
-            interruptedCmd.setState(interruptedCmd.Cancelled, '%s cancelled whilst running by the higher priority command: %s' % (interruptedCmd.cmdVerb, interruptingCmd.cmdVerb,))        
-        if interruptedCmd.cmdVerb.lower() == interruptingCmd.cmdVerb.lower() == 'move':
-            # run stop first
-            print 'trying to send stop before another move!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-            self.dev.galilDevice.sendStop(callFunc=cancellit)
-        else:
-            # just set done (stop or reset are doing the interrupting
-            cancellit()
-        
+#     def interruptGalil(self, interruptingCmd, interruptedCmd):
+# #         def cancellit(cmd=None): 
+# #             # incase of callback   
+# #             interruptedCmd.setState(interruptedCmd.Cancelling, '%s cancelling whilst running by the higher priority command: %s' % (interruptedCmd.cmdVerb, interruptingCmd.cmdVerb,))        
+# #         if interruptedCmd.cmdVerb.lower() == interruptingCmd.cmdVerb.lower() == 'move':
+# #             # run stop first
+# #             print 'trying to send stop before another move'
+# #             self.dev.galilDevice.sendStop(callFunc=cancellit)
+# #         else:
+# #             # just set done (stop or reset are doing the interrupting
+# #             cancellit()
+#         
+#         print interruptingCmd.cmdStr, 'intruppting: ', interruptedCmd.cmdStr
+#         interruptedCmd.setState(interruptedCmd.Cancelling, '%s cancelling whilst running by the higher priority command: %s' % (interruptedCmd.cmdVerb, interruptingCmd.cmdVerb,))        
+  
 def runMirrorCtrl(device, userPort):
     """Start up a Galil actor
     

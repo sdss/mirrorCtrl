@@ -457,7 +457,8 @@ class GenericTests(MirrorCtrlTestBase):
         return dBoth
 
     def testCmdQueueHome(self):
-        """send a status then a home, they should collide and both finish
+        """send a status then a home, 
+        home should supersede status.
         """
         d1 = Deferred()
         d2 = Deferred()
@@ -486,7 +487,7 @@ class GenericTests(MirrorCtrlTestBase):
             """Check results after cmdVar is done
             """
             self.assertFalse(cmdHome.didFail)
-            self.assertFalse(cmdStatus.didFail)     
+            self.assertTrue(cmdStatus.didFail)     
             
         dBoth.addCallback(checkResults)    
         self.dispatcher.executeCmd(cmdStatus)    
@@ -495,7 +496,7 @@ class GenericTests(MirrorCtrlTestBase):
 
     def testDoubleQueueMoveMove(self):
         """send status, move, move.
-        status and 2nd move should finish, 1st move should be superseded
+        2nd move should finish, 1st move and status should be superseded
         """
         d1 = Deferred()
         d2 = Deferred()
@@ -535,7 +536,7 @@ class GenericTests(MirrorCtrlTestBase):
             """Check results after cmdVar is done
             """
             self.assertTrue(cmdMove1.didFail)
-            self.assertFalse(cmdStatus.didFail)
+            self.assertTrue(cmdStatus.didFail)
             self.assertFalse(cmdMove2.didFail)     
             
         dAll.addCallback(checkResults)    
@@ -545,8 +546,8 @@ class GenericTests(MirrorCtrlTestBase):
         return dAll
 
     def testDoubleQueueMoveHome(self):
-        """send status, move, move.
-        status and 2nd move should finish, 1st move should be superseded
+        """send status, move, home.
+        move should finish, home should be rejected, and status should be superseded
         """
         d1 = Deferred()
         d2 = Deferred()
@@ -585,9 +586,9 @@ class GenericTests(MirrorCtrlTestBase):
         def checkResults(cb):
             """Check results after cmdVar is done
             """
-            self.assertTrue(cmdMove.didFail)
-            self.assertFalse(cmdStatus.didFail)
-            self.assertFalse(cmdHome.didFail)     
+            self.assertFalse(cmdMove.didFail)
+            self.assertTrue(cmdStatus.didFail)
+            self.assertTrue(cmdHome.didFail)     
             
         dAll.addCallback(checkResults)    
         self.dispatcher.executeCmd(cmdStatus)    
@@ -596,8 +597,8 @@ class GenericTests(MirrorCtrlTestBase):
         return dAll
 
     def testDoubleQueueHomeMove(self):
-        """send status, move, move.
-        status and 2nd move should finish, 1st move should be superseded
+        """send status, home, move.
+        home should finish, move rejected, and status should be superseded
         """
         d1 = Deferred()
         d2 = Deferred()
@@ -636,9 +637,9 @@ class GenericTests(MirrorCtrlTestBase):
         def checkResults(cb):
             """Check results after cmdVar is done
             """
-            self.assertTrue(cmdHome.didFail)
-            self.assertFalse(cmdStatus.didFail)
-            self.assertFalse(cmdMove.didFail)     
+            self.assertFalse(cmdHome.didFail)
+            self.assertTrue(cmdStatus.didFail)
+            self.assertTrue(cmdMove.didFail)     
             
         dAll.addCallback(checkResults)    
         self.dispatcher.executeCmd(cmdStatus)    
@@ -698,7 +699,8 @@ class GenericTests(MirrorCtrlTestBase):
         return dAll
     
     def testCmdQueueMove(self):
-        """send a staus then a move, they should collide and both finish
+        """send a staus then a move.
+        move should supersede status
         """
         d1 = Deferred()
         d2 = Deferred()
@@ -727,7 +729,7 @@ class GenericTests(MirrorCtrlTestBase):
             """Check results after cmdVar is done
             """
             self.assertFalse(cmdMove.didFail)
-            self.assertFalse(cmdStatus.didFail)     
+            self.assertTrue(cmdStatus.didFail)     
             
         dBoth.addCallback(checkResults)    
         self.dispatcher.executeCmd(cmdStatus)    
