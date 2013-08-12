@@ -56,13 +56,34 @@ class MirrorCtrl(Actor):
             name = name,
         )
         self.cmdQueue = CommandQueue()
-        self.cmdQueue.addRule("stop", "supersedes", ["move", "status", "params", "home"])
-        self.cmdQueue.addRule("reset", "supersedes", ["move", "status", "params", "home"]) # everything
-        self.cmdQueue.addRule("move", "supersedes", ["move", "status", "params"]) # move overwrites and earlier move
-        self.cmdQueue.addRule("home", "supersedes", ["status", "params"])
-        self.cmdQueue.addRule("status", "waitsfor", ["move", "home", "params"]) # status will be queued behind these
-        self.cmdQueue.addRule("params", "waitsfor", ["move", "home", "status"])
-        #self.cmdQueue.addInterrupt(self.interruptGalil) # this safely interrupts the galil. 
+        self.cmdQueue.addRule(
+            "stop", 
+            cancelRunning = ("move", "status", "params", "home"),
+            rejectMeBehind = ("reset", "stop"),
+        )
+        self.cmdQueue.addRule(
+            "reset", 
+            cancelRunning = ("move", "status", "params", "home"),
+            rejectMeBehind = ("reset", "stop",),
+        )            
+        self.cmdQueue.addRule(
+            "move", 
+            cancelRunning = ("move", "status", "params"),
+            rejectMeBehind = ("home", "reset", "stop"),
+        )
+        self.cmdQueue.addRule(
+            "home", 
+            cancelRunning = ("status", "params"),
+            rejectMeBehind = ("move", "home", "reset", "stop"),
+        )            
+        self.cmdQueue.addRule(
+            "status", 
+            cancelQueued = ("status",) # maybe rejectMeBehind?
+        )
+        self.cmdQueue.addRule(
+            "params", 
+            cancelQueued = ("params",), # maybe rejectMeBehind? Should
+        )        
 
     def logMsg(self, msgStr):
         """Write a message string to the log.  
