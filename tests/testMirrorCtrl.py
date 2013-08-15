@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """http://twistedmatrix.com/documents/current/core/howto/trial.html
 """
 from twisted.trial import unittest
