@@ -3,7 +3,7 @@
 
 \section mirrorCtrl_introduction Introduction
 
-This package provides high-level mirror control as described in the <a href="mirrorControllerActor.html">Mirror Controller Actor<a> manual. This implementation interfaces to the APO <a href="http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html">Galil mirror controllers</a>.
+This package provides high-level mirror control as described in the <a href="mirrorControllerActor.html">Mirror Controller Actor</a> manual. This implementation interfaces to the APO <a href="http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html">Galil mirror controllers</a>.
 
 This package adds the following capabilities to the Galil mirror controllers:
 * Command mirror orientation (piston, tilt and translation) to the extent supported by the actuators. (The Galil only supports commanding individual actuators.)
@@ -19,7 +19,7 @@ The following packages are optional:
 * sconsUtils (from LSST): this package is pure python, so it need not be built or installed, but if you build it with scons then documentation is built and unit tests are run,
 
 The simplest way to build this package is:
-* Install the minimal LSST software stack <https://dev.lsstcorp.org/trac/wiki/Installing>, which includes eups and sconsUtils.
+* <a href="https://dev.lsstcorp.org/trac/wiki/Installing">Install the minimal LSST software stack</a>, which includes eups and sconsUtils.
 * Install twistedActor
 * Use "eups declare -r ." to declare this package
 * Use "scons" to build it
