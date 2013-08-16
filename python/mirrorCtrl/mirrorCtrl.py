@@ -7,7 +7,7 @@ import math
 import os
 import numpy
 
-from twistedActor import Actor, CommandError, UserCmd, BaseCmd, writeToLog, startGlobalLogging, CommandQueue, QueuedCommand
+from twistedActor import Actor, CommandError, UserCmd, BaseCmd, writeToLog, startGlobalLogging, CommandQueue#, QueuedCommand
 
 Version = 0.1
 
@@ -57,7 +57,22 @@ class MirrorCtrl(Actor):
         )
         def killFunc(killThisCmd):
             killThisCmd.setState(killThisCmd.Cancelling)
-        self.cmdQueue = CommandQueue(killFunc)       
+        self.cmdQueue = CommandQueue(
+            killFunc=killFunc,
+            priorityDict = {
+                "stop" : CommandQueue.Immediate,
+                "reset" : CommandQueue.Immediate,
+                "move" : 3,
+                "home" : 3,
+                "status" : 1,
+                "params" : 1,
+            }
+        )
+        self.cmdQueue.addRule("move", "move", CommandQueue.KillRunning)
+        self.cmdQueue.addRule("move", "home", CommandQueue.CancelNew)  
+        self.cmdQueue.addRule("home", "move", CommandQueue.CancelNew)
+        self.cmdQueue.addRule("status", "status", CommandQueue.CancelNew) 
+        self.cmdQueue.addRule("params", "params", CommandQueue.CancelNew)    
 
     def logMsg(self, msgStr):
         """Write a message string to the log.  
@@ -104,14 +119,14 @@ class MirrorCtrl(Actor):
             raise CommandError("Device Not Connected")
         try:
             #self.dev.galilDevice.cmdMove(cmdOrient, userCmd=cmd)
-            qCmd = QueuedCommand(
-                cmd = cmd,
-                priority = 3,
-                callFunc = lambda: self.dev.galilDevice.cmdMove(cmdOrient, userCmd=cmd),
-            )
-            qCmd.addCollideRule("move", qCmd.KillOther)
-            qCmd.addCollideRule("home", qCmd.CancelMe)
-            self.cmdQueue.addCmd(qCmd)
+#             qCmd = QueuedCommand(
+#                 cmd = cmd,
+#                 priority = 3,
+#                 callFunc = lambda: self.dev.galilDevice.cmdMove(cmdOrient, userCmd=cmd),
+#             )
+#             qCmd.addCollideRule("move", qCmd.KillOther)
+#             qCmd.addCollideRule("home", qCmd.CancelMe)
+            self.cmdQueue.addCmd(cmd, lambda: self.dev.galilDevice.cmdMove(cmdOrient, userCmd=cmd))
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -129,13 +144,13 @@ class MirrorCtrl(Actor):
             raise CommandError("Device Not Connected")
         try:
             #self.dev.galilDevice.cmdHome(axisList, userCmd=cmd)
-            qCmd = QueuedCommand(
-                cmd = cmd,
-                priority = 3,
-                callFunc = lambda: self.dev.galilDevice.cmdHome(axisList, userCmd=cmd),
-            )
-            qCmd.addCollideRule("move", qCmd.CancelMe)
-            self.cmdQueue.addCmd(qCmd)
+#             qCmd = QueuedCommand(
+#                 cmd = cmd,
+#                 priority = 3,
+#                 callFunc = lambda: self.dev.galilDevice.cmdHome(axisList, userCmd=cmd),
+#             )
+#             qCmd.addCollideRule("move", qCmd.CancelMe)
+            self.cmdQueue.addCmd(cmd, lambda: self.dev.galilDevice.cmdHome(axisList, userCmd=cmd))
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -150,13 +165,13 @@ class MirrorCtrl(Actor):
         try:
             # additional status from Galil
             #self.dev.galilDevice.cmdStatus(cmd)
-            qCmd = QueuedCommand(
-                cmd = cmd,
-                priority = 1,
-                callFunc = lambda: self.dev.galilDevice.cmdStatus(userCmd=cmd),
-            )
-            qCmd.addCollideRule("status", qCmd.CancelMe) # no point in stacking up status cmds
-            self.cmdQueue.addCmd(qCmd)
+#             qCmd = QueuedCommand(
+#                 cmd = cmd,
+#                 priority = 1,
+#                 callFunc = lambda: self.dev.galilDevice.cmdStatus(userCmd=cmd),
+#             )
+#             qCmd.addCollideRule("status", qCmd.CancelMe) # no point in stacking up status cmds
+            self.cmdQueue.addCmd(cmd, lambda: self.dev.galilDevice.cmdStatus(userCmd=cmd))
         except Exception, e:
             raise CommandError(str(e))
         else:
@@ -173,13 +188,13 @@ class MirrorCtrl(Actor):
             raise CommandError("Device Not Connected")
         try:
             #self.dev.galilDevice.cmdParams(cmd)
-            qCmd = QueuedCommand(
-                cmd = cmd,
-                priority = 1,
-                callFunc = lambda: self.dev.galilDevice.cmdParams(userCmd=cmd)
-            )
-            qCmd.addCollideRule("showparams", qCmd.CancelMe) # don't stack up params
-            self.cmdQueue.addCmd(qCmd)
+#             qCmd = QueuedCommand(
+#                 cmd = cmd,
+#                 priority = 1,
+#                 callFunc = lambda: self.dev.galilDevice.cmdParams(userCmd=cmd)
+#             )
+#             qCmd.addCollideRule("showparams", qCmd.CancelMe) # don't stack up params
+            self.cmdQueue.addCmd(cmd, lambda: self.dev.galilDevice.cmdParams(userCmd=cmd))
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -192,12 +207,12 @@ class MirrorCtrl(Actor):
             raise CommandError("Device Not Connected")
         try:
             #self.dev.galilDevice.cmdStop(cmd)
-            qCmd = QueuedCommand(
-                cmd = cmd,
-                priority = self.cmdQueue.Immediate,
-                callFunc = lambda: self.dev.galilDevice.cmdStop(userCmd=cmd),
-            )
-            self.cmdQueue.addCmd(qCmd)
+#             qCmd = QueuedCommand(
+#                 cmd = cmd,
+#                 priority = self.cmdQueue.Immediate,
+#                 callFunc = lambda: self.dev.galilDevice.cmdStop(userCmd=cmd),
+#             )
+            self.cmdQueue.addCmd(cmd, lambda: self.dev.galilDevice.cmdStop(userCmd=cmd))
         except Exception, e:
             raise CommandError(str(e))     
         return True
@@ -209,12 +224,12 @@ class MirrorCtrl(Actor):
             raise CommandError("Device Not Connected")
         try:
             #self.dev.galilDevice.cmdReset(cmd)
-            qCmd = QueuedCommand(
-                cmd = cmd,
-                priority = self.cmdQueue.Immediate,
-                callFunc = lambda: self.dev.galilDevice.cmdReset(userCmd=cmd),
-            )
-            self.cmdQueue.addCmd(qCmd)
+#             qCmd = QueuedCommand(
+#                 cmd = cmd,
+#                 priority = self.cmdQueue.Immediate,
+#                 callFunc = lambda: self.dev.galilDevice.cmdReset(userCmd=cmd),
+#             )
+            self.cmdQueue.addCmd(cmd, lambda: self.dev.galilDevice.cmdReset(userCmd=cmd))
         except Exception, e:
             raise CommandError(str(e))        
         return True
