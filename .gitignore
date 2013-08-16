@@ -2,5 +2,7 @@
 *.log
 _trial_temp
 .scon*
+doc/html
+doc/mirrorCtrl.tag
 tests/.tests
 ups/mirrorCtrl.cfgc
