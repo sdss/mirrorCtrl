@@ -312,7 +312,7 @@ class GalilDevice(TCPDevice):
             updateStr = self.status._getKeyValStr(["encMount"])
             self.writeToUsers("i", updateStr, cmd=self.currUserCmd)
             # DesOrient may be nans
-            if not numpy.isfinite(sum(self.status.encMount)):
+            if not numpy.isfinite(sum(self.status.encMount[0:self.nAct])):
                 # encoder positons contain NaN(s)
                 # Further computations cannot be done
                 self.status.orient = [numpy.nan]*6
@@ -320,7 +320,7 @@ class GalilDevice(TCPDevice):
             else:    
                 # initial guess is desOrient, unless nothing is there, in which case start from zero
                 initOrient = self.status.desOrient if numpy.isfinite(sum(self.status.desOrient)) else numpy.zeros(6)
-                orient = self.mirror.orientFromEncoderMount(self.status.encMount, initOrient)
+                orient = self.mirror.orientFromEncoderMount(self.status.encMount[0:self.nAct], initOrient)
                 actMount = self.mirror.actuatorMountFromOrient(orient)
                 actMount = numpy.asarray(actMount, dtype=float)
                 # add these new values to status
