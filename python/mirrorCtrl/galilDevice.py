@@ -756,7 +756,7 @@ class GalilDevice(TCPDevice):
             self.currUserCmd.setState(self.currUserCmd.Failed, textMsg="Final actuator positions not received from move")
             return
 
-        actErr = self.status.cmdMount - self.status.actMount
+        actErr = self.status.cmdMount[0:self.nAct] - self.status.actMount[0:self.nAct]
 
         # error too large to correct?
         if numpy.any(numpy.abs(actErr) > self.mirror.maxCorrList):
