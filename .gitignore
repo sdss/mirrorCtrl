@@ -1,3 +1,6 @@
 *.pyc
 *.log
 _trial_temp
+.scon*
+tests/.tests
+ups/mirrorCtrl.cfgc

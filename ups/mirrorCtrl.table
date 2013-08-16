@@ -1,6 +1,7 @@
 setupRequired("numpy")
 setupRequired("RO")
 setupRequired("twistedActor")
+setupOptional("scipy") # required but may be installed in python
 setupOptional("matplotlib")
 
 envAppend(PATH, ${PRODUCT_DIR}/bin)

@@ -7,14 +7,14 @@ http://www.apo.nmsu.edu/Telescopes/TCC/MessageKeywords.html
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>
 <head>
-	<title>Galil Actor</title>
+	<title>Mirror Controller Actor</title>
 </head>
 <body>
-<h1>Galil Actor</h1>
+<h1>Mirror Controller Actor</h1>
 
 <ul>
     <li><a href="#Overview">Overview</a>
-    <li><a href="#GalCommands">Galil Commands</a>
+    <li><a href="#Commands">Commands</a>
     <ul>
         <li><a href="#cmd_move">move <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a>
         <li><a href="#cmd_home">home <i>[A [,B [,C [,D [,E [,F]]]]]]</i></a>
@@ -76,13 +76,11 @@ http://www.apo.nmsu.edu/Telescopes/TCC/MessageKeywords.html
 
 <h2><a name="Overview">Overview</a></h2>
 
-<p>Galil Actor is based on TclActor. This actor sends commands to and parses replies from a
-Galil motion controller. The Galil motion controller interfaces with the actuators and encoders 
-responsible for moving the mirror.
+<p>Mirror Controller Actor provides high-level mirror control. It takes mirror piston, tilt and translation and commands actuators and reads encoders to implement the motion. This package interfaces to a <a href="http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html">Galil mirror controllers</a> (the Galil controls the actuator motors and encoders and mirrorCtrl provides a high-level interface).
 
-<p>See <a href="http://www.apo.nmsu.edu/35m_operations/MC2/TclActorInternals.html">TclActor Internals</a> for information about writing code based on TclActor.
+<p>In the future it is possible that there will be other implementations of this mirror controller interface that control the motors in some other fashion.
 
-<h2><a name="GalCommands">Galil Commands</a></h2>
+<h2><a name="Commands">Commands</a></h2>
 
 <h3><a name="cmd_move">move <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a></h3>
 
