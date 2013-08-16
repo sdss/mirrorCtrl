@@ -127,7 +127,7 @@ class MirrorCtrl(Actor):
         numpy.array([Piston (mm), Tilt X (rad), Tilt Y (rad), Trans X (rad), Trans Y (rad)])
         """
         orientation = numpy.hstack((orientation, numpy.zeros(5-len(orientation))))
-        return orientation / ConvertOrient
+        return orientation * ConvertOrient
         
     
     def cmd_move(self, cmd):
