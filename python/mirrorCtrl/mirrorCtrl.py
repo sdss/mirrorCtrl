@@ -68,11 +68,31 @@ class MirrorCtrl(Actor):
                 "params" : 1,
             }
         )
-        self.cmdQueue.addRule("move", "move", CommandQueue.KillRunning)
-        self.cmdQueue.addRule("move", "home", CommandQueue.CancelNew)  
-        self.cmdQueue.addRule("home", "move", CommandQueue.CancelNew)
-        self.cmdQueue.addRule("status", "status", CommandQueue.CancelNew) 
-        self.cmdQueue.addRule("params", "params", CommandQueue.CancelNew)    
+        self.cmdQueue.addRule(
+            action = CommandQueue.KillRunning,
+            newCmds = ['move'],
+            queuedCmds = ['move'],
+        )
+        self.cmdQueue.addRule(
+            action = CommandQueue.CancelNew,
+            newCmds = ['move'],
+            queuedCmds = ['home'],
+        )
+        self.cmdQueue.addRule(
+            action = CommandQueue.CancelNew,
+            newCmds = ['home'],
+            queuedCmds = ['move'],
+        )
+        self.cmdQueue.addRule(
+            action = CommandQueue.CancelNew,
+            newCmds = ['status'],
+            queuedCmds = ['status'],
+        )        
+        self.cmdQueue.addRule(
+            action = CommandQueue.CancelNew,
+            newCmds = ['params'],
+            queuedCmds = ['params'],
+        )  
 
     def logMsg(self, msgStr):
         """Write a message string to the log.  
