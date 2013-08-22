@@ -7,7 +7,7 @@ import math
 import os
 import numpy
 
-from twistedActor import Actor, CommandError, UserCmd, BaseCmd, writeToLog, startGlobalLogging
+from twistedActor import Actor, CommandError, UserCmd, BaseCmd, writeToLog, startGlobalLogging, CommandQueue#, QueuedCommand
 
 Version = 0.1
 
@@ -55,59 +55,47 @@ class MirrorCtrl(Actor):
             version = Version,
             name = name,
         )
-# removed initialConn, was seeing errors (when, for example, not everything was up and
-#                        listening)    
-#     def initialConn(self):
-#         """Perform initial connections.  Same as Actor Base Class method, but with the
-#         addition of commanding 'stop', then 'showparams' to put the Galil in a known 
-#         state upon connection.
-#         """
-#         def doPars(cmd):
-#             """2nd startup callback
-#             """
-#             if not cmd.isDone:
-#                 return
-#             dummyCmd3 = UserCmd(cmdStr='showparams', callFunc=None, timeLim=10)
-#             self.parseAndDispatchCmd(cmd=dummyCmd3)
-#                         
-#         def doStatus(cmd):
-#             """1st startup callback
-#             """
-#             if not cmd.isDone:
-#                 return
-#             dummyCmd2 = UserCmd(cmdStr='stop', callFunc=doPars, timeLim=10)
-#             self.parseAndDispatchCmd(cmd=dummyCmd2)                
-#         # note, must use UserCmd
-#         dummyCmd1 =  UserCmd(cmdStr='conndev', callFunc=doStatus, timeLim=10)
-#         self.parseAndDispatchCmd(cmd=dummyCmd1)
-#         
-#         # do we want to query the galil for state immediately after connection?
-#         # or wait to make sure someone's listening (the mirror device?)
-#         
-# #         def doParams(cmd, isOK):
-# #             if isOK:
-# #                 cmdStr='showparams'
-# #                 paramCmd = UserCmd(cmdStr=cmdStr)
-# #                 paramCmd.timeLimit = 10
-# #                 self.parseAndDispatchCmd(paramCmd)
-# #         def doStatus(cmd, isOK):
-# #             if isOK:
-# #                 cmdStr = 'stop'
-# #                 stopCmd = UserCmd(cmdStr=cmdStr, callFunc=doParams)
-# #                 stopCmd.timeLimit = 10
-# #                 self.parseAndDispatchCmd(stopCmd)
-# #                 
-# # 
-# #         cmdStr = 'connDev'
-# #         connCmd = UserCmd(cmdStr='connDev', callFunc=doStatus)
-# #         connCmd.timeLimit = 10
-# #         self.parseAndDispatchCmd(connCmd)
-#         
-#         #get device state            
-# #         stopCmd = UserCmd(callFunc=doParams)
-# #         stopCmd.timeLimit = 10 # give it 10 seconds before timeout
-# #        self.cmd_stop(stopCmd) # put Galil in known state   
-# 
+        def killFunc(killThisCmd):
+            killThisCmd.setState(killThisCmd.Cancelling)
+            # the galil device is listening for the cancelling state
+            # and will take charge of fully canceling the command
+            # after any necessary cleanup has happened.
+        self.cmdQueue = CommandQueue(
+            killFunc=killFunc,
+            priorityDict = {
+                "stop" : CommandQueue.Immediate,
+                "reset" : CommandQueue.Immediate,
+                "move" : 3,
+                "home" : 3,
+                "status" : 1,
+                "params" : 1,
+            }
+        )
+        self.cmdQueue.addRule(
+            action = CommandQueue.KillRunning,
+            newCmds = ['move'],
+            queuedCmds = ['move'],
+        )
+        self.cmdQueue.addRule(
+            action = CommandQueue.CancelNew,
+            newCmds = ['move'],
+            queuedCmds = ['home'],
+        )
+        self.cmdQueue.addRule(
+            action = CommandQueue.CancelNew,
+            newCmds = ['home'],
+            queuedCmds = ['move'],
+        )
+        self.cmdQueue.addRule(
+            action = CommandQueue.CancelNew,
+            newCmds = ['status'],
+            queuedCmds = ['status'],
+        )        
+        self.cmdQueue.addRule(
+            action = CommandQueue.CancelNew,
+            newCmds = ['params'],
+            queuedCmds = ['params'],
+        )  
 
     def logMsg(self, msgStr):
         """Write a message string to the log.  
@@ -153,7 +141,7 @@ class MirrorCtrl(Actor):
         if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.dev.galilDevice.cmdMove(cmdOrient, userCmd=cmd)
+            self.cmdQueue.addCmd(cmd, lambda: self.dev.galilDevice.cmdMove(cmdOrient, userCmd=cmd))
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -170,7 +158,7 @@ class MirrorCtrl(Actor):
         if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.dev.galilDevice.cmdHome(axisList, userCmd=cmd)
+            self.cmdQueue.addCmd(cmd, lambda: self.dev.galilDevice.cmdHome(axisList, userCmd=cmd))
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -183,10 +171,14 @@ class MirrorCtrl(Actor):
         if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            # additional status from Galil
-            self.dev.galilDevice.cmdStatus(cmd)
+            self.cmdQueue.addCmd(cmd, lambda: self.dev.galilDevice.cmdStatus(userCmd=cmd))
         except Exception, e:
             raise CommandError(str(e))
+        else:
+            # if status was queued or cancelled (not running), send 
+            # a cached status
+            if not cmd.isActive:
+                self.dev.galilDevice.cmdCachedStatus(cmd)
         return True
         
     def cmd_showparams(self, cmd):
@@ -195,7 +187,7 @@ class MirrorCtrl(Actor):
         if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.dev.galilDevice.cmdParams(cmd)
+            self.cmdQueue.addCmd(cmd, lambda: self.dev.galilDevice.cmdParams(userCmd=cmd))
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -203,12 +195,13 @@ class MirrorCtrl(Actor):
     def cmd_stop(self, cmd):
         """Abort any executing Galil command, put Galil in known state
         """
+        
         if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.dev.galilDevice.cmdStop(cmd)
+            self.cmdQueue.addCmd(cmd, lambda: self.dev.galilDevice.cmdStop(userCmd=cmd))
         except Exception, e:
-            raise CommandError(str(e))        
+            raise CommandError(str(e))     
         return True
     
     def cmd_reset(self, cmd):
@@ -217,11 +210,12 @@ class MirrorCtrl(Actor):
         if not self.dev.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.dev.galilDevice.cmdReset(cmd)
+            self.cmdQueue.addCmd(cmd, lambda: self.dev.galilDevice.cmdReset(userCmd=cmd))
         except Exception, e:
             raise CommandError(str(e))        
         return True
-        
+          
+  
 def runMirrorCtrl(device, userPort):
     """Start up a Galil actor
     
