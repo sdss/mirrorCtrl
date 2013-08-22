@@ -459,7 +459,7 @@ class GenericTests(MirrorCtrlTestBase):
 
     def testCmdQueueHome(self):
         """send a status then a home, 
-        home should supersede status.
+        home should finish after status.
         """
         d1 = Deferred()
         d2 = Deferred()
@@ -488,7 +488,7 @@ class GenericTests(MirrorCtrlTestBase):
             """Check results after cmdVar is done
             """
             self.assertFalse(cmdHome.didFail)
-            self.assertTrue(cmdStatus.didFail)     
+            self.assertFalse(cmdStatus.didFail)     
             
         dBoth.addCallback(checkResults)    
         self.dispatcher.executeCmd(cmdStatus)    
@@ -497,7 +497,7 @@ class GenericTests(MirrorCtrlTestBase):
 
     def testDoubleQueueMoveMove(self):
         """send status, move, move.
-        2nd move should finish, 1st move and status should be superseded
+        2nd move should finish, 1st move and status should finish
         """
         d1 = Deferred()
         d2 = Deferred()
@@ -537,7 +537,7 @@ class GenericTests(MirrorCtrlTestBase):
             """Check results after cmdVar is done
             """
             self.assertTrue(cmdMove1.didFail)
-            self.assertTrue(cmdStatus.didFail)
+            self.assertFalse(cmdStatus.didFail)
             self.assertFalse(cmdMove2.didFail)     
             
         dAll.addCallback(checkResults)    
@@ -548,7 +548,7 @@ class GenericTests(MirrorCtrlTestBase):
 
     def testDoubleQueueMoveHome(self):
         """send status, move, home.
-        move should finish, home should be rejected, and status should be superseded
+        move should finish, home should be rejected, and status should finish
         """
         d1 = Deferred()
         d2 = Deferred()
@@ -588,7 +588,7 @@ class GenericTests(MirrorCtrlTestBase):
             """Check results after cmdVar is done
             """
             self.assertFalse(cmdMove.didFail)
-            self.assertTrue(cmdStatus.didFail)
+            self.assertFalse(cmdStatus.didFail)
             self.assertTrue(cmdHome.didFail)     
             
         dAll.addCallback(checkResults)    
@@ -599,7 +599,7 @@ class GenericTests(MirrorCtrlTestBase):
 
     def testDoubleQueueHomeMove(self):
         """send status, home, move.
-        home should finish, move rejected, and status should be superseded
+        home should finish, move rejected, and status should finish
         """
         d1 = Deferred()
         d2 = Deferred()
@@ -639,7 +639,7 @@ class GenericTests(MirrorCtrlTestBase):
             """Check results after cmdVar is done
             """
             self.assertFalse(cmdHome.didFail)
-            self.assertTrue(cmdStatus.didFail)
+            self.assertFalse(cmdStatus.didFail)
             self.assertTrue(cmdMove.didFail)     
             
         dAll.addCallback(checkResults)    
@@ -701,7 +701,7 @@ class GenericTests(MirrorCtrlTestBase):
     
     def testCmdQueueMove(self):
         """send a staus then a move.
-        move should supersede status
+        move should finish after status
         """
         d1 = Deferred()
         d2 = Deferred()
@@ -730,7 +730,7 @@ class GenericTests(MirrorCtrlTestBase):
             """Check results after cmdVar is done
             """
             self.assertFalse(cmdMove.didFail)
-            self.assertTrue(cmdStatus.didFail)     
+            self.assertFalse(cmdStatus.didFail)     
             
         dBoth.addCallback(checkResults)    
         self.dispatcher.executeCmd(cmdStatus)    
