@@ -111,24 +111,25 @@ class AdjustableLink(BaseLink):
                     when the mirror is at zero orientation
         - minMount: minimum length (steps)
         - maxMount: maximum length (steps)
-        - scale:    actuator scale (mm/step)
+        - scale:    actuator scale (mount units/um)
         - offset:   mount position when mirror is at zero orientation
         """
         BaseLink.__init__(self, isAdjustable=True, basePos=basePos, mirPos=mirPos)
         self.minMount = float(minMount)
         self.maxMount = float(maxMount)
         self.scale = float(scale)
+        self._scale = float(scale) * 1000. # convert scale to mount units/mm
         self.offset = float(offset)
 
     def mountFromPhys(self, phys):
         """Compute mount length (steps) of adjustable element given its physical length (mm)
         """
-        return self.offset + (self.scale * phys)
+        return self.offset + (self._scale * phys)
     
     def physFromMount(self, mount):
         """Compute physical length (mm) of adjustable element given its mount length (steps)
         """
-        return (mount - self.offset) / self.scale
+        return (mount - self.offset) / (self._scale)
     
     def mountInRange(self, mount):
         """Return True if the mount position is in range
