@@ -43,8 +43,10 @@ class FakeGalilProtocol(Protocol):
         
         homed, notHomed = numpy.array([1]*6, dtype=int)[0:self.nAxes], numpy.array([0]*6, dtype=int)[0:self.nAxes]
         self.isHomed = homed if self.factory.wakeUpHomed else notHomed
-        self.cmdPos = numpy.array([0]*6, dtype=int)[0:self.nAxes]
-        self.measPos = numpy.array([0]*6, dtype=int)[0:self.nAxes]
+        #self.cmdPos = numpy.array([0]*6, dtype=int)[0:self.nAxes]
+        self.cmdPos = numpy.array([-117150, -115750, -126700])#  999999999, 999999999], dtype=int) # present from russells tests
+        #self.measPos = numpy.array([0]*6, dtype=int)[0:self.nAxes]
+        self.measPos = numpy.array([129, 1480, -2132])#,  999999999, 999999999])
         self.userNums = numpy.array([MAXINT]*6, dtype=int)[0:self.nAxes]
 
         self.range = numpy.array([3842048]*3 + [190000]*3, dtype=int)[0:self.nAxes]

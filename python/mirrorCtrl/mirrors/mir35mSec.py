@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""This script contains configuration for the 2.5m Secondary mirror, and launches the galil actor.
+"""This script contains configuration for the 3.5m Secondary mirror, and launches the galil actor.
 
 notes: 
     8/12    - Measured encoder and fixed link positions during 2012 shutdown.

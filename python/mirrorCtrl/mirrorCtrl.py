@@ -7,7 +7,7 @@ import math
 import os
 import numpy
 
-from twistedActor import Actor, CommandError, UserCmd, BaseCmd, writeToLog, startGlobalLogging, CommandQueue#, QueuedCommand
+from twistedActor import Actor, CommandError, UserCmd, BaseCmd, writeToLog, startGlobalLogging, CommandQueue
 
 Version = 0.1
 

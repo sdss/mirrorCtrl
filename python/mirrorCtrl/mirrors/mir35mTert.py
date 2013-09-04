@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""This script contains configuration for the 2.5m Primary mirror, and launches the galil actor.
+"""This script contains configuration for the 3.5m Tertiary mirror, and launches the galil actor.
 
 The 3.5m tertiary has a different coordinate system convention:
 +Z points towards secondary
@@ -130,7 +130,8 @@ fixedLinkList = []
 # generate list of actuators, encoders, and fixed links
 for i in range(3):    
     actuatorList.append(
-        mirrorCtrl.AdjBaseActuator(
+        mirrorCtrl.AdjLengthLink(
+        #mirrorCtrl.AdjBaseActuator(
             basePosAct[i, :], mirPosAct[i, :], ActMinMount[i], 
             ActMaxMount[i], ActMountScale[i], ActMountOffset[i]
         )
