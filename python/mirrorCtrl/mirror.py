@@ -192,7 +192,7 @@ class MirrorBase(object):
             raise RuntimeError("Need %s values; got %s" % (len(self.actuatorList), len(mount)))
         return self._orientFromMount(mount, self.actuatorList, initOrient)
     
-    def actuatorMountFromOrient(self, userOrient, return_adjOrient = False):
+    def actuatorMountFromOrient(self, userOrient, return_adjOrient = False, adjustOrient = True):
         """Compute actuator mount lengths from orientation
         
         Inputs:
@@ -203,14 +203,24 @@ class MirrorBase(object):
         - mountList: list of mount coords for actuator/encoders
         - adjOrient: adjusted orient based on mirror fixed links
         """
-        adjOrient = self._fullOrient(userOrient)
-        mountList = self._mountFromOrient(adjOrient, self.actuatorList)
+        if len(userOrient) not in set((0, 1, 3, 5, 6)):
+            raise RuntimeError('Input orientation must be a list of numbers of \n\
+                                length 0, 1, 3, or 5, 6. Actual length %s' % (len(userOrient)))
+
+        # set all non-supplied orientations to 0.
+        orient = numpy.zeros(6, dtype=float)
+        orient[0:len(userOrient)] = userOrient
+        if adjustOrient:
+            orient = self._fullOrient(orient)
+        else:
+            orient = Orientation(*orient)
+        mountList = self._mountFromOrient(orient, self.actuatorList)
         if return_adjOrient == True:
-            return mountList, adjOrient
+            return mountList, orient
         else:
             return mountList
         
-    def encoderMountFromOrient(self, userOrient, return_adjOrient = False):
+    def encoderMountFromOrient(self, userOrient, return_adjOrient = False, adjustOrient = True):
         """Compute actuator mount lengths from orientation
         
         Inputs:
@@ -222,14 +232,24 @@ class MirrorBase(object):
         - mountList: list of mount coords for actuator/encoders
         - adjOrient: adjusted orient based on mirror fixed links
         """
-        adjOrient = self._fullOrient(userOrient)
-        mountList = self._mountFromOrient(adjOrient, self.encoderList)
+        if len(userOrient) not in set((0, 1, 3, 5, 6)):
+            raise RuntimeError('Input orientation must be a list of numbers of \n\
+                                length 0, 1, 3, or 5, 6. Actual length %s' % (len(userOrient)))
+
+        # set all non-supplied orientations to 0.
+        orient = numpy.zeros(6, dtype=float)
+        orient[0:len(userOrient)] = userOrient
+        if adjustOrient:
+            orient = self._fullOrient(orient)
+        else:
+            orient = Orientation(*orient)
+        mountList = self._mountFromOrient(orient, self.encoderList)
         if return_adjOrient == True:
-            return mountList, adjOrient
+            return mountList, orient
         else:
             return mountList
         
-    def _fullOrient(self, userOrient):
+    def _fullOrient(self, orient):
         """Compute fully specified orientation from a partially specified orientation.
         
         Input:
@@ -239,13 +259,6 @@ class MirrorBase(object):
         - orient: the full 6-axis orientation as an Orientation. Axes that cannot be controlled
             are set to their constrained value (which should be nearly 0 for a typical mirror).
         """
-        if len(userOrient) not in set((0, 1, 3, 5, 6)):
-            raise RuntimeError('Input orientation must be a list of numbers of \n\
-                                length 0, 1, 3, or 5, 6. Actual length %s' % (len(userOrient)))
-
-        # set all non-supplied orientations to 0.
-        orient = numpy.zeros(6, dtype=float)
-        orient[0:len(userOrient)] = userOrient
 
         # compute constrained axes of orientation
         if self._fixedAxes:
@@ -371,7 +384,10 @@ class MirrorBase(object):
         # Compute physical errors
         physMult = self._physMult(linkListFull)
         
-        fullInitOrient = self._fullOrient(initOrient)
+        orient = numpy.zeros(6, dtype=float)
+        orient[0:len(initOrient)] = initOrient
+        
+        fullInitOrient = self._fullOrient(orient)
 
         minOut = scipy.optimize.fmin_powell(
             self._minOrientErr,
@@ -552,32 +568,6 @@ class DirectMirror(MirrorBase):
             physList.append(act.physFromMirPos(desMirPos))
         physList = numpy.asarray(physList, dtype=float)
         return physList
-                      
-#     def _physFromOrient(self, orient, linkList):
-#         """Compute desired physical position of actuators or encoders given mirror orientation
-#         
-#         Input:
-#         - orient: mirror orientation (an Orientation)
-#         - linkList: list of actuators or encoders
-# 
-#         Output: 
-#         - physList: physical length of each actuator (mm), measured from the neutral position.
-#                     FixedLengthLink links always return a phys of 0 because they cannot change length.
-#         """
-# 
-# 
-#         # Get rotation matrices and offsets.
-#         rotMat, offsets = self._orient2RotTransMats(orient)
-#         
-#       # list of acutator outputs in physical length (um), with neutral as the zero point.
-#         physList = []   
-#         for act in linkList:
-#             desMirPos = numpy.dot(rotMat, act.mirPos)
-#             desMirPos = desMirPos + offsets
-#             
-#             phys = act.physFromMirPos(desMirPos)
-#             physList.append(phys)
-#         return numpy.asarray(physList, dtype=float)
 
       
 class TipTransMirror(MirrorBase):

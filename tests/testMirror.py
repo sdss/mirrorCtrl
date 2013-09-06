@@ -4,6 +4,8 @@ import unittest
 import numpy
 import math
 import time
+import itertools
+import copy
 
 # This flag determines the initial guess to solve for orietation 
 # If False: start from a noisy (but close) guess to the solution
@@ -26,11 +28,13 @@ RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
 #Define maximum allowable fitOrient error, reusing from mirror.py, not using z rot
 # MaxOrientErr = numpy.array([0.0001, 5e-8, 5e-8, 0.0001, 0.0001])
 MaxOrientErr = numpy.array([.1 * MMPerMicron, .01 * RadPerArcSec, .01 * RadPerArcSec, .1 * MMPerMicron, .1 * MMPerMicron, 1*RadPerDeg])
-MaxMountErr = 0.01
-
+MaxMountErr = 0.02
+MaxMountAdjNoAdjErr = 0.5 # um
 # construct range of orients to test +/- (0-25mm, 0-2 degrees)
-maxDist = 25.0 # mm
-maxTilt = 2.0 * RadPerDeg # radians
+#maxDist = 25.0 # mm
+#maxTilt = 2.0 * RadPerDeg # radians
+maxDist = 50. * MMPerMicron # mm
+maxTilt = 3. * RadPerArcSec # radians
 # set number of orientation 'samples' to test (per axis)
 resolution = 5 # was 21
 
@@ -108,7 +112,53 @@ class MirTests(unittest.TestCase):
         if len(errLog) > 0:
             self._errLogPrint(errLog, linkType)
         self.assertEqual(len(errLog), 0, 'Errors Found and Printed To File')
+
+    def testMountAdj(self):
+        # check that adjusted orientations do not cause a large discrepancy in mount lengths
+        errLog=[]
+        for ind, mir in enumerate(mirList):
+            for orient in orientList:
+                for getMount, links in itertools.izip([mir.actuatorMountFromOrient, mir.encoderMountFromOrient], [mir.actuatorList, mir.encoderList]):
+                    scaleBy = numpy.asarray([link.scale for link in links]) # mount units/um
+                    mountAdj = numpy.asarray(getMount(orient))/scaleBy
+                    mountNoAdj = numpy.asarray(getMount(orient, adjustOrient = False))/scaleBy
+                    mountErr = numpy.abs(mountAdj-mountNoAdj) # in um (scaled)
+                    if True in (mountErr > MaxMountAdjNoAdjErr):
+                        errStr = 'mir %i mount discrepancy! %s (um err), %s (orientation)' % (ind, str(mountErr), str(orient))
+                        errLog.append(errStr)
+        if len(errLog) > 0:
+            self._errLogPrint(errLog, 'adj_vs_noadj')
+        self.assertEqual(len(errLog), 0, 'Errors Found and Printed To File')                          
+
+    def testOverConstraint(self, mirList=mirList):
+        """Simultaneously place a fixed link exactly in place of an adjustable link
+        and command a move.  Choose the first actuator in each mirror.
+        """     
+        orient = [maxDist*0.5, maxTilt*0.2, -maxTilt*0.6, maxDist*0.5, -maxDist*0.7] # chosen randomly by me            
+        mirs = []
+        for mir in mirList:
+            if len(mir.fixedLinkList) == 0:
+                continue # no fixed links for this mirror 
+            # change the position of the first fixed link to match the position of the
+            # first actuator
+            mirCp = copy.deepcopy(mir)
+            mirCp.fixedLinkList[0].mirPos = mirCp.actuatorList[0].mirPos
+            mirCp.fixedLinkList[0].basePos = mirCp.actuatorList[0].basePos
+            for link in mirCp.actuatorList:
+                link.maxMount = numpy.inf
+                link.minMount = numpy.inf * -1.
+            mirs.append(mirCp)
+        self.expectMountDiscrepancy(mirs, orient)
+
+    def expectMountDiscrepancy(self, mirList, orient):
+        for mir in mirList:
+            scaleBy = numpy.asarray([link.scale for link in mir.actuatorList]) # mount units/um
+            mtAdj = numpy.asarray(mir.actuatorMountFromOrient(orient))/scaleBy
+            mtNoAdj = numpy.asarray(mir.actuatorMountFromOrient(orient, adjustOrient = False))/scaleBy
+            mountErr = numpy.abs(mtAdj-mtNoAdj) # in um (scaled)            
+            self.assertTrue(True in (mountErr > MaxMountAdjNoAdjErr))
         
+                
     def _roundTrip(self, linkType, orientList):
     
         OrientNoiseAmplitude = numpy.array(MaxOrient) * 0.1
