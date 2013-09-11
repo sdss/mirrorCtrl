@@ -116,7 +116,7 @@ class MirTests(unittest.TestCase):
     def testMountAdj(self):
         # check that adjusted orientations do not cause a large discrepancy in mount lengths
         errLog=[]
-        for ind, mir in enumerate(mirList):
+        for ind, mir in enumerate(mirList[:3]): # exclude the 3.5 M3 (due to large induced translations)
             for orient in orientList:
                 for getMount, links in itertools.izip([mir.actuatorMountFromOrient, mir.encoderMountFromOrient], [mir.actuatorList, mir.encoderList]):
                     scaleBy = numpy.asarray([link.scale for link in links]) # mount units/um
@@ -237,9 +237,11 @@ class MirTests(unittest.TestCase):
         - desMount: desired mount (computed from desOrient)
         - fitMount: fit mount (computed from fitOrient)
         """
+        # check that the user command-able orientation values have not changed (others are allowed to vary)
+        desVsFit = numpy.abs(numpy.subtract(desOrient[:mir.numAdjOrient], fitOrient[:mir.numAdjOrient]))
         orientErr = numpy.abs(numpy.subtract(adjOrient, fitOrient))
         mountErr = numpy.abs(numpy.subtract(desMount, fitMount))
-        if numpy.any(orientErr > MaxOrientErr) or numpy.any(mountErr > MaxMountErr):
+        if numpy.any(orientErr > MaxOrientErr) or numpy.any(desVsFit > MaxOrientErr[:mir.numAdjOrient]) or numpy.any(mountErr > MaxMountErr):
             fa = FormatArr()
             
             return "Mirror ind=%s; numAdjOrient=%s; desOrient=%s; adjOrient=%s; initOrient=%s; orientErr=%s; mountErr=%s" % \

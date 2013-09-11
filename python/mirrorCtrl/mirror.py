@@ -428,7 +428,7 @@ class MirrorBase(object):
         - givPhys:  list of physical link lengths, must be same length as linkList
         - physMult: list of multipliers for computing errors
         - linkList: list of links
-        - fitAxes:  a Python list of axes to solve for.
+        - fitAxes:  a Python list of axes indices to solve for.
                         Ignored if minOrient has 6 elements, else must be the same size as minOrient.
         - fullOrient: 6 item collection. This is a 'constant' orientation, minOrient is inserted
                         into specific axes of fullOrient defined by fitAxes. This way we can define
