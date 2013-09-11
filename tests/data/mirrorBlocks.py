@@ -239,10 +239,11 @@ def makeMirrors(mirDat):
 
 # read mir.dat files     
 mirDat35 = MirDat35()
-file35 = 'data/mir_35m.dat'
+dataDir = os.path.dirname(__file__)
+file35 = os.path.join(dataDir, 'mir_35m.dat')
 mirDat35.loadPath(file35)
 mirDat25 = MirDat25()
-file25 = 'data/mir_25m.dat'
+file25 = os.path.join(dataDir, 'mir_25m.dat')
 mirDat25.loadPath(file25)
 
 # make mirrors
