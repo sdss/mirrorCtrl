@@ -1,4 +1,5 @@
 from data.mirrorBlocks import mirDict35, mirDict25
+import os.path
 import numpy
 import itertools
 import unittest
@@ -6,6 +7,8 @@ import time
 import RO.Astro.Tm
 import numpy.random
 numpy.random.seed(0)
+
+dataDir = os.path.join((os.path.dirname(__file__)), "data")
 
 Mirrors = ['prim', 'sec', 'tert']
 Acts = ['A', 'B', 'C', 'D', 'E', 'F']
@@ -22,9 +25,9 @@ MaxMountAdjNoAdjErr = 0.5 # um
 # output produced from massOrient2Mount.for written by russell for mirror testing
 # with fortran tcc code.
 massOrientInFiles = [
-    'data/massorient_out_25_1.dat',
-    'data/massorient_out_25_2.dat',
-    'data/massorient_out_35_2.dat',
+    os.path.join(dataDir, "massorient_out_25_1.dat"),
+    os.path.join(dataDir, 'massorient_out_25_2.dat'),
+    os.path.join(dataDir, 'massorient_out_35_2.dat'),
 ]
 
 class MirVsFortran(unittest.TestCase):
@@ -81,7 +84,7 @@ class MirVsFortran(unittest.TestCase):
     def testTertGeom(self):
         """Test the unusual 3.5 M3 geomery
         """                             
-        slurper = TheSlurper('data/massorient_out_35_3.dat')
+        slurper = TheSlurper(os.path.join(dataDir,'massorient_out_35_3.dat'))
         # piston the mirror 100um.  Actuators A,B,C should lengthen by
         # roughly sqrt(100**2/2)
         orient = [100. * MMPerMicron, 0, 0, 0, 0]
