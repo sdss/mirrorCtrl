@@ -4,5 +4,6 @@ _trial_temp
 .scon*
 doc/html
 doc/mirrorCtrl.tag
+doc/doxygen.conf
 tests/.tests
 ups/mirrorCtrl.cfgc
