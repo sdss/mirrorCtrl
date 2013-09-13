@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from data.mirrorBlocks import mirDict35, mirDict25
 import os.path
 import numpy
