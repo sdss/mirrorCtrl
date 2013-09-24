@@ -7,7 +7,7 @@ import math
 import os
 import numpy
 
-from twistedActor import Actor, CommandError, UserCmd, BaseCmd, writeToLog, startGlobalLogging, CommandQueue
+from twistedActor import Actor, CommandError, UserCmd, BaseCmd, writeToLog, CommandQueue#,startGlobalLogging
 
 Version = 0.1
 
@@ -22,12 +22,12 @@ ConvertOrient = numpy.array([MMPerMicron, RadPerArcSec, RadPerArcSec,
                              MMPerMicron, MMPerMicron], dtype = float)
 
 try:
-    LogDir = os.environ["TCC_LOG_DIR"]
+    LogDir = os.environ["TWISTED_LOG_DIR"]
 except KeyError:
     LogDir = None
 # if LogDir is defined, start global logging
-if LogDir:
-    startGlobalLogging(LogDir)
+# if LogDir:
+#     startGlobalLogging(LogDir)
 
 class MirrorCtrl(Actor):
     def __init__(self,
@@ -43,7 +43,7 @@ class MirrorCtrl(Actor):
         - userPort  port on which to listen for client connections
         - maxUsers  maximum allowed simultaneous users
         """
-        # if TCC_LOGDIR is specified as an environment variable
+        # if LogDir is specified as an environment variable
         # begin logging to it.
         self.logging = bool(LogDir)
         # give the device logging capabilities
