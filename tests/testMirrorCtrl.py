@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """http://twistedmatrix.com/documents/current/core/howto/trial.html
 """
-from twisted.trial import unittest
-from twisted.internet.defer import Deferred, gatherResults, maybeDeferred
+from twisted.trial.unittest import TestCase
+from twisted.internet.defer import Deferred, gatherResults
 from twisted.internet import reactor
 import numpy
 import socket
@@ -25,7 +25,7 @@ def showReply(msgStr, *args, **kwargs): # prints what the dispactcher sees to th
     
 
         
-class MirrorCtrlTestBase(unittest.TestCase):
+class MirrorCtrlTestBase(TestCase):
 
     
     def setVars(self):
@@ -973,3 +973,7 @@ class PiezoTests(MirrorCtrlTestBase):
         self.deferred.addCallback(checkResults)        
         self.dispatcher.executeCmd(cmdVar)
         return self.deferred
+
+if __name__ == '__main__':
+    from unittest import main
+    main()
