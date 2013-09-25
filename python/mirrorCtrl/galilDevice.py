@@ -398,7 +398,7 @@ class GalilDevice(TCPDevice):
             return
         if okLineRegEx.match(replyStr):
             # command finished
-            state, foo, bar = self.currDevCmd.fullState
+            state = self.currDevCmd.state
             if state == self.currDevCmd.Failing:
                 # got the OK, now fail the command
                 self.currDevCmd.setState(self.currDevCmd.Failed)
