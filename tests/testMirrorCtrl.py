@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 """http://twistedmatrix.com/documents/current/core/howto/trial.html
+
+Tests communication and other behavior between the Actor and Device. Commands are dispatched using a 
+dispatcher. 
+
+Note: Orientations tested here are almost certainly unrealistic and these tests were failing.
+They were previously passing because we hadn't discovered the problem in mount/phys conversions (mm vs um).  
+The tests now work because I unset the actuator/encoder limits of motion. 
 """
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import Deferred, gatherResults
@@ -43,6 +50,11 @@ class MirrorCtrlTestBase(TestCase):
     def setUp(self):
         print "setUp()"
         self.setVars()
+        # overwrite position limits for mirror to inf, 
+        # because we are commanding impossible orientations
+        for link in self.mirror.encoderList + self.mirror.actuatorList:
+            link.minMount = -numpy.inf
+            link.maxMount = numpy.inf
         self.dispatcher = None
         # first start up the fake galil listening
         galilPort = self.startFakeGalil()
