@@ -45,17 +45,25 @@ class MirrorCtrlTestBase(TestCase):
         self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror"
         """
-        pass
+        self.userPort = None
+        self.fakeGalilFactory = None
+        self.mirror = None
+        self.mirDev = None
+        self.name = None
+        self.test = ''
             
     def setUp(self):
         print "setUp()"
         self.setVars()
         # overwrite position limits for mirror to inf, 
         # because we are commanding impossible orientations
-        for link in self.mirror.encoderList + self.mirror.actuatorList:
-            link.minMount = -numpy.inf
-            link.maxMount = numpy.inf
-        self.dispatcher = None
+        try:
+            for link in self.mirror.encoderList + self.mirror.actuatorList:
+                link.minMount = -numpy.inf
+                link.maxMount = numpy.inf
+                self.dispatcher = None
+        except AttributeError:
+            raise RuntimeError('Stuffs broken on test: %s'%self.test)
         # first start up the fake galil listening
         galilPort = self.startFakeGalil()
         # connect an actor to it
@@ -177,6 +185,7 @@ class GenericTests(MirrorCtrlTestBase):
         3. the commanded mount on the model matches the expected version, explicitly computed
         4. the encoder mount position on the model is within the noise range added by the fakeGalil
         """
+        self.test = 'testSingleMove'
         self.mirDev.status.maxIter = 0 # turn iteration off
         self.deferred = Deferred()
         orientation = [10000, 3600, 3600]
@@ -219,6 +228,7 @@ class GenericTests(MirrorCtrlTestBase):
         1. command finished without failing
         2. the iter value on the model is > 1
         """
+        self.test = 'testiterMove'
         self.deferred = Deferred()
         orientation = [10000, 3600, 3600]
         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
@@ -245,6 +255,7 @@ class GenericTests(MirrorCtrlTestBase):
         2. iter on the model = 1
         3. the maxIter on the device is > 1
         """
+        self.test = 'testCleanMove'
         # turn off noise added by fakeGalil.  This move should not iterate.
         self.fakeGalilFactory.proto.encRes = self.fakeGalilFactory.proto.encRes*0.
         self.deferred = Deferred()
@@ -270,6 +281,7 @@ class GenericTests(MirrorCtrlTestBase):
         checks:
         1. the command fails
         """
+        self.test = 'testUnHomedMove'
         # force all axes on the fakeGalil to unhomed
         self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
         self.deferred = Deferred()
@@ -294,6 +306,7 @@ class GenericTests(MirrorCtrlTestBase):
         1. command doesn't fail
         2. all axes are set to homed on the model.
         """
+        self.test = 'testHome'
         # force all axes on the fakeGalil to unhomed
         self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
         self.deferred = Deferred()
@@ -320,6 +333,7 @@ class GenericTests(MirrorCtrlTestBase):
         1. command completes without failure
         2. isHomed = False for all axes.
         """
+        self.test = "testStatus"
         # force all axes on the fakeGalil to unhomed
         self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
         self.deferred = Deferred()
@@ -345,6 +359,7 @@ class GenericTests(MirrorCtrlTestBase):
         1. command completes without failure
         2. isHomed = False for all axes
         """
+        self.test = "testReset"
         self.deferred = Deferred()
         cmdStr = 'reset'        
         cmdVar = CmdVar (
@@ -367,6 +382,7 @@ class GenericTests(MirrorCtrlTestBase):
         checks:
         1. command completes without failure
         """
+        self.test="testStop"
         self.deferred = Deferred()
         cmdStr = 'reset'        
         cmdVar = CmdVar (
@@ -390,6 +406,7 @@ class GenericTests(MirrorCtrlTestBase):
         1. the move fails
         2. the stop succeeds.
         """          
+        self.test = "testStopInterrupt"
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
@@ -433,6 +450,7 @@ class GenericTests(MirrorCtrlTestBase):
         2. the reset succeeds.
         3. check that isHomed == False (due to the reset)
         """          
+        self.test = "testResetInterrupt"
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
@@ -473,6 +491,7 @@ class GenericTests(MirrorCtrlTestBase):
         """send a status then a home, 
         home should finish after status.
         """
+        self.test = "testCmdQueueHome"
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
@@ -511,6 +530,7 @@ class GenericTests(MirrorCtrlTestBase):
         """send status, move, move.
         2nd move should finish, 1st move and status should finish
         """
+        self.test = "testDoubleQueueMoveMove"
         d1 = Deferred()
         d2 = Deferred()
         d3 = Deferred()
@@ -562,6 +582,7 @@ class GenericTests(MirrorCtrlTestBase):
         """send status, move, home.
         move should finish, home should be rejected, and status should finish
         """
+        self.test = "testDoubleQueueMoveHome"
         d1 = Deferred()
         d2 = Deferred()
         d3 = Deferred()
@@ -613,6 +634,7 @@ class GenericTests(MirrorCtrlTestBase):
         """send status, home, move.
         home should finish, move rejected, and status should finish
         """
+        self.test = "testDoubleQueueHomeMove"
         d1 = Deferred()
         d2 = Deferred()
         d3 = Deferred()
@@ -664,6 +686,7 @@ class GenericTests(MirrorCtrlTestBase):
         """send a status then a home then a stop, 
         stop should succeed rest should fail
         """
+        self.test = "testCmdQueueSuperseded"
         d1 = Deferred()
         d2 = Deferred()
         d3 = Deferred()
@@ -715,6 +738,7 @@ class GenericTests(MirrorCtrlTestBase):
         """send a staus then a move.
         move should finish after status
         """
+        self.test = "testCmdQueueMove"
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
@@ -755,6 +779,7 @@ class GenericTests(MirrorCtrlTestBase):
         1. Status succeeds
         2. Home succeeds
         """
+        self.test = 'testStatusCollide'
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
@@ -792,6 +817,7 @@ class GenericTests(MirrorCtrlTestBase):
     def testMoveSupersede(self):
         """Send two move commands, the second should supersede the first
         """
+        self.test = "testMoveSupersede"
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
@@ -835,6 +861,7 @@ class GenericTests(MirrorCtrlTestBase):
         1. The move command is cancelled
         2. The home command succeeds
         """
+        self.test = "testMoveCollide"
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
@@ -875,6 +902,7 @@ class GenericTests(MirrorCtrlTestBase):
         checks:
         1. command fails
         """
+        self.test = "testBadMove"
         # turn off noise added by fakeGalil.  This move should not iterate.
         self.fakeGalilFactory.proto.encRes = self.fakeGalilFactory.proto.encRes*0.
         self.deferred = Deferred()
@@ -898,6 +926,7 @@ class GenericTests(MirrorCtrlTestBase):
         checks:
         1. command fails
         """
+        self.test = "testBadHome"
         # force all axes on the fakeGalil to unhomed
         self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
         self.deferred = Deferred()
@@ -941,6 +970,7 @@ class PiezoTests(MirrorCtrlTestBase):
         1. command doesn't fail
         2. all axes are set to homed on the model.
         """
+        self.test = "piezoTestHome"
         # force all axes on the fakeGalil to unhomed
         self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
         self.deferred = Deferred()
@@ -967,6 +997,7 @@ class PiezoTests(MirrorCtrlTestBase):
         2. the iter value on the model is > 1
         3. the piezo correction is non-zero
         """
+        self.test = "piezoIterMove"
         self.deferred = Deferred()
         orientation = [1000, 360, 360, 1000]
         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        

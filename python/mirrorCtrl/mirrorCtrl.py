@@ -68,7 +68,7 @@ class MirrorCtrl(Actor):
                 "move" : 3,
                 "home" : 3,
                 "status" : 1,
-                "params" : 1,
+                "showparams" : 1,
             }
         )
         self.cmdQueue.addRule(
@@ -93,8 +93,8 @@ class MirrorCtrl(Actor):
         )        
         self.cmdQueue.addRule(
             action = CommandQueue.CancelNew,
-            newCmds = ['params'],
-            queuedCmds = ['params'],
+            newCmds = ['showparams'],
+            queuedCmds = ['showparams'],
         )  
 
     def logMsg(self, msgStr):
