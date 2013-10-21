@@ -7,7 +7,7 @@ import math
 import os
 import numpy
 
-from twistedActor import Actor, CommandError, UserCmd, BaseCmd, writeToLog, CommandQueue#,startGlobalLogging
+from twistedActor import Actor, CommandError, UserCmd, BaseCmd, writeToLog, startLogging, CommandQueue#,startGlobalLogging
 
 Version = 0.1
 
@@ -21,13 +21,6 @@ RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
 ConvertOrient = numpy.array([MMPerMicron, RadPerArcSec, RadPerArcSec,
                              MMPerMicron, MMPerMicron], dtype = float)
 
-try:
-    LogDir = os.environ["TWISTED_LOG_DIR"]
-except KeyError:
-    LogDir = None
-# if LogDir is defined, start global logging
-# if LogDir:
-#     startGlobalLogging(LogDir)
 
 class MirrorCtrl(Actor):
     def __init__(self,
@@ -45,7 +38,12 @@ class MirrorCtrl(Actor):
         """
         # if LogDir is specified as an environment variable
         # begin logging to it.
-        self.logging = bool(LogDir)
+        # try:
+        #     LogDir = os.environ["TWISTED_LOG_DIR"]
+        # except KeyError:
+        #     pass # logging will not start
+        # else:
+        #     startLogging(LogDir)
         # give the device logging capabilities
         device.logMsg = self.logMsg
         Actor.__init__(self,
@@ -100,8 +98,7 @@ class MirrorCtrl(Actor):
     def logMsg(self, msgStr):
         """Write a message string to the log.  
         """
-        if self.logging:
-            writeToLog(msgStr, systemName=self.name, logPath=LogDir) # system adds brackets
+        writeToLog(msgStr) # system adds brackets
 
 
     def processOrientation(self, orientation):
