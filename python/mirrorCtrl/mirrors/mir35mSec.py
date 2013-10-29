@@ -18,12 +18,12 @@ import mirrorCtrl
 Name = '3.5m Secondary'
 
 # old TCC config file, for reference
-# ActMirX  = numpy.array([      0., -230.529,  230.529,  29.186,   -29.186])
-# ActMirY  = numpy.array([ 266.192, -133.096, -133.096,  29.186,    29.186])
-# ActMirZ  = numpy.array([-152.806, -152.806, -152.806, -167.361, -167.361])
-# ActBaseX = numpy.array([      0., -230.529,  230.529,  284.010, -284.010])
-# ActBaseY = numpy.array([ 266.192, -133.096, -133.096,  284.010,  284.010])
-# ActBaseZ = numpy.array([-256.438, -256.438, -256.438, -192.710, -192.710])
+ActMirX  = numpy.array([      0., -230.529,  230.529,  29.186,   -29.186])
+ActMirY  = numpy.array([ 266.192, -133.096, -133.096,  29.186,    29.186])
+ActMirZ  = numpy.array([-152.806, -152.806, -152.806, -167.361, -167.361])
+ActBaseX = numpy.array([      0., -230.529,  230.529,  284.010, -284.010])
+ActBaseY = numpy.array([ 266.192, -133.096, -133.096,  284.010,  284.010])
+ActBaseZ = numpy.array([-256.438, -256.438, -256.438, -192.710, -192.710])
 
 MMPerInch = 25.4
 RadPerDeg = math.pi / 180.0
@@ -110,16 +110,28 @@ for actInd in range(3, 5):
 # generate lists of link objects for mirror configuration
 actuatorList = []
 encoderList = []
-for i in range(5):    
+for i in range(5):
+    ############## from mir.dat ################
+    basePosAct = [ActBaseX[i], ActBaseY[i], ActBaseZ[i]]
+    mirPosAct = [ActMirX[i], ActMirY[i], ActMirZ[i]]
+    basePosEnc = basePosAct[:]
+    mirPosEnc = mirPosAct[:]
+    ###########################################
+    ##### actual measurement ##################
+    # basePosAct = baseAct[i, :]
+    # mirPosAct = mirAct[i, :]
+    # basePosEnc = baseEnc[i, :]
+    # mirPosEnc = mirEnc[i, :]   
+    ###########################################
     actuatorList.append(
         mirrorCtrl.AdjBaseActuator(
-            baseAct[i, :], mirAct[i, :], 
+            basePosAct, mirPosAct, 
             ActMinMount[i], ActMaxMount[i], ActMountScale[i], ActMountOffset[i]
         )
     )
     encoderList.append(
         mirrorCtrl.AdjLengthLink(
-            baseEnc[i, :], mirEnc[i, :], 
+            basePosEnc, mirPosEnc, 
             ActMinMount[i], ActMaxMount[i], ActMountScale[i], ActMountOffset[i]        
         )
     )
