@@ -38,12 +38,12 @@ class MirrorCtrl(Actor):
         """
         # if LogDir is specified as an environment variable
         # begin logging to it.
-        # try:
-        #     LogDir = os.environ["TWISTED_LOG_DIR"]
-        # except KeyError:
-        #     pass # logging will not start
-        # else:
-        #     startLogging(LogDir)
+        try:
+            LogDir = os.environ["TWISTED_LOG_DIR"]
+        except KeyError:
+            pass # logging will not start
+        else:
+            startLogging(LogDir)
         # give the device logging capabilities
         device.logMsg = self.logMsg
         Actor.__init__(self,
