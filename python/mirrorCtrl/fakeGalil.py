@@ -16,7 +16,7 @@ To do:
 
 - Figure out how to set status more realistically.
 """
-__all__ = ["FakeGalilProtocol", "FakeGalilFactory"]
+__all__ = ["FakeGalilFactory", "FakePiezoGalilFactory"]
 
 import re
 import sys
