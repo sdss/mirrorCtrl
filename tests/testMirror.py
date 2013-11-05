@@ -28,7 +28,7 @@ RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
 #Define maximum allowable fitOrient error, reusing from mirror.py, not using z rot
 # MaxOrientErr = numpy.array([0.0001, 5e-8, 5e-8, 0.0001, 0.0001])
 MaxOrientErr = numpy.array([.1 * MMPerMicron, .01 * RadPerArcSec, .01 * RadPerArcSec, .1 * MMPerMicron, .1 * MMPerMicron, 1*RadPerDeg])
-MaxMountErr = 0.02
+MaxMountErr = 0.03
 MaxMountAdjNoAdjErr = 0.5 # um
 # construct range of orients to test +/- (0-25mm, 0-2 degrees)
 #maxDist = 25.0 # mm
