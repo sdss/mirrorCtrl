@@ -863,7 +863,6 @@ class PiezoTests(MirrorCtrlTestBase):
             """
             self.assertFalse(cmdVar.didFail)
             self.assertTrue(self.dispatcher.model.iter.valueList[0] > 1)
-            print 'piezoCorModel: ', self.dispatcher.model.piezoCorr
             self.assertTrue(numpy.sum(numpy.abs(self.dispatcher.model.piezoCorr)) > 0)
         d.addCallback(checkResults)        
         self.dispatcher.executeCmd(cmdVar)

@@ -877,6 +877,8 @@ class GalilDevice25Sec(GalilDevice):
             callFunc = callFunc,
         )
         # this mirror has extra status entries
+        self.status.castDict["piezoStatus"] = statusCast
+        self.status.castDict["piezoCorr"] = mountCast
         self.status.piezoStatus = numpy.nan
         self.status.piezoCorr = [numpy.nan]*3
 
