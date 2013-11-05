@@ -180,16 +180,16 @@ def makeMirrors(mirDat):
                 getattr(mirDat, mirName + 'ActMirZ')[actNum],
                 
             ])
-            min = getattr(mirDat, mirName + 'MinMount')[actNum]
-            max = getattr(mirDat, mirName + 'MaxMount')[actNum]
+            minMount = getattr(mirDat, mirName + 'MinMount')[actNum]
+            maxMount = getattr(mirDat, mirName + 'MaxMount')[actNum]
             scale = getattr(mirDat, mirName + 'MountScale')[actNum]
             offset = getattr(mirDat, mirName + 'MountOffset')[actNum]
             actuatorList.append(
                 mirrorCtrl.AdjLengthLink(
                     basePos, 
                     mirPos,
-                    min,
-                    max,
+                    minMount,
+                    maxMount,
                     scale,
                     offset,
                 )

@@ -1,4 +1,5 @@
-!+
+!+  Note, these mir.dat files were modified to include fixed link positions (mir/base positions beyond the nAct)
+
 !              Mirror Information for SDSS 2.5m Telescope
 !
 ! History:
@@ -108,7 +109,7 @@ PrimActMirY       864.90    -432.45    -432.45   -1305.00   -1277.00    1277.00
 PrimActMirZ       251.00     251.00     251.00     238.00     262.00     262.00       
 PrimActBaseX        0.00    -749.03     749.03       0.00    -698.00    -698.00  
 PrimActBaseY      864.90    -432.45    -432.45      -9e9    -1277.00    1277.00  
-PrimActBaseZ        9e9        9e9        9e9      238.00     262.00     262.00  
+PrimActBaseZ        9e9       9e9        9e9      238.00     262.00     262.00  
 
 !+
 !      Secondary Mirror

@@ -14,8 +14,8 @@ import mirrorCtrl
 Name = 'SDSS Primary'
 
 # choose the actuator model (adjustable base or adjustable length)
-genLink = mirrorCtrl.AdjBaseActuator # new style
-# genLink = mirrorCtrl.AdjLengthLink # old style
+#genLink = mirrorCtrl.AdjBaseActuator # new style
+genLink = mirrorCtrl.AdjLengthLink # old style
 
 # Warnings:
 # - most of this info is from drawings and may be a bit off
@@ -58,7 +58,7 @@ ActMaxMount = numpy.array([ 120000.,  120000.,  120000.,  90000.,  50000.,  5000
 # and the corresponding PrimMountOffset in this file (values to physically center
 # the primary mirror in its cell) were:
 # PrimMountOffset  9700       800       5650      -1650      -6900      -6900
-ActMountOffset = numpy.array([11300.,  -650.,  5500., -1650., -6900., -6900])
+ActMountOffset = numpy.array([11300.,  -650.,  5500., -1650., -6900., -6900.])
 # do we want a higher resolution scale?
 ActMountScale = numpy.array([15.696, 15.696, 15.696, 15.696,  33.22, 32.53])
 
@@ -79,8 +79,8 @@ ActMirZ  = numpy.array([  251.,    251.,    251.,   238.,   262.,  262.])
 
 # A more finite version (replaced 9e9 with 9e4):
 ActBaseX = numpy.array([    0., -749.03,  749.03,     0.,  -698., -698.])
-ActBaseY = numpy.array([864.90, -432.45, -432.45,   -9e4, -1277., 1277.])
-ActBaseZ = numpy.array([   9e4,     9e4,     9e4,   238.,   262.,  262.])
+ActBaseY = numpy.array([864.90, -432.45, -432.45,   -9e9, -1277., 1277.])
+ActBaseZ = numpy.array([   9e9,     9e9,     9e9,   238.,   262.,  262.])
 
 # generate a lists of link objects for mirror configuration
 fixedLinkList = [] # no fixed length links on SDSS primary

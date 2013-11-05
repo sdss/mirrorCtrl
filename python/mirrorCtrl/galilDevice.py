@@ -56,6 +56,27 @@ AxisEchoRegEx = re.compile(r'[A-Z]=-?(\d+)', re.IGNORECASE)
 
 MaxIter = 2
 
+################## KEYWORD CAST VALUES ##################################
+mountCast = lambda mount: ",".join(["%.2f"%x for x in mount])
+orientCast = lambda orient: ",".join(["%.2f"%x for x in orient])
+floatCast = lambda number: "%.2f"%number
+strArrayCast = lambda strArray: ",".join([str(x) for x in strArray])
+def intOrNan(anInt):
+    try:
+        return str(int(anInt))
+    except ValueError:
+        return "nan"
+def statusCast(status):
+    statusStr = []
+    for element in status:
+        statusStr.append(intOrNan(element))
+        # if numpy.isfinite(element):
+        #     statusStr.append("%i"%element)
+        # else:
+        #     statusStr.append("nan")
+    return ",".join(statusStr)
+###########################################################################
+
 class GalilTimer(object):
     """Measure elapsed time
     """
@@ -79,11 +100,12 @@ class GalilTimer(object):
 
         Return nan if startTimer not called since construction or last reset.
         """
-        return time.time() - self.initTime
+        return "%.2f"%(time.time() - self.initTime)
 
 
 class GalilStatus(object):
     """A container for holding the status of the Galil """
+
     def __init__(self, device):
         """Construct a GalilStatus
 
@@ -108,6 +130,23 @@ class GalilStatus(object):
         self.homing = ["?"]*self.nAct
         self.axisHomed = ["?"]*self.nAct
 
+        self.castDict = {
+            "nAct": int,
+            "maxDuration": floatCast,
+            "duration": self.duration.getTime,
+            "actMount": mountCast,
+            "encMount": mountCast,
+            "cmdMount": mountCast,
+            "orient": orientCast,
+            "desOrient": orientCast,
+            "desOrientAge": self.desOrientAge.getTime,
+            "iter": intOrNan,
+            "maxIter": intOrNan,
+            "status": statusCast,
+            "homing": strArrayCast,
+            "axisHomed": strArrayCast,
+        }
+
     def _getKeyValStr(self, keywords):
         """Package and return current keyword value info in status cache
 
@@ -117,21 +156,25 @@ class GalilStatus(object):
         """
         strList = []
         for keyword in keywords:
-            val = getattr(self, keyword)
             if keyword in ['duration', 'desOrientAge']:
-                # get current execution time
-                val = val.getTime()
-#             if keyword == 'remainExecTime':
-#                 # get current execution time
-#                     val = self.maxDuration - self.duration.getTime()
-            if keyword in ['orient', 'desOrient']:
-                # convert to user-friendly units
-                val = numpy.divide(val, ConvertOrient)
-            if type(val) in [list, numpy.ndarray]:
-                # val is a list or numpy array, we need to format as comma seperated string
-                strVal = ", ".join(str(x) for x in val)
+                strVal = self.castDict[keyword]()
             else:
-                strVal = str(val)
+                val = getattr(self, keyword)
+                strVal = self.castDict[keyword](val)
+#             if keyword in ['duration', 'desOrientAge']:
+#                 # get current execution time
+#                 val = val.getTime()
+# #             if keyword == 'remainExecTime':
+# #                 # get current execution time
+# #                     val = self.maxDuration - self.duration.getTime()
+#             if keyword in ['orient', 'desOrient']:
+#                 # convert to user-friendly units
+#                 val = numpy.divide(val, ConvertOrient)
+#             if type(val) in [list, numpy.ndarray]:
+#                 # val is a list or numpy array, we need to format as comma seperated string
+#                 strVal = ", ".join(str(x) for x in val)
+#             else:
+#                 strVal = str(val)
             strList.append("%s=%s" % (keyword, strVal))
         return "; ".join(strList)
 

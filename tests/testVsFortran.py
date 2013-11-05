@@ -7,6 +7,7 @@ import unittest
 import time
 import RO.Astro.Tm
 import numpy.random
+from mirrorCtrl.mirrors import mir35mSec, mir35mTert, mir25mSec, mir25mPrim
 numpy.random.seed(0)
 
 dataDir = os.path.join((os.path.dirname(__file__)), "data")
@@ -32,22 +33,29 @@ massOrientInFiles = [
 ]
 
 class MirVsFortran(unittest.TestCase):
-    def testMirrors(self):
+    def testMirrorsDotDat(self):
+        self._testMirrors(useMirDat=True, maxOrientErr=MaxOrientErr, maxMountErr=MaxMountErr, maxMountAdjNoAdjErr=MaxMountAdjNoAdjErr)
+
+    def testMirrorsMade(self):
+        # allow for a little more flexibility for made mirrors
+        self._testMirrors(useMirDat=False, maxOrientErr=numpy.ones(5), maxMountErr=1, maxMountAdjNoAdjErr=MaxMountAdjNoAdjErr)
+
+    def _testMirrors(self, useMirDat, maxOrientErr, maxMountErr, maxMountAdjNoAdjErr):
         errLog = []
         for file in massOrientInFiles:
-            slurper = TheSlurper(file)
+            slurper = TheSlurper(file, useMirDat)
             mirName = slurper.mirFile.split('_')[1].split('.')[0] # remove the .dat part
             mirNum = str(slurper.mirNum)
             adjMountDiff = numpy.abs(slurper.adjMountDiff)  # in um
             unAdjMountDiff = numpy.abs(slurper.unAdjMountDiff) # in um
             # ignore 3.5m M3, it will have large variations in adj vs un adjusted
-            if (mirName=='35m') and (mirNum=='2'): # zero indexing 2 = tertiary
-                continue
+            # if (mirName=='35m') and (mirNum=='2'): # zero indexing 2 = tertiary
+            #     continue
             orientDiff = numpy.abs(slurper.orientDiff) # in um arcsec
             for ind in range(slurper.nRan):
-                adjOver = True in (adjMountDiff[ind] > MaxMountErr)
-                unAdjOver = True in (unAdjMountDiff[ind] > MaxMountAdjNoAdjErr)
-                orientOver = True in (orientDiff[ind][:slurper.mirror.numAdjOrient] > MaxOrientErr[:slurper.mirror.numAdjOrient])
+                adjOver = True in (adjMountDiff[ind] > maxMountErr)
+                unAdjOver = True in (unAdjMountDiff[ind] > maxMountAdjNoAdjErr)
+                orientOver = True in (orientDiff[ind][:slurper.mirror.numAdjOrient] > maxOrientErr[:slurper.mirror.numAdjOrient])
                 if True in [adjOver, unAdjOver, orientOver]:
                     #print 'failed: ', [adjOver, unAdjOver, orientOver]
                     errLog.append(
@@ -98,10 +106,11 @@ class TheSlurper(object):
     """An object for generating data on orient to mount conversions
     and comparing with the FORTRAN conversion code
     """
-    def __init__(self, massorientfile):
+    def __init__(self, massorientfile, useMirDat=True):
         """Take a massorientfile, build everything, run conversions
         
         @param[in] massorientfile: a data/massorient_out*.dat
+        @param[in] useMirDat: boolean. construct a mirror from a mir.dat file (rather than a measured mirror, with separate encoder positions...)
 
         These are the output of Russell's massorient2mount.for script. I have manually
         appended the correstponding data/mir*.dat file and the mirror number on the 
@@ -112,9 +121,15 @@ class TheSlurper(object):
         for attr, data in itertools.izip(attrs, parsed):
             setattr(self, attr, data)
         if self.mirFile == 'mir_25m.dat':
-            self.mirror = mirDict25[Mirrors[self.mirNum]]
+            if useMirDat:
+                self.mirror = mirDict25[Mirrors[self.mirNum]]
+            else:
+                self.mirror = mir25mSec.Mirror if self.mirNum==1 else mir25mPrim.Mirror
         elif self.mirFile == 'mir_35m.dat':
-            self.mirror = mirDict35[Mirrors[self.mirNum]]
+            if useMirDat:
+                self.mirror = mirDict35[Mirrors[self.mirNum]]
+            else:
+                self.mirror = mir35mTert.Mirror if self.mirNum==2 else mir35mSec.Mirror
         else:
             raise RuntimeError('Unrecognized mirror file')
         # clean up mounts from massorient, remove trailing zeros for non movable axes

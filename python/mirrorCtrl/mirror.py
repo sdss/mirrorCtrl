@@ -107,6 +107,7 @@ class MirrorBase(object):
         """ Plots links and glass when the mirror is in neutral position,
         mostly a sanity check.
         """
+        mirRad = 500 # mm
         fig = matplotlib.pyplot.figure()
         ax = fig.gca(projection='3d')
         theta = numpy.linspace(0., 2 * numpy.pi, 100)
@@ -114,10 +115,11 @@ class MirrorBase(object):
         fig.hold()
         
         # plot the mirror black concentric circles
-        for r in numpy.linspace(0., self.mirRad, 50):
+        for r in numpy.linspace(0., mirRad, 50):
             x = r * numpy.sin(theta)
             y = r * numpy.cos(theta)
-            if self.mirRad < 300: # mm
+            if len(self.fixedLinkList)==3: # mm
+                mirRad = 300
                 # 3.5m M3 mirror is rotated about x by -45 deg
                 phi = 90. * math.pi / 180.0
                 cosP = math.cos(phi)
@@ -154,10 +156,12 @@ class MirrorBase(object):
             z = numpy.array([act.mirPos[2], act.basePos[2]])   
             ax.plot(x, y, z, 'ro-')
         
-        xyrange=(-1.5 * self.mirRad, 1.5 * self.mirRad)
-        zrange = (-3 * self.mirRad, 2 * self.mirRad)
+        xyrange=(-1.5 * mirRad, 1.5 * mirRad)
+        zrange = (-3 * mirRad, 2 * mirRad)
         matplotlib.pyplot.xlim(xyrange)
         matplotlib.pyplot.ylim(xyrange)
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
         ax.set_zlim(xyrange)        
         matplotlib.pyplot.show()                    
     

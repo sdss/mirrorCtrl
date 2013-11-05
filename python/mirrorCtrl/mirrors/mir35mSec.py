@@ -39,7 +39,7 @@ xyMirTrans = 29.186 # for Transverse
 xyBaseTrans = 284.010 # for Transverse
 zEncOffsetTrans = 0.90 * MMPerInch # Transverse encoders are between actuator and glass.
 
-angDegList = numpy.array([-90.0, 30., 150.])
+angDegList = numpy.array([-90.0+180., 30.+180., 150.+180.]) # add 180 degrees to ABC, to match old tcc positions
 angRadList = angDegList * RadPerDeg
 
 # Actuators are: Axial A, B, C, Transverse D, E
@@ -112,17 +112,19 @@ actuatorList = []
 encoderList = []
 for i in range(5):
     ############## from mir.dat ################
-    basePosAct = [ActBaseX[i], ActBaseY[i], ActBaseZ[i]]
-    mirPosAct = [ActMirX[i], ActMirY[i], ActMirZ[i]]
-    basePosEnc = basePosAct[:]
-    mirPosEnc = mirPosAct[:]
+    # basePosAct = [ActBaseX[i], ActBaseY[i], ActBaseZ[i]]
+    # mirPosAct = [ActMirX[i], ActMirY[i], ActMirZ[i]]
+    # basePosEnc = basePosAct[:]
+    # mirPosEnc = mirPosAct[:]
     ###########################################
     ##### actual measurement ##################
-    # basePosAct = baseAct[i, :]
-    # mirPosAct = mirAct[i, :]
-    # basePosEnc = baseEnc[i, :]
-    # mirPosEnc = mirEnc[i, :]   
+    basePosAct = baseAct[i, :]
+    mirPosAct = mirAct[i, :]
+    basePosEnc = baseEnc[i, :]
+    mirPosEnc = mirEnc[i, :]   
     ###########################################
+
+
     actuatorList.append(
         mirrorCtrl.AdjBaseActuator(
             basePosAct, mirPosAct, 
@@ -141,8 +143,8 @@ for i in range(5):
 # located between C and B on edge of mirror opposite of A.
 linkLength = 12.36 * MMPerInch # measured
 mirRadius = 1000. # guess
-fixMirPos = numpy.array([0., mirRadius, zMirAx]) # opposite of A
-fixBasePos = numpy.array([linkLength, mirRadius, zMirAx])
+fixMirPos = numpy.array([0., -1*mirRadius, zMirAx]) # opposite of A
+fixBasePos = numpy.array([linkLength, -1*mirRadius, zMirAx])
 fixedLinkList = [mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos)]
 
 # minCorrList = [4.0e-5]*3 + [0.0016]*2 # min correction (mm); 50 actuator microsteps for all actuators
@@ -160,3 +162,21 @@ Mirror = mirrorCtrl.DirectMirror(
     maxCorrList = maxCorrList,
     name = Name,
 )
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+    import itertools
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    for n, (act, enc) in enumerate(itertools.izip(actuatorList, encoderList)):
+        x,y = act.mirPos[0], act.mirPos[1]
+        ax.plot(x,y, 'or')
+        ax.annotate("%i"%n, xy=(x,y))
+        x,y = act.basePos[0], act.basePos[1]
+        ax.plot(x,y, 'ob')
+        ax.annotate("%i"%n, xy=(x,y))
+    plt.title("3.5 M2 XY (measured+rotated) Mirror Position (Actuator = Red, Encoder = Blue)")
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.show(block=True)
+
