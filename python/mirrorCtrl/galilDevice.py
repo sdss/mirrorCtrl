@@ -19,6 +19,7 @@ import time
 import itertools
 import math
 import re
+import copy
 
 import numpy
 from RO.StringUtil import quoteStr, strFromException
@@ -54,7 +55,12 @@ DevSpecVersionRegEx = re.compile(r"version of .+ additions", re.IGNORECASE)
 CmdEchoRegEx = re.compile(r'xq *#[a-z]+$', re.IGNORECASE)
 AxisEchoRegEx = re.compile(r'[A-Z]=-?(\d+)', re.IGNORECASE)
 
+# Tune-ables
 MaxIter = 2
+CorrectionStrength = 0.9 # scale the determined correction by this much
+# if abs(measured orientation - desired orientation) is within, orientation tolerence, 
+# call it good enough
+OrientationTolerance = numpy.array([1., 1., .01, .01, 1., 40.]) * ConvertOrient
 
 ################## KEYWORD CAST VALUES ##################################
 mountCast = lambda mount: ",".join(["%.2f"%x for x in mount])
@@ -120,7 +126,9 @@ class GalilStatus(object):
 #        self.remainExecTime = numpy.nan
         self.actMount = [numpy.nan]*self.nAct # get rid of?
         self.encMount = [numpy.nan]*self.nAct
-        self.cmdMount = [numpy.nan]*self.nAct # updated upon iteration
+        self.cmdMount = [numpy.nan]*self.nAct  # user commanded
+        self.cmdMountIter = [numpy.nan]*self.nAct # will be updated upon move iterations
+        self.localMountErr = [numpy.nan]*self.nAct # the last offset applied to a user commanded mount to bump towards convergence
         self.orient = [numpy.nan]*6 # get rid of?
         self.desOrient = [numpy.nan]*6
         self.desOrientAge = GalilTimer()
@@ -354,9 +362,13 @@ class GalilDevice(TCPDevice):
 
         elif ('commanded position' == key) or ('target position' == key):
             # in the case where cmdMount == 999999999 set to NaN
-            self.status.cmdMount = [int(x) if int(x) != 999999999 else numpy.nan for x in dataList]
-            updateStr = self.status._getKeyValStr(["cmdMount"])
-            self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
+            # this was causing a bug by updating cmdMount
+            # cmdMount must not be updated for actuator error determination
+            # and subsequent move commands
+            # self.status.cmdMount = [int(x) if int(x) != 999999999 else numpy.nan for x in dataList]
+            # updateStr = self.status._getKeyValStr(["cmdMount"])
+            # self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
+            pass
 
         elif ('actual position' == key) or ('final position' == key):
             # measured position (adjusted)
@@ -554,7 +566,8 @@ class GalilDevice(TCPDevice):
             self.status.iter = 1
         # (user) commanded orient --> mount
         mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient=True)
-        self.status.cmdMount = numpy.asarray(mount, dtype=float) # this will change upon iteration
+        self.status.cmdMount = numpy.asarray(mount, dtype=float) # this will not change upon iteration
+        self.status.cmdMountIter = self.status.cmdMount[:] # this will change upon iteration
         self.status.desOrient = numpy.asarray(adjOrient, dtype=float) # initial guess for fitter
         # format Galil command
         cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
@@ -742,7 +755,9 @@ class GalilDevice(TCPDevice):
             self.userCmd.setState(self.userCmd.Failed, textMsg="Final actuator positions not received from move")
             return
 
-        actErr = self.status.cmdMount[0:self.nAct] - self.status.actMount[0:self.nAct]
+        #actErr = self.status.cmdMount[0:self.nAct] - self.status.actMount[0:self.nAct]
+        actErr = [cmd - act for cmd, act in itertools.izip(self.status.cmdMount[0:self.nAct], self.status.actMount[0:self.nAct])]
+        #orientationErr = self.status.desOrient - mirror.orientationFromEncoderMount(self.status.encMount)
 
         # error too large to correct?
         if numpy.any(numpy.abs(actErr) > self.mirror.maxCorrList):
@@ -750,8 +765,11 @@ class GalilDevice(TCPDevice):
             return
 
         # perform another iteration?
-        if numpy.any(numpy.abs(actErr) > self.mirror.minCorrList) and (self.status.iter < self.status.maxIter):
-            self.status.cmdMount += actErr
+        if numpy.any(numpy.abs(actErr) > self.mirror.minCorrList) and (self.status.iter < self.status.maxIter): # and (numpy.any(numpy.abs(orietationErr)/OrientationTolerance > 1)):
+            #self.status.cmdMount += actErr
+            #newCmdActPos = numpy.asarray(actErr)*CorrectionStrength + numpy.asarray(self.status.cmdMountIter)
+            newCmdActPos = [err*CorrectionStrength + prevMount for err, prevMount in itertools.izip(actErr, self.status.cmdMountIter)]
+            self.status.cmdMountIter = newCmdActPos
             # clear or update the relevant slots before beginning a new device cmd
             self.parsedKeyList = []
             self.status.iter += 1
@@ -760,7 +778,7 @@ class GalilDevice(TCPDevice):
             statusStr = self.status._getKeyValStr(["cmdMount", "iter"])
             self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
             # convert from numpy to simple list for command formatting
-            mount = [x for x in self.status.cmdMount]
+            mount = [x for x in newCmdActPos]
             cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
             self.startDevCmd(cmdMoveStr, callFunc=self._moveIter, errFunc=self.failStop)
             return
@@ -877,7 +895,7 @@ class GalilDevice25Sec(GalilDevice):
             callFunc = callFunc,
         )
         # this mirror has extra status entries
-        self.status.castDict["piezoStatus"] = statusCast
+        self.status.castDict["piezoStatus"] = int
         self.status.castDict["piezoCorr"] = mountCast
         self.status.piezoStatus = numpy.nan
         self.status.piezoCorr = [numpy.nan]*3

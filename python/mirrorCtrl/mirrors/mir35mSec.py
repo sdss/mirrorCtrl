@@ -77,7 +77,7 @@ for actInd, angRad in enumerate(angRadList):
         math.sin(angRad) * encRad,
         zMirAx
     ])
-    baseEnc[actInd, 0:2] = mirAct[actInd, 0:2]
+    baseEnc[actInd, 0:2] = mirEnc[actInd, 0:2]
     baseEnc[actInd, 2] = zBaseAx
 
 # now handle Transverse actuator / encoders D, E.

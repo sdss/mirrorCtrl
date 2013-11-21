@@ -18,6 +18,19 @@ To do:
 """
 __all__ = ["FakeGalilFactory", "FakePiezoGalilFactory"]
 
+# remove this when done testing
+import itertools
+import math
+import numpy
+MMPerMicron = 1 / 1000.0        # millimeters per micron
+RadPerDeg  = math.pi / 180.0    # radians per degree
+ArcSecPerDeg = 60.0 * 60.0      # arcseconds per degree
+RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
+
+ConvertOrient = numpy.asarray([MMPerMicron, RadPerArcSec, RadPerArcSec, MMPerMicron, MMPerMicron])
+
+##
+
 import re
 import sys
 import numpy
@@ -130,7 +143,7 @@ class FakeGalilProtocol(Protocol):
 
         if cmdVerb == "MOVE":
             # round user nums to nearest st_fs step
-            self.userNums = numpy.around(self.userNums/50.)*50.
+            #self.userNums = numpy.around(self.userNums/50.)*50.
             newCmdPos = numpy.where(self.userNums == MAXINT, self.cmdPos, self.userNums)
             self.moveStart(newCmdPos)
 
@@ -264,16 +277,19 @@ class FakeGalilProtocol(Protocol):
         moveTime = min(deltaTimeArr.max(), MaxCmdTime)
         self.cmdPos = newCmdPos
         # get random sample between -self.noiseRange and +self.noiseRange
-        noise = numpy.random.random_sample(size=newCmdPos.shape)*2.*self.noiseRange - self.noiseRange
+        #noise = numpy.random.random_sample(size=newCmdPos.shape)*2.*self.noiseRange - self.noiseRange
+        noise = numpy.zeros(len(newCmdPos))
         if 0 in self.encRes:
             # no noise should be added to any axis with a 0 encoder resolution
             zeroit = numpy.nonzero(self.encRes==0)
             noise[zeroit] = 0.
         trueOrient = self.mirror.orientFromActuatorMount(newCmdPos)
+  #      print "true Orientation", [x/y for x,y in itertools.izip(trueOrient, ConvertOrient)]
         trueEnc = self.mirror.encoderMountFromOrient(trueOrient)
         # add noise to encoder measurement
         noisyEnc = trueEnc + noise
         self.measPos = noisyEnc
+ #       print "fake Galil Meas Pos", self.measPos
 #         noisyPos = newCmdPos + noise
 #         measOrient = self.mirror.orientFromActuatorMount(noisyPos[0:3])
 #         #measMount = numpy.hstack((self.mirror.encoderMountFromOrient(measOrient), noisyPos[3:])) #append last 3 'unused' axes

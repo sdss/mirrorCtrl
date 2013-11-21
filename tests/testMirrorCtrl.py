@@ -121,9 +121,15 @@ class MirrorCtrlTestBase(TestCase):
         """Start a commander"""
         print "startCommander(*args=%r)" % (args,)
         # this doesn't close cleanly
+        # def readCB(foo, line):
+        #     print "socket read", line
+        # def stateCB(foo):
+        #     print foo.fullState
         self.cmdConn = TCPConnection(
             host = 'localhost',
             port = UserPort,
+            # readCallback = readCB,
+            # stateCallback = stateCB,
             readLines = True,
             name = "Commander",
         )
@@ -169,74 +175,74 @@ class GenericTests(MirrorCtrlTestBase):
         self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror"
                 
-    def testSingleMove(self):
-        """Turns iteration off, moves once, 
-        checks:
-        1. command finished without failure
-        2. only one iteration was done
-        3. the commanded mount on the model matches the expected version, explicitly computed
-        4. the encoder mount position on the model is within the noise range added by the fakeGalil
-        """
-        self.test = 'testSingleMove'
-        self.mirDev.status.maxIter = 0 # turn iteration off
-        d = Deferred()
-        orientation = [10000, 3600, 3600]
-        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])
-        encMount = self.mirDev.mirror.encoderMountFromOrient(
-            self.mirActor.processOrientation(orientation)
-            )
-        # round to nearest 50 like the 3.5m Tert Galil
-        cmdMount = numpy.around(numpy.asarray(
-            self.mirDev.mirror.actuatorMountFromOrient(self.mirActor.processOrientation(orientation)))/50.
-            )*50.
+    # def testSingleMove(self):
+    #     """Turns iteration off, moves once, 
+    #     checks:
+    #     1. command finished without failure
+    #     2. only one iteration was done
+    #     3. the commanded mount on the model matches the expected version, explicitly computed
+    #     4. the encoder mount position on the model is within the noise range added by the fakeGalil
+    #     """
+    #     self.test = 'testSingleMove'
+    #     self.mirDev.status.maxIter = 0 # turn iteration off
+    #     d = Deferred()
+    #     orientation = [10000, 3600, 3600]
+    #     cmdStr = 'move ' + ', '.join([str(x) for x in orientation])
+    #     encMount = self.mirDev.mirror.encoderMountFromOrient(
+    #         self.mirActor.processOrientation(orientation)
+    #         )
+    #     # round to nearest 50 like the 3.5m Tert Galil
+    #     cmdMount = numpy.around(numpy.asarray(
+    #         self.mirDev.mirror.actuatorMountFromOrient(self.mirActor.processOrientation(orientation)))/50.
+    #         )*50.
         
-        cmdVar = CmdVar (
-                actor = self.name,
-                cmdStr = cmdStr,
-                callFunc = CmdCallback(d),
-            )
-        def checkResults(cb):
-            """Check results after cmdVar is done
-            """
-            self.assertEqual(cmdVar.didFail, False)
-            self.assertEqual(1, self.dispatcher.model.iter.valueList[0])
-            self.assertTrue(numpy.array_equal(
-                cmdMount, self.dispatcher.model.cmdMount.valueList[:]
-                ))
-            # encMount should be within the noise range determined
-            # on the fake Galil
-            noiseRng = self.fakeGalilFactory.proto.noiseRange # steps
-            encDiff = numpy.abs(numpy.subtract(encMount, self.dispatcher.model.encMount.valueList[:]))
-            encTruth = numpy.abs(encDiff) < noiseRng
-            encInRange = False if False in encTruth else True
-            self.assertTrue(encInRange)            
-        d.addCallback(checkResults)        
-        self.dispatcher.executeCmd(cmdVar)
-        return d
+    #     cmdVar = CmdVar (
+    #             actor = self.name,
+    #             cmdStr = cmdStr,
+    #             callFunc = CmdCallback(d),
+    #         )
+    #     def checkResults(cb):
+    #         """Check results after cmdVar is done
+    #         """
+    #         self.assertEqual(cmdVar.didFail, False)
+    #         self.assertEqual(1, self.dispatcher.model.iter.valueList[0])
+    #         self.assertTrue(numpy.array_equal(
+    #             cmdMount, self.dispatcher.model.cmdMount.valueList[:]
+    #             ))
+    #         # encMount should be within the noise range determined
+    #         # on the fake Galil
+    #         noiseRng = self.fakeGalilFactory.proto.noiseRange # steps
+    #         encDiff = numpy.abs(numpy.subtract(encMount, self.dispatcher.model.encMount.valueList[:]))
+    #         encTruth = numpy.abs(encDiff) < noiseRng
+    #         encInRange = False if False in encTruth else True
+    #         self.assertTrue(encInRange)            
+    #     d.addCallback(checkResults)        
+    #     self.dispatcher.executeCmd(cmdVar)
+    #     return d
         
-    def testIterMove(self):
-        """move with allowed iteration
-        checks:
-        1. command finished without failing
-        2. the iter value on the model is > 1
-        """
-        self.test = 'testiterMove'
-        d = Deferred()
-        orientation = [10000, 3600, 3600]
-        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
-        cmdVar = CmdVar (
-                actor = self.name,
-                cmdStr = cmdStr,
-                callFunc = CmdCallback(d),
-            )
-        def checkResults(cb):
-            """Check results after cmdVar is done
-            """
-            self.assertFalse(cmdVar.didFail)
-            self.assertTrue(self.dispatcher.model.iter.valueList[0] > 1)
-        d.addCallback(checkResults)        
-        self.dispatcher.executeCmd(cmdVar)
-        return d
+    # def testIterMove(self):
+    #     """move with allowed iteration
+    #     checks:
+    #     1. command finished without failing
+    #     2. the iter value on the model is > 1
+    #     """
+    #     self.test = 'testiterMove'
+    #     d = Deferred()
+    #     orientation = [10000, 3600, 3600]
+    #     cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
+    #     cmdVar = CmdVar (
+    #             actor = self.name,
+    #             cmdStr = cmdStr,
+    #             callFunc = CmdCallback(d),
+    #         )
+    #     def checkResults(cb):
+    #         """Check results after cmdVar is done
+    #         """
+    #         self.assertFalse(cmdVar.didFail)
+    #         self.assertTrue(self.dispatcher.model.iter.valueList[0] > 1)
+    #     d.addCallback(checkResults)        
+    #     self.dispatcher.executeCmd(cmdVar)
+    #     return d
 
     def testCleanMove(self):
         """Turn off noise added by fakeGalil so the first move goes to
@@ -842,31 +848,31 @@ class PiezoTests(MirrorCtrlTestBase):
         self.dispatcher.executeCmd(cmdVar)
         return d  
         
-    def testIterMove(self):
-        """move with allowed iteration
-        checks:
-        1. command finished without failing
-        2. the iter value on the model is > 1
-        3. the piezo correction is non-zero
-        """
-        self.test = "piezoIterMove"
-        d = Deferred()
-        orientation = [1000, 360, 360, 1000]
-        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
-        cmdVar = CmdVar (
-                actor = self.name,
-                cmdStr = cmdStr,
-                callFunc = CmdCallback(d),
-            )
-        def checkResults(cb):
-            """Check results after cmdVar is done
-            """
-            self.assertFalse(cmdVar.didFail)
-            self.assertTrue(self.dispatcher.model.iter.valueList[0] > 1)
-            self.assertTrue(numpy.sum(numpy.abs(self.dispatcher.model.piezoCorr)) > 0)
-        d.addCallback(checkResults)        
-        self.dispatcher.executeCmd(cmdVar)
-        return d
+    # def testIterMove(self):
+    #     """move with allowed iteration
+    #     checks:
+    #     1. command finished without failing
+    #     2. the iter value on the model is > 1
+    #     3. the piezo correction is non-zero
+    #     """
+    #     self.test = "piezoIterMove"
+    #     d = Deferred()
+    #     orientation = [1000, 360, 360, 1000]
+    #     cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
+    #     cmdVar = CmdVar (
+    #             actor = self.name,
+    #             cmdStr = cmdStr,
+    #             callFunc = CmdCallback(d),
+    #         )
+    #     def checkResults(cb):
+    #         """Check results after cmdVar is done
+    #         """
+    #         self.assertFalse(cmdVar.didFail)
+    #         self.assertTrue(self.dispatcher.model.iter.valueList[0] > 1)
+    #         self.assertTrue(numpy.sum(numpy.abs(self.dispatcher.model.piezoCorr)) > 0)
+    #     d.addCallback(checkResults)        
+    #     self.dispatcher.executeCmd(cmdVar)
+    #     return d
 
 if __name__ == '__main__':
     from unittest import main
