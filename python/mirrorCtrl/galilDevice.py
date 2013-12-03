@@ -64,7 +64,7 @@ OrientationTolerance = numpy.array([1., 1., .01, .01, 1., 40.]) * ConvertOrient
 
 ################## KEYWORD CAST VALUES ##################################
 mountCast = lambda mount: ",".join(["%.2f"%x for x in mount])
-orientCast = lambda orient: ",".join(["%.2f"%x for x in orient])
+orientCast = lambda orient: ",".join(["%.2f"%x for x in (orient/ConvertOrient)])
 floatCast = lambda number: "%.2f"%number
 strArrayCast = lambda strArray: ",".join([str(x) for x in strArray])
 def intOrNan(anInt):
@@ -128,7 +128,7 @@ class GalilStatus(object):
         self.encMount = [numpy.nan]*self.nAct
         self.cmdMount = [numpy.nan]*self.nAct  # user commanded
         self.cmdMountIter = [numpy.nan]*self.nAct # will be updated upon move iterations
-        self.localMountErr = [numpy.nan]*self.nAct # the last offset applied to a user commanded mount to bump towards convergence
+        self.mountErr = [numpy.nan]*self.nAct # the last offset applied to a user commanded mount to bump towards convergence
         self.orient = [numpy.nan]*6 # get rid of?
         self.desOrient = [numpy.nan]*6
         self.desOrientAge = GalilTimer()
@@ -145,7 +145,8 @@ class GalilStatus(object):
             "actMount": mountCast,
             "encMount": mountCast,
             "cmdMount": mountCast,
-            "localMountErr": mountCast,
+            "cmdMountIter": mountCast,
+            "mountErr": mountCast,
             "orient": orientCast,
             "desOrient": orientCast,
             "desOrientAge": self.desOrientAge.getTime,
@@ -758,7 +759,7 @@ class GalilDevice(TCPDevice):
 
         #actErr = self.status.cmdMount[0:self.nAct] - self.status.actMount[0:self.nAct]
         actErr = [cmd - act for cmd, act in itertools.izip(self.status.cmdMount[0:self.nAct], self.status.actMount[0:self.nAct])]
-        self.status.localMountErr = actErr[:]
+        self.status.mountErr = actErr[:]
         #orientationErr = self.status.desOrient - mirror.orientationFromEncoderMount(self.status.encMount)
 
         # error too large to correct?
@@ -777,7 +778,7 @@ class GalilDevice(TCPDevice):
             self.status.iter += 1
             self.status.duration.reset() # new timer for new move
             self.userCmd.setTimeLimit(5)
-            statusStr = self.status._getKeyValStr(["cmdMount", "iter", "localMountErr"])
+            statusStr = self.status._getKeyValStr(["cmdMount", "cmdMountIter" ,"iter", "mountErr", "orient"])
             self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
             # convert from numpy to simple list for command formatting
             mount = [x for x in newCmdActPos]
