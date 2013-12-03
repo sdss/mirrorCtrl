@@ -2,10 +2,13 @@
 import sys
 import unittest
 import numpy
+import numpy.random
 import math
 import time
 import itertools
 import copy
+import pickle
+import matplotlib.pyplot as plt
 
 # This flag determines the initial guess to solve for orietation 
 # If False: start from a noisy (but close) guess to the solution
@@ -14,16 +17,20 @@ zeroFlag = False
 
 import RO.Astro.Tm
 from data import genMirrors
+#from data import loadMirDat
 import mirrorCtrl
 import mirrorCtrl.mirrors.mir25mPrim
 import mirrorCtrl.mirrors.mir25mSec
 import mirrorCtrl.mirrors.mir35mSec
 import mirrorCtrl.mirrors.mir35mTert
 
+import os
+
 MMPerMicron = 1 / 1000.0        # millimeters per micron
 RadPerDeg  = math.pi / 180.0    # radians per degree
 ArcSecPerDeg = 60.0 * 60.0      # arcseconds per degree
 RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
+ConvertOrient = numpy.asarray([MMPerMicron, RadPerArcSec, RadPerArcSec, MMPerMicron, MMPerMicron, RadPerArcSec])
 
 #Define maximum allowable fitOrient error, reusing from mirror.py, not using z rot
 # MaxOrientErr = numpy.array([0.0001, 5e-8, 5e-8, 0.0001, 0.0001])
@@ -81,7 +88,13 @@ for orient in orientList:
 #            genMirrors.Tert35().makeMirror(), # new non-inf length links
 #            genMirrors.Tert35(vers='old').makeMirror() # old semi-inf length links
 #            ]
-           
+def plotABC(mirror):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    for act, letter in itertools.izip(mirror.actuatorList[:3], ("A", "B", "C")):
+        ax.plot(act.mirPos[0], act.mirPos[1], 'or')
+        ax.annotate(letter, xy=act.mirPos[:2], xycoords='data')
+
 # mirrors can be viewed using the plotMirror() method, eg: mirrorCtrl.mirrors.mir25mPrim.Mirror.plotMirror()
 # use the non-fictitous mirrors:
 mirList = [
@@ -90,13 +103,59 @@ mirList = [
     mirrorCtrl.mirrors.mir35mSec.Mirror,
     mirrorCtrl.mirrors.mir35mTert.Mirror,
 ]
-
 print 'mirList len: ', len(mirList)
+#from data.loadMirDat import mirDict35Adj
+#print 'mirDict35', mirDict35["tert"].plotMirror()
+#mirrorCtrl.mirrors.mir35mTert.Mirror.plotMirror()
+# plotABC(mirDict35["tert"])
+# plt.show()
+# plotABC(mirrorCtrl.mirrors.mir35mTert.Mirror)
+# plt.show()
+pwd = os.path.dirname(__file__)
+secMoveList = pickle.load(open(os.path.join(pwd, "data/secMoveList.p")))
+tertMoveList = pickle.load(open(os.path.join(pwd, "data/tertMoveList.p")))
 ############################# TESTS #####################################
 
 class MirTests(unittest.TestCase):
     """Tests for mirrors
     """
+    def _testBallPark(self, mirror, moveList, fract, adj=True):
+        """Using a list of mirror log data from the 3.5m, check
+        that the M2 and M3 conversions produced by our models are sane.
+        """
+        # mountDiffs = []
+        # just take a fraction of moveList
+        numpy.random.shuffle(moveList)
+        nAxes = len(mirror.actuatorList)
+        for move in moveList[:5]: # only test 5 orientations
+            desOrient = numpy.asarray(move["desOrient"])
+            desOrient = desOrient
+            encMount, adjOrient = mirror.encoderMountFromOrient(desOrient*ConvertOrient[:5], return_adjOrient=True, adjustOrient = adj)
+            #print 'testing: ' + ",".join(["%.2f"%x for x in desOrient])
+            #print 'adjusted: ' + ",".join(["%.2f"%x for x in numpy.asarray(adjOrient)/ConvertOrient])
+            actMountLog = numpy.asarray([mount/(2*act.maxMount) for mount, act in itertools.izip(move["actMount"][:nAxes], mirror.actuatorList[:nAxes])])
+            encMountNew = numpy.asarray([mount/(2*act.maxMount) for mount, act in itertools.izip(encMount, mirror.actuatorList[:nAxes])])
+            encMountNew = encMountNew[:nAxes]
+            mountDiff = numpy.abs(actMountLog-encMountNew)
+            #print 'mount diff: ' + ",".join(["%.2f"%x for x in mountDiff])
+            self.assertTrue(numpy.all(mountDiff < fract)) # lengths accurate to < 50 microns
+            # mountDiffs.append(mountDiff)
+        # mountDiffs = numpy.asarray(mountDiffs)
+        # plt.hist(mountDiffs.flatten(), 100)
+        # plt.show()
+
+    def testSecBallPark(self):
+        self._testBallPark(mirrorCtrl.mirrors.mir35mSec.Mirror, secMoveList, .02)
+
+    def testTertBallPark(self):
+        mirror = mirrorCtrl.mirrors.mir35mTert.Mirror
+        self._testBallPark(mirror, tertMoveList, .14)
+
+    def testTertNoAdjBallPark(self):
+        #mirror = mirDict35Adj["tert"]
+        mirror = mirrorCtrl.mirrors.mir35mTert.Mirror
+        self._testBallPark(mirror, tertMoveList, .025, False)
+
     def testRoundTripAct(self):
         # test all orientations in orientList
         linkType = 'Act'

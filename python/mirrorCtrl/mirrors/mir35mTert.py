@@ -104,6 +104,7 @@ baseFix[2, :] = numpy.array([281.47, 0., 0.])
 # x is unchanged
 # in other words, rotate 45 degrees about x
 rotAng = -45.0 * math.pi / 180.0
+#rotAng = 0.
 rotMat = numpy.zeros([3,3])
 rotMat[0,0] = 1
 rotMat[1,1] = math.cos(rotAng)

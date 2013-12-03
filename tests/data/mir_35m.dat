@@ -92,6 +92,10 @@ SecActBaseZ    -256.438    -256.438    -256.438    -192.710    -192.710    -152.
 ! but is used to report the resulting orientation
 TertNAct    3
 TertNConst  2
+
+!TertNAct    6
+!TertNConst  0
+
 ! Mirror type (see tinc:MirDef.for for codes)
 TertType    2	! direct
 ! Number of additional status lines for local modifications
@@ -100,11 +104,19 @@ TertNAddStatus 4
 ! These limits are set to allow safe motion throughout the range 5/13/99 (jsm)
 TertMinMount     -7250000   -7250000   -7250000 !-7250000   -7250000   -7250000
 TertMaxMount      7250000    7250000    7250000  !7250000    7250000    7250000
+
+!TertMinMount     -7250000   -7250000   -7250000 -7250000   -7250000   -7250000
+!TertMaxMount      7250000    7250000    7250000  7250000    7250000    7250000
+
 ! Offset (mount units) and scale (mount units/um) for each actuator
 ! Note: these offsets are those for the 3.5-m NA2 port as of 5/13/99 (jsm)
 ! Adjusted by +250000 steps to accomodate effect of range reduction 12/3/99. R.O.
 TertMountOffset         0          0          0   !0          0          0
 TertMountScale       1259.843   1259.843   1259.843   !1259.843   1259.843   1259.843
+
+!TertMountOffset         0          0          0   0          0          0
+!TertMountScale       1259.843   1259.843   1259.843   1259.843   1259.843   1259.843
+
 ! Position of each end of each actuator (mm), relative to mirror vertex
 !                  Ax A       Ax B       Ax C     Cnst 1    Const 2    Const 3
 TertActMirX       0.000    257.673   -257.673  -203.2  203.2  0           !          0          0        298
@@ -113,6 +125,13 @@ TertActMirZ     194.674   -120.910   -120.910  0  0  0              !       0   
 TertActBaseX      0.000    257.673   -257.673  -203.3  197.09  281.47          !    1e+02     -1e+02        298
 TertActBaseY   -271.006     44.578     44.578  -199.03 -214.74  0            !7.07e+02   7.07e+02   7.07e+02
 TertActBaseZ    149.773   -165.811   -165.811  199.03 183.31 0              !-7.07e+02  -7.07e+02  -7.07e+02
+
+!TertActMirX       0.000    257.673   -257.673           0          0        298
+!TertActMirY    -226.105     89.479     89.479         0          0          0
+!TertActMirZ     194.674   -120.910   -120.910         0          0          0
+!TertActBaseX      0.000    257.673   -257.673      1e+09     -1e+09        298
+!TertActBaseY   -271.006     44.578     44.578 7.07e+08   7.07e+08   7.07e+08
+!TertActBaseZ    149.773   -165.811   -165.811  -7.07e+08  -7.07e+08  -7.07e+08
 
 !+
 !              End of Mirror Information Block
