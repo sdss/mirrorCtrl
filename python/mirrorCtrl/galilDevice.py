@@ -145,6 +145,7 @@ class GalilStatus(object):
             "actMount": mountCast,
             "encMount": mountCast,
             "cmdMount": mountCast,
+            "localMountErr": mountCast,
             "orient": orientCast,
             "desOrient": orientCast,
             "desOrientAge": self.desOrientAge.getTime,
@@ -757,6 +758,7 @@ class GalilDevice(TCPDevice):
 
         #actErr = self.status.cmdMount[0:self.nAct] - self.status.actMount[0:self.nAct]
         actErr = [cmd - act for cmd, act in itertools.izip(self.status.cmdMount[0:self.nAct], self.status.actMount[0:self.nAct])]
+        self.status.localMountErr = actErr[:]
         #orientationErr = self.status.desOrient - mirror.orientationFromEncoderMount(self.status.encMount)
 
         # error too large to correct?
@@ -775,7 +777,7 @@ class GalilDevice(TCPDevice):
             self.status.iter += 1
             self.status.duration.reset() # new timer for new move
             self.userCmd.setTimeLimit(5)
-            statusStr = self.status._getKeyValStr(["cmdMount", "iter"])
+            statusStr = self.status._getKeyValStr(["cmdMount", "iter", "localMountErr"])
             self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
             # convert from numpy to simple list for command formatting
             mount = [x for x in newCmdActPos]
