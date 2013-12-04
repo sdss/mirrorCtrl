@@ -130,6 +130,7 @@ class GalilStatus(object):
         self.cmdMountIter = [numpy.nan]*self.nAct # will be updated upon move iterations
         self.mountErr = [numpy.nan]*self.nAct # the last offset applied to a user commanded mount to bump towards convergence
         self.orient = [numpy.nan]*6 # get rid of?
+        self.mountOrient = [numpy.nan]*6
         self.desOrient = [numpy.nan]*6
         self.desOrientAge = GalilTimer()
         self.iter = numpy.nan
@@ -149,6 +150,7 @@ class GalilStatus(object):
             "mountErr": mountCast,
             "orient": orientCast,
             "desOrient": orientCast,
+            "mountOrient": orientCast,
             "desOrientAge": self.desOrientAge.getTime,
             "iter": intOrNan,
             "maxIter": intOrNan,
@@ -198,6 +200,8 @@ class GalilDevice(TCPDevice):
     but doing so when the command begins is probably sufficient,
     or when the state is Running.
     """
+    STWaitTime = 1. # one second to wait after sending an st
+    RSWaitTime = 2. # wait two seconds after sending an rs
     def __init__(self, mirror, host, port, callFunc = None):
         """Construct a GalilDevice
 
@@ -378,7 +382,6 @@ class GalilDevice(TCPDevice):
             #self.status.encMount = numpy.asarray(dataList, dtype=float)
             # in the case where encMount == 999999999 set to NaN
             self.status.encMount = [int(x) if int(x) != 999999999 else numpy.nan for x in dataList]
-
             #self.status.encMount = encMount if encMount != [999999999]*self.nAct else [numpy.nan]*self.nAct
             updateStr = self.status._getKeyValStr(["encMount"])
             self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
@@ -433,8 +436,6 @@ class GalilDevice(TCPDevice):
         """
         self.logMsg('Galil Reply(%s)' % (replyStr,))
         replyStr = replyStr.replace(":", "").strip(' ;\r\n\x01\x03\x18\x00')
-        #log.msg('Galil Reply: ' + replyStr)
-        #print 'Galil Reply: ' + replyStr
         #print "handleReply(replyStr=%r)" % (replyStr,)
         if self.currDevCmd.isDone:
             # ignore unsolicited input
@@ -576,7 +577,7 @@ class GalilDevice(TCPDevice):
         self.status.desOrientAge.startTimer()
         statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "cmdMount", "maxIter", "iter"])
         self.writeToUsers('i', statusStr, cmd=self.userCmdOrNone)
-        self.startDevCmd(cmdMoveStr, callFunc=self._moveIter, errFunc=self.failStop)
+        self.startDevCmd(cmdMoveStr, callFunc=self._moveIter, errFunc=self.failStop)#timeLim=0.03, 
 
 
     def cmdReset(self, userCmd):
@@ -590,7 +591,7 @@ class GalilDevice(TCPDevice):
         #self.startUserCmd(userCmd, doCancel=True, timeLim=10)
         self.setCurrUserCmd(userCmd)
         self.conn.writeLine('RS')
-        reactor.callLater(2, self.sendStop) # wait 3 seconds then command stop, then status
+        reactor.callLater(self.RSWaitTime, self.sendStop) # wait 3 seconds then command stop, then status
 
     def cmdStop(self, userCmd):
         """Stop the Galil.
@@ -669,8 +670,9 @@ class GalilDevice(TCPDevice):
             setting userCmd to failed. Intended primarily for a status query prior to user
             command termination.
         """
-#         print "startDevCmd(cmdStr=%s, timeLimt=%s, callFunc=%s)" % (cmdStr, timeLim, callFunc)
-#         print "self.userCmd=%r" % (self.userCmd,)
+        # print "startDevCmd(cmdStr=%s, timeLimt=%s, callFunc=%s)" % (cmdStr, timeLim, callFunc)
+        # print "self.userCmd=%r" % (self.userCmd,)
+        # print "self.devCmd=%r" % (self.currDevCmd,)
         if not self.currDevCmd.isDone:
             # this should never happen, but...just in case
             raise RuntimeError("Cannot start new device command: %s , %s is currently running" % (cmdStr, self.currDevCmd,))
@@ -698,7 +700,7 @@ class GalilDevice(TCPDevice):
                 textMsg="Galil command %s failed" % (self.userCmd.cmdStr,))
 
     def _cancelUserCmd(self):
-        """Simply fail the current user command
+        """Simply cancel the current user command
         """
         self._cleanup()
         self._userCmdNextStep = None
@@ -711,23 +713,25 @@ class GalilDevice(TCPDevice):
 
         startDevCmd always assigns this as the callback, which then calls and clears any user-specified callback.
         """
-#        print 'dev cmd state', self.currDevCmd.cmdStr, self.currDevCmd.state
-#         print "_devCmdCallback(); currDevCmd=%r; _userCmdNextStep=%s" % (self.currDevCmd, self._userCmdNextStep)
-#         print "_devCmdCallback(); self.userCmd=%r" % (self.userCmd,)
+        # print 'dev cmd state', self.currDevCmd.cmdStr, self.currDevCmd.state, self.currDevCmd._textMsg
+        # print "_devCmdCallback(); currDevCmd=%r; _userCmdNextStep=%s" % (self.currDevCmd, self._userCmdNextStep)
+        # print "_devCmdCallback(); self.userCmd=%r" % (self.userCmd,)
 
 #         if self.currDevCmd.state == self.currDevCmd.Cancelling:
 #             self.conn.writeLine('ST')
 #             self.currDevCmd.setState(self.currDevCmd.Cancelled)
 #             return
         if self.currDevCmd.state == self.currDevCmd.Cancelled:
+            self.writeToUsers("w", "Text=\"Device Command %s Cancelled: %s\"" % (self.currDevCmd.cmdStr, self.currDevCmd._textMsg,), cmd = self.currDevCmd)
             self._cancelUserCmd()
             return
         if self.currDevCmd.state == self.currDevCmd.Failed:
-            # failed internally
+            self.writeToUsers("w", "Text=\"Device Command %s Failed: %s\"" % (self.currDevCmd.cmdStr, self.currDevCmd._textMsg,), cmd = self.currDevCmd)
             userCmdCatchFail, self._userCmdCatchFail = self._userCmdCatchFail, None
             if userCmdCatchFail:
                 # don't do this if cmd was 'cancelled', only if 'failed'
-                userCmdCatchFail() # I imagine will almost always be self.failStop()
+                self.conn.writeLine("ST")
+                reactor.callLater(self.STWaitTime, userCmdCatchFail) # I imagine will almost always be self.failStop()
             else:
                 self._failUserCmd()
             return
@@ -773,12 +777,13 @@ class GalilDevice(TCPDevice):
             #newCmdActPos = numpy.asarray(actErr)*CorrectionStrength + numpy.asarray(self.status.cmdMountIter)
             newCmdActPos = [err*CorrectionStrength + prevMount for err, prevMount in itertools.izip(actErr, self.status.cmdMountIter)]
             self.status.cmdMountIter = newCmdActPos
+            self.status.mountOrient = numpy.asarray(self.mirror.orientFromActuatorMount(newCmdActPos))
             # clear or update the relevant slots before beginning a new device cmd
             self.parsedKeyList = []
             self.status.iter += 1
             self.status.duration.reset() # new timer for new move
             self.userCmd.setTimeLimit(5)
-            statusStr = self.status._getKeyValStr(["cmdMount", "cmdMountIter" ,"iter", "mountErr", "orient"])
+            statusStr = self.status._getKeyValStr(["cmdMount", "cmdMountIter" ,"iter", "mountErr", "mountOrient"])
             self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
             # convert from numpy to simple list for command formatting
             mount = [x for x in newCmdActPos]

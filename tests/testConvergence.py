@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from mirrorCtrl.mirrors import mir35mSec
+from mirrorCtrl.mirrors import mir35mSec, mir35mTert
 import numpy
 import itertools
 import copy
@@ -9,6 +9,7 @@ numpy.random.seed(10)
 #from data.mirLogParse import secMoveList
 import pickle
 import os
+from mirrorCtrl.mirror import DirectMirror
 
 import RO.Comm.Generic
 RO.Comm.Generic.setFramework("twisted")
@@ -21,6 +22,7 @@ from opscore.actor import CmdVar
 
 pwd = os.path.dirname(__file__)
 secMoveList = pickle.load(open(os.path.join(pwd, "data/secMoveList.p")))
+tertMoveList = pickle.load(open(os.path.join(pwd, "data/tertMoveList.p")))
 # set max iter to 12
 mirrorCtrl.galilDevice.MaxIter = 12
 
@@ -34,13 +36,20 @@ RussellsOrient = numpy.asarray([834.26, -24.03, 366.27, -192.64, 1388.21]) # in 
 randInds = numpy.random.randint(0, len(secMoveList), 2)# a few random indices from real mirror positions from log
 m2TestOrients = [numpy.asarray(d["desOrient"]) for d in [secMoveList[ind] for ind in randInds]]
 m2TestOrients.append(RussellsOrient)
+m3TestOrients = [numpy.asarray(d["desOrient"]) for d in [tertMoveList[ind] for ind in randInds]]
+
 #m2TesetOrients = secMoveList + [RussellsOrient]
 
 #MaxOrientErr = numpy.asarray([1, .01, .01, 1, 1])*ConvertOrient
 
 
-TrueMirror = mir35mSec.Mirror
+#TrueMirror = mir35mSec.Mirror
 #trueMirror.plotMirror()
+
+# class NoAdjDirMir(DirectMirror):
+#     def actuatorMountFromOrient(self, userOrient, return_adjOrient = False, adjustOrient = False):
+#         return DirectMirror.actuatorMountFromOrient(self, userOrient, return_adjOrient, adjustOrient)
+
 
 def getActEqEncMir(mirror):
     """ Returns the same mirror as input, except actuators are moved to be exactly aligned with actuators
@@ -193,10 +202,10 @@ class ConvergenceTestBase(MirrorCtrlTestBase):
         self.dispatcher.executeCmd(cmdVar)
         return d
 
-    def _testOrients(self):
+    def _testOrients(self, orients):
         """test a set of orientations
         """
-        iterOs = iter(m2TestOrients)
+        iterOs = iter(orients)
         outerD = Deferred()
         def doNext(foo='for a callback'):
             try:
@@ -234,7 +243,7 @@ class ConvergenceTestActEqEnc(ConvergenceTestBase):
         self.name = "mirror"    
 
     def testOrients(self):
-        return self._testOrients()    
+        return self._testOrients(m2TestOrients)    
 
 # class ConvergenceTestRandAct(ConvergenceTestBase):
 #     def setVars(self):
@@ -247,6 +256,17 @@ class ConvergenceTestActEqEnc(ConvergenceTestBase):
 #     def testOrients(self):
 #         return self._testOrients()
 
+class ConvergenceTestM3(ConvergenceTestBase):
+    def setVars(self):
+        self.fakeGalilFactory = FakeGalilFactory
+        self.trueMirror = mir35mTert.Mirror
+        self.mirror = getActEqEncMir(self.trueMirror)
+        self.mirDev = mirrorCtrl.GalilDevice
+        self.name = "mirror" 
+
+    def testOrients(self):
+        return self._testOrients(m3TestOrients)
+
 class ConvergenceTestRandAct(ConvergenceTestBase):
     def setVars(self):
         self.fakeGalilFactory = FakeGalilFactory
@@ -256,7 +276,7 @@ class ConvergenceTestRandAct(ConvergenceTestBase):
         self.name = "mirror" 
 
     def testOrients(self):
-        return self._testOrients()
+        return self._testOrients(m2TestOrients)
 
 class ConvergenceTestPerfect(ConvergenceTestBase):
     """model exactly represents truth, no iterations
@@ -269,7 +289,7 @@ class ConvergenceTestPerfect(ConvergenceTestBase):
         self.name = "mirror" 
 
     def testOrients(self):
-        return self._testOrients()
+        return self._testOrients(m2TestOrients)
 
     def _testConv(self, modelMirState, trueMirState, desOrient):
         iters = 1
