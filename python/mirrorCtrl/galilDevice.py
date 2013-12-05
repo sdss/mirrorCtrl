@@ -202,6 +202,7 @@ class GalilDevice(TCPDevice):
     """
     STWaitTime = 1. # one second to wait after sending an st
     RSWaitTime = 2. # wait two seconds after sending an rs
+    DevCmdTimeout = 2. # initial timeout to use for every device command
     def __init__(self, mirror, host, port, callFunc = None):
         """Construct a GalilDevice
 
@@ -657,12 +658,11 @@ class GalilDevice(TCPDevice):
             self.startDevCmd("XQ#STATUS", callFunc = self._failUserCmd)
         self.startDevCmd("XQ#STOP", callFunc=failStatus)
 
-    def startDevCmd(self, cmdStr, timeLim=2, callFunc=None, errFunc=None):
+    def startDevCmd(self, cmdStr, callFunc=None, errFunc=None):
         """Start a new device command, replacing self.currDevCmd
 
         Inputs:
         - cmdStr: command to send to the Galil
-        - timeLim: time limit for command, in seconds
         - callFunc: function to call when the command finishes; receives no arguments
             (note: _devCmdCallback is called by the device command and is responsible
             for calling callFunc, which is stored in _userCmdNextStep)
@@ -679,7 +679,7 @@ class GalilDevice(TCPDevice):
 
         self._userCmdNextStep = callFunc
         self._userCmdCatchFail = errFunc
-        devCmd = self.cmdClass(cmdStr, timeLim = timeLim, callFunc=self._devCmdCallback)
+        devCmd = self.cmdClass(cmdStr, timeLim = self.DevCmdTimeout, callFunc=self._devCmdCallback)
         self.currDevCmd = devCmd
         self.parsedKeyList = []
         try:

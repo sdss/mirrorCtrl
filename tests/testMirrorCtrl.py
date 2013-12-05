@@ -244,35 +244,6 @@ class GenericTests(MirrorCtrlTestBase):
     #     self.dispatcher.executeCmd(cmdVar)
     #     return d
 
-    def testCleanMove(self):
-        """Turn off noise added by fakeGalil so the first move goes to
-        exactly the right spot. This should cause a move to finish without needing
-        to iterate
-        checks:
-        1. command finishes without failure
-        2. iter on the model = 1
-        3. the maxIter on the device is > 1
-        """
-        self.test = 'testCleanMove'
-        # turn off noise added by fakeGalil.  This move should not iterate.
-        self.fakeGalilFactory.proto.encRes = self.fakeGalilFactory.proto.encRes*0.
-        d = Deferred()
-        orientation = [10000, 3600, 3600]
-        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
-        cmdVar = CmdVar (
-                actor = self.name,
-                cmdStr = cmdStr,
-                callFunc = CmdCallback(d),
-            )
-        def checkResults(cb):
-            """Check results after cmdVar is done
-            """
-            self.assertFalse(cmdVar.didFail)
-            self.assertTrue(self.dispatcher.model.iter.valueList[0], 1)
-            self.assertTrue(self.dispatcher.model.iter.valueList[0] < self.mirDev.status.maxIter)
-        d.addCallback(checkResults)        
-        self.dispatcher.executeCmd(cmdVar)
-        return d
 
     def testUnHomedMove(self):
         """Set isHomed on the fakeGalil to all False. Try to move.
@@ -297,7 +268,30 @@ class GenericTests(MirrorCtrlTestBase):
         d.addCallback(checkResults)        
         self.dispatcher.executeCmd(cmdVar)
         return d
+
+    def testMoveTimeout(self):
+        """Let a move command time out, be sure it is handled correctly
+        """
+        self.test = "testMoveTimeout"
+        d = Deferred()
+        orientation = [10000, 3600, 3600]
+        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
+        cmdVar = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr,
+                callFunc = CmdCallback(d),
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertTrue(cmdVar.didFail)
+        d.addCallback(checkResults) 
+        # set timeout to a very small number
+        self.mirDev.DevCmdTimeout = 0.01       
+        self.dispatcher.executeCmd(cmdVar)
+        return d
         
+
     def testHome(self):
         """Sets isHomed to false then tests home command.
         checks:
