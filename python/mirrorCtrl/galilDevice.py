@@ -610,7 +610,7 @@ class GalilDevice(TCPDevice):
     def cmdCachedStatus(self, userCmd):
         """Return a cached status, don't ask the galil for a fresh one
         """
-        self.writeToUsers("w", "Text=\"Galil is busy, showing cached status\"", cmd = self.currDevCmd)
+        self.writeToUsers("w", "Text=\"Galil is busy executing: %s, showing cached status\"" % self.currDevCmd.cmdStr, cmd = userCmd)
         statusStr = self.status._getKeyValStr([
             "maxDuration",
             "duration",
@@ -624,7 +624,8 @@ class GalilDevice(TCPDevice):
             "homing",
             "axisHomed",
         ])
-        self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
+        self.writeToUsers("i", statusStr, cmd=userCmd)
+        userCmd.setState(userCmd.Done)
 
     def cmdStatus(self, userCmd):
         """Return the Galil status to the user.
