@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from mirrorCtrl.mirrors import mir35mSec, mir35mTert
+from mirrorCtrl.mirrors import mir35mSec, mir35mTert, mir25mSec
 import numpy
 import itertools
 import copy
@@ -13,7 +13,7 @@ from mirrorCtrl.mirror import DirectMirror
 
 import RO.Comm.Generic
 RO.Comm.Generic.setFramework("twisted")
-from mirrorCtrl.fakeGalil import FakeGalilFactory
+from mirrorCtrl.fakeGalil import FakeGalilFactory, FakePiezoGalilFactory
 from testMirrorCtrl import MirrorCtrlTestBase, CmdCallback
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
@@ -245,17 +245,6 @@ class ConvergenceTestActEqEnc(ConvergenceTestBase):
     def testOrients(self):
         return self._testOrients(m2TestOrients)    
 
-# class ConvergenceTestRandAct(ConvergenceTestBase):
-#     def setVars(self):
-#         self.fakeGalilFactory = FakeGalilFactory
-#         self.trueMirror = mir35mSec.Mirror
-#         self.mirror = getActRandMove(self.trueMirror)
-#         self.mirDev = mirrorCtrl.GalilDevice
-#         self.name = "mirror"        
-
-#     def testOrients(self):
-#         return self._testOrients()
-
 class ConvergenceTestM3(ConvergenceTestBase):
     def setVars(self):
         self.fakeGalilFactory = FakeGalilFactory
@@ -266,6 +255,21 @@ class ConvergenceTestM3(ConvergenceTestBase):
 
     def testOrients(self):
         return self._testOrients(m3TestOrients)
+
+class ConvergenceTestSDSSM2(ConvergenceTestBase):
+    def setVars(self):
+        self.fakeGalilFactory = FakePiezoGalilFactory
+        self.trueMirror = mir25mSec.Mirror
+        self.mirror = getActEqEncMir(self.trueMirror)
+        self.mirDev = mirrorCtrl.GalilDevice
+        self.name = "mirror" 
+
+    def testOrients(self):
+        orientList = [
+            [2000, 20, 20, 4, 8],
+            [-2000, -40, 89, 45, -23],
+        ]
+        return self._testOrients(orientList)
 
 class ConvergenceTestRandAct(ConvergenceTestBase):
     def setVars(self):
