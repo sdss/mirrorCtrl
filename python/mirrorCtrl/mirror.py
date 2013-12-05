@@ -27,6 +27,8 @@ ZeroOrientation = Orientation(0, 0, 0, 0, 0, 0)
 #     return 
 
 class MirrorBase(object):
+    """Base class for mirrors
+    """
     def __init__(self, actuatorList, fixedLinkList,
         encoderList=None, minCorrList=None, maxCorrList=None, name=None):
         """Construct a MirrorBase

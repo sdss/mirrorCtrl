@@ -23,6 +23,8 @@ ConvertOrient = numpy.array([MMPerMicron, RadPerArcSec, RadPerArcSec,
 
 
 class MirrorCtrl(Actor):
+    """Mirror controller actor
+    """
     def __init__(self,
         device,
         userPort,

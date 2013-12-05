@@ -398,11 +398,19 @@ class FakePiezoGalilProtocol(FakeGalilProtocol):
           
     
 class FakePiezoGalilFactory(FakeGalilFactory):
+    """FakePiezoGalil factory
+    
+    Example of use:
+        
+    from twisted.internet import reactor
+    reactor.listenTCP(port, FakePiezoGalilFactory(verbose=False))
+    reactor.run()
+    """
     def __init__(self, verbose=True, wakeUpHomed=True, mirror=mir25mSec.Mirror):
         FakeGalilFactory.__init__(self, verbose, wakeUpHomed, mirror)
         
     def buildProtocol(self, addr):
-        """Build a FakeGalilProtocol
+        """Build a FakePiezoGalilProtocol
         
         This override is required because FakeGalilProtocol needs the factory in __init__,
         but default buildProtocol only sets factory after the protocol is constructed
