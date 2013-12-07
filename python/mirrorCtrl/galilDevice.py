@@ -55,12 +55,10 @@ DevSpecVersionRegEx = re.compile(r"version of .+ additions", re.IGNORECASE)
 CmdEchoRegEx = re.compile(r'xq *#[a-z]+$', re.IGNORECASE)
 AxisEchoRegEx = re.compile(r'[A-Z]=-?(\d+)', re.IGNORECASE)
 
-# Tune-ables
-MaxIter = 2
-CorrectionStrength = 0.9 # scale the determined correction by this much
+
 # if abs(measured orientation - desired orientation) is within, orientation tolerence, 
 # call it good enough
-OrientationTolerance = numpy.array([1., 1., .01, .01, 1., 40.]) * ConvertOrient
+#OrientationTolerance = numpy.array([1., 1., .01, .01, 1., 40.]) * ConvertOrient
 
 ################## KEYWORD CAST VALUES ##################################
 mountCast = lambda mount: ",".join(["%.2f"%x for x in mount])
@@ -111,7 +109,6 @@ class GalilTimer(object):
 
 class GalilStatus(object):
     """A container for holding the status of the Galil """
-
     def __init__(self, device):
         """Construct a GalilStatus
 
@@ -124,18 +121,18 @@ class GalilStatus(object):
         self.maxDuration = numpy.nan
         self.duration = GalilTimer()
 #        self.remainExecTime = numpy.nan
-        self.actMount = [numpy.nan]*self.nAct # get rid of?
-        self.encMount = [numpy.nan]*self.nAct
-        self.cmdMount = [numpy.nan]*self.nAct  # user commanded
-        self.cmdMountIter = [numpy.nan]*self.nAct # will be updated upon move iterations
-        self.mountErr = [numpy.nan]*self.nAct # the last offset applied to a user commanded mount to bump towards convergence
-        self.orient = [numpy.nan]*6 # get rid of?
-        self.mountOrient = [numpy.nan]*6
-        self.desOrient = [numpy.nan]*6
+        self.actMount = numpy.asarray([numpy.nan]*self.nAct) # get rid of?
+        self.encMount = numpy.asarray([numpy.nan]*self.nAct)
+        self.cmdMount = numpy.asarray([numpy.nan]*self.nAct)  # user commanded
+        self.cmdMountIter = numpy.asarray([numpy.nan]*self.nAct) # will be updated upon move iterations
+        self.mountErr = numpy.asarray([0.]*self.nAct) # the last offset applied to a user commanded mount to bump towards convergence
+        self.orient = numpy.asarray([numpy.nan]*6) # get rid of?
+        self.mountOrient = numpy.asarray([numpy.nan]*6)
+        self.desOrient = numpy.asarray([numpy.nan]*6)
         self.desOrientAge = GalilTimer()
         self.iter = numpy.nan
-        self.maxIter = MaxIter if self.mirror.hasEncoders else 1
-        self.status = [numpy.nan]*self.nAct
+        self.maxIter = device.MaxIter if self.mirror.hasEncoders else 1
+        self.status = numpy.asarray([numpy.nan]*self.nAct)
         self.homing = ["?"]*self.nAct
         self.axisHomed = ["?"]*self.nAct
 
@@ -203,6 +200,14 @@ class GalilDevice(TCPDevice):
     STWaitTime = 1. # one second to wait after sending an st
     RSWaitTime = 2. # wait two seconds after sending an rs
     DevCmdTimeout = 2. # initial timeout to use for every device command
+    # the following are thresholds (large moves) beyond which automatic (previously computed)
+    # move offsets should not be used
+    LargePiston = 500. * MMPerMicron
+    LargeTranslation = 100. * MMPerMicron
+    LargeTilt = 10. * RadPerArcSec
+    # Tune-ables
+    MaxIter = 2
+    CorrectionStrength = 0.9 # scale the determined move offset correction by this much 
     def __init__(self, mirror, host, port, callFunc = None):
         """Construct a GalilDevice
 
@@ -570,9 +575,22 @@ class GalilDevice(TCPDevice):
             self.status.iter = 1
         # (user) commanded orient --> mount
         mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient=True)
-        self.status.cmdMount = numpy.asarray(mount, dtype=float) # this will not change upon iteration
-        self.status.cmdMountIter = self.status.cmdMount[:] # this will change upon iteration
-        self.status.desOrient = numpy.asarray(adjOrient, dtype=float) # initial guess for fitter
+        adjOrient = numpy.asarray(adjOrient, dtype=float)
+        mount = numpy.asarray(mount, dtype=float)
+        self.status.cmdMount = mount[:] # this will not change upon iteration
+        # determine if automatic offset should be applied (is this a small move?)
+        # self.status.desOrient will not be finite (numpy.nans) upon startup
+        addOffset = False
+        if numpy.isfinite(numpy.sum(self.status.desOrient)):
+            orientDiff = numpy.abs(adjOrient-self.status.desOrient)[:5] #don't care about z-rot
+            bigOrient = numpy.asarray([self.LargePiston, self.LargeTilt, self.LargeTilt, self.LargeTranslation, self.LargeTranslation], dtype=float)
+            addOffset = numpy.all(numpy.all(orientDiff/bigOrient < 1)) # small move, add offset
+        if addOffset:
+            # be sure that a previous desOrient is defined (not nans)
+            mount = mount + numpy.asarray(self.status.mountErr, dtype=float)*self.CorrectionStrength
+            self.writeToUsers("i", "Text=\"Automatically applying previous offset to mirror move.\"")
+        self.status.cmdMountIter = mount[:] # this will change upon iteration
+        self.status.desOrient = adjOrient[:] # initial guess for fitter
         # format Galil command
         cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
         self.status.desOrientAge.startTimer()
@@ -776,7 +794,7 @@ class GalilDevice(TCPDevice):
         if numpy.any(numpy.abs(actErr) > self.mirror.minCorrList) and (self.status.iter < self.status.maxIter): # and (numpy.any(numpy.abs(orietationErr)/OrientationTolerance > 1)):
             #self.status.cmdMount += actErr
             #newCmdActPos = numpy.asarray(actErr)*CorrectionStrength + numpy.asarray(self.status.cmdMountIter)
-            newCmdActPos = [err*CorrectionStrength + prevMount for err, prevMount in itertools.izip(actErr, self.status.cmdMountIter)]
+            newCmdActPos = [err*self.CorrectionStrength + prevMount for err, prevMount in itertools.izip(actErr, self.status.cmdMountIter)]
             self.status.cmdMountIter = newCmdActPos
             self.status.mountOrient = numpy.asarray(self.mirror.orientFromActuatorMount(newCmdActPos))
             # clear or update the relevant slots before beginning a new device cmd
@@ -854,6 +872,7 @@ class GalilDevice(TCPDevice):
         - valFmt: value format
         - nAxes: number of axes in command; if None use all axes
         """
+        valueList = list(valueList) # incase of numpy array
         if nAxes is None:
             nAxes = self.nAct
         elif nAxes > self.nAct:

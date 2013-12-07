@@ -182,7 +182,16 @@ class ConvergenceTestBase(MirrorCtrlTestBase):
         """
         # set encoder noise to zero
         #self.fakeGalilFactory.proto.noiseRange = 0.#
-        print 'testing orient', orient
+        # previoulsy commanded orient
+        # handle 'invalid' data, convert to numpy.nans
+        # prevOrient = self.dispatcher.model.desOrient[:]
+        # try:
+        #     numpy.sum(prevOrient)
+        #     prevOrient = numpy.asarray(prevOrient)/ConvertOrient
+        # except:
+        #     prevOrient = numpy.asarray([numpy.nan]*len(prevOrient))
+        # print 'previous orient ', prevOrient
+        # print 'testing orient', orient
         trueMirState = MirState(self.trueMirror)
         modelMirState = MirState(self.mirror)
         nIter, finalOffset = self._testConv(modelMirState, trueMirState,  orient)
@@ -197,7 +206,23 @@ class ConvergenceTestBase(MirrorCtrlTestBase):
             """Check results after cmdVar is done
             """
             self.assertFalse(cmdVar.didFail)
-            self.assertTrue(self.dispatcher.model.iter.valueList[0] == nIter)
+            # if new orient is a big difference from the previous, an automatic offset
+            # should have been applied, thus taking less iterations to converge
+            # bigMove = True
+            # if numpy.isfinite(numpy.sum(prevOrient)):
+            #     orientDiff = numpy.abs(numpy.asarray(orient)-numpy.asarray(prevOrient)[:5]) #don't care about z-rot
+            #     bigOrient = numpy.asarray([self.mirDev.LargePiston/MMPerMicron, self.mirDev.LargeTilt/RadPerArcSec, self.mirDev.LargeTilt/RadPerArcSec, self.mirDev.LargeTranslation/MMPerMicron, self.mirDev.LargeTranslation/MMPerMicron], dtype=float)
+            #  #   bigMove = numpy.any(orientDiff/bigOrient > 1)
+            # #print 'bigMOve???', bigMove
+            self.assertTrue(self.dispatcher.model.iter.valueList[0] <= nIter)
+            # if bigMove:
+            #     # should have gotten in the same amount of steps
+            #     print 'should equal', self.dispatcher.model.iter.valueList[0], nIter
+            #     #self.assertTrue(self.dispatcher.model.iter.valueList[0] == nIter)
+            # else:
+            #     # small move, automatic offset should have been applied
+            #     print 'should not equal', self.dispatcher.model.iter.valueList[0], nIter
+            #     #self.assertTrue(self.dispatcher.model.iter.valueList[0] < nIter)
         d.addCallback(checkResults)   
         self.dispatcher.executeCmd(cmdVar)
         return d
@@ -244,6 +269,20 @@ class ConvergenceTestActEqEnc(ConvergenceTestBase):
 
     def testOrients(self):
         return self._testOrients(m2TestOrients)    
+
+    def testSmallMoves(self):
+        bigOrient = bigOrient = numpy.asarray([self.mirDev.LargePiston/MMPerMicron, self.mirDev.LargeTilt/RadPerArcSec, self.mirDev.LargeTilt/RadPerArcSec, self.mirDev.LargeTranslation/MMPerMicron, self.mirDev.LargeTranslation/MMPerMicron], dtype=float)
+        orient1 = numpy.asarray(m2TestOrients[0], dtype=float)
+        orient2 = orient1 + 0.5*bigOrient
+        orient3 = orient2 + 0.75*bigOrient
+        return self._testOrients([orient1, orient2, orient3]) # should automatically add offsets
+
+    def testBigMoves(self):
+        bigOrient = bigOrient = numpy.asarray([self.mirDev.LargePiston/MMPerMicron, self.mirDev.LargeTilt/RadPerArcSec, self.mirDev.LargeTilt/RadPerArcSec, self.mirDev.LargeTranslation/MMPerMicron, self.mirDev.LargeTranslation/MMPerMicron], dtype=float)
+        orient1 = numpy.asarray(m2TestOrients[0], dtype=float)
+        orient2 = orient1 + 1.5*bigOrient
+        orient3 = orient2 + 2.75*bigOrient
+        return self._testOrients([orient1, orient2, orient3])      # no added offset  
 
 class ConvergenceTestM3(ConvergenceTestBase):
     def setVars(self):

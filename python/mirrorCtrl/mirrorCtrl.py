@@ -6,6 +6,8 @@ import itertools
 import math
 import os
 import numpy
+import traceback
+import sys
 
 from twistedActor import Actor, CommandError, UserCmd, BaseCmd, writeToLog, startLogging, CommandQueue#,startGlobalLogging
 
@@ -142,7 +144,9 @@ class MirrorCtrl(Actor):
         try:
             self.cmdQueue.addCmd(cmd, lambda: self.dev.galilDevice.cmdMove(cmdOrient, userCmd=cmd))
         except Exception, e:
+            traceback.print_exc(file=sys.stderr)
             raise CommandError(str(e))
+            
         return True
             
     def cmd_home(self, cmd):
