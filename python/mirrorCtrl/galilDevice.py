@@ -125,7 +125,9 @@ class GalilStatus(object):
         self.encMount = numpy.asarray([numpy.nan]*self.nAct)
         self.cmdMount = numpy.asarray([numpy.nan]*self.nAct)  # user commanded
         self.cmdMountIter = numpy.asarray([numpy.nan]*self.nAct) # will be updated upon move iterations
-        self.mountErr = numpy.asarray([0.]*self.nAct) # the last offset applied to a user commanded mount to bump towards convergence
+        self.mountErr = numpy.asarray([0.]*self.nAct) # the last delta-offset applied to a user commanded mount to bump towards convergence
+        # last computed total offset between the first commanded mount position and the last commanded mount position after iteration
+        self.mountOffset = numpy.asarray([0.]*self.nAct) 
         self.orient = numpy.asarray([numpy.nan]*6) # get rid of?
         self.mountOrient = numpy.asarray([numpy.nan]*6)
         self.desOrient = numpy.asarray([numpy.nan]*6)
@@ -145,6 +147,7 @@ class GalilStatus(object):
             "cmdMount": mountCast,
             "cmdMountIter": mountCast,
             "mountErr": mountCast,
+            "mountOffset": mountCast,
             "orient": orientCast,
             "desOrient": orientCast,
             "mountOrient": orientCast,
@@ -204,11 +207,9 @@ class GalilDevice(TCPDevice):
     # move offsets should not be used
     LargePiston = 500. * MMPerMicron
     LargeTranslation = 100. * MMPerMicron
-    LargeTilt = 10. * RadPerArcSec
-    # Tune-ables
-    MaxIter = 2
+    LargeTilt = 10. * RadPerArcSec    
     CorrectionStrength = 0.9 # scale the determined move offset correction by this much 
-    def __init__(self, mirror, host, port, callFunc = None):
+    def __init__(self, mirror, host, port, maxIter = 5, callFunc = None):
         """Construct a GalilDevice
 
         @param[in] mirror: an instance of mirrorCtrl.MirrorBase
@@ -219,9 +220,10 @@ class GalilDevice(TCPDevice):
             Note that callFunc is NOT called when the connection state changes;
             register a callback with "conn" for that.
         """
+        self.MaxIter = maxIter
         self.mirror = mirror
         TCPDevice.__init__(self,
-            name = 'galilDevice',
+            name = 'galil',
             host = host,
             port = port,
             callFunc = callFunc,
@@ -587,8 +589,10 @@ class GalilDevice(TCPDevice):
             addOffset = numpy.all(numpy.all(orientDiff/bigOrient < 1)) # small move, add offset
         if addOffset:
             # be sure that a previous desOrient is defined (not nans)
-            mount = mount + numpy.asarray(self.status.mountErr, dtype=float)*self.CorrectionStrength
+            mount = mount + numpy.asarray(self.status.mountOffset, dtype=float)
             self.writeToUsers("i", "Text=\"Automatically applying previous offset to mirror move.\"")
+            statusStr = self.status._getKeyValStr(["mountOffset"])
+            self.writeToUsers('i', statusStr, cmd=self.userCmdOrNone)
         self.status.cmdMountIter = mount[:] # this will change upon iteration
         self.status.desOrient = adjOrient[:] # initial guess for fitter
         # format Galil command
@@ -810,6 +814,10 @@ class GalilDevice(TCPDevice):
             self.startDevCmd(cmdMoveStr, callFunc=self._moveIter, errFunc=self.failStop)
             return
         # done
+        # record offset which is total descrepancy between first commanded (naive) mount position
+        # and lastly commanded (iterated/converged) mount position
+        # offset should be added
+        self.status.mountOffset = [cmdLast - cmdFirst for cmdFirst, cmdLast in itertools.izip(self.status.cmdMount[0:self.nAct], self.status.cmdMountIter[0:self.nAct])]
         self._moveEnd()
 
     def _moveEnd(self, *args):

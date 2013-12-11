@@ -246,12 +246,12 @@ class ConvergenceTestBase(MirrorCtrlTestBase):
     def startFakeGalil(self):
         """Start the fake Galil on a randomly chosen port; return the port number
         """
-        print "startFakeGalil()"
+        #print "startFakeGalil()"
         self.fakeGalilFactory = self.fakeGalilFactory(verbose=False, wakeUpHomed=True, mirror=self.trueMirror)
         portObj = reactor.listenTCP(port=0, factory=self.fakeGalilFactory)
         galilPort = portObj.getHost().port
         self.addCleanup(portObj.stopListening)
-        print "Started fake Galil on port", galilPort
+        #print "Started fake Galil on port", galilPort
         return galilPort
 
     # def testSmallOffset(self):
@@ -276,6 +276,11 @@ class ConvergenceTestActEqEnc(ConvergenceTestBase):
         orient2 = orient1 + 0.5*bigOrient
         orient3 = orient2 + 0.75*bigOrient
         return self._testOrients([orient1, orient2, orient3]) # should automatically add offsets
+
+    def testSameMoves(self):
+        # offset should be pre-determined and automatic for moves 2 and 3
+        orient1 = numpy.asarray(m2TestOrients[0], dtype=float)
+        return self._testOrients([orient1]*3) # should automatically add offsets
 
     def testBigMoves(self):
         bigOrient = bigOrient = numpy.asarray([self.mirDev.LargePiston/MMPerMicron, self.mirDev.LargeTilt/RadPerArcSec, self.mirDev.LargeTilt/RadPerArcSec, self.mirDev.LargeTranslation/MMPerMicron, self.mirDev.LargeTranslation/MMPerMicron], dtype=float)

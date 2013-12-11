@@ -360,7 +360,7 @@ class FakePiezoGalilProtocol(FakeGalilProtocol):
         """Overwritten from base class to handle piezo commands also
         """
         # piezo specifics
-        print 'cmd: ', cmd
+        #print 'cmd: ', cmd
         cmdMatch = re.match(r"LDESPOS([A-F]) *= *((-)?\d+)$", cmd)
         if cmdMatch:
             axis = cmdMatch.groups()[0]

@@ -76,25 +76,25 @@ class MirrorCtrlTestBase(TestCase):
     def tearDown(self):
         """Tear down things; most of the work is done by addCleanup
         """
-        print "tearDown()"
+        #print "tearDown()"
         if self.dispatcher is not None:
             self.dispatcher.disconnect()
 
     def startFakeGalil(self):
         """Start the fake Galil on a randomly chosen port; return the port number
         """
-        print "startFakeGalil()"
+        #print "startFakeGalil()"
         self.fakeGalilFactory = self.fakeGalilFactory(verbose=False, wakeUpHomed=True)
         portObj = reactor.listenTCP(port=0, factory=self.fakeGalilFactory)
         galilPort = portObj.getHost().port
         self.addCleanup(portObj.stopListening)
-        print "Started fake Galil on port", galilPort
+        #print "Started fake Galil on port", galilPort
         return galilPort
         
     def startMirrorCtrl(self, galilPort):
         """Start mirror controller
         """
-        print "startMirrorCtrl(galilPort=%r)" % (galilPort,)
+        #print "startMirrorCtrl(galilPort=%r)" % (galilPort,)
         #mirror = mirrorCtrl.mirrors.mir35mTert.Mirror
         self.mirDev = self.mirDev(
             mirror = self.mirror,
@@ -104,7 +104,7 @@ class MirrorCtrlTestBase(TestCase):
         
         d = Deferred()
         def connCallback(conn, d=d):
-            print "mirror controller conn state=", conn.state
+            #print "mirror controller conn state=", conn.state
             if conn.isConnected:
                 d.callback("success")
         
@@ -119,7 +119,7 @@ class MirrorCtrlTestBase(TestCase):
 
     def startCommander(self, *args): # *args for the callback result that we don't care about
         """Start a commander"""
-        print "startCommander(*args=%r)" % (args,)
+        #print "startCommander(*args=%r)" % (args,)
         # this doesn't close cleanly
         # def readCB(foo, line):
         #     print "socket read", line
@@ -144,9 +144,9 @@ class MirrorCtrlTestBase(TestCase):
             # so fire the callback
             d.callback('whooohooo')
         def getStatus(conn):
-            print "commander conn state=", conn.state
+            #print "commander conn state=", conn.state
             if conn.isConnected:
-                print 'Querying Device for status'
+                #print 'Querying Device for status'
                 cmdVar = CmdVar (
                     actor = self.name,
                     cmdStr = 'status',
@@ -154,7 +154,7 @@ class MirrorCtrlTestBase(TestCase):
                 )
                 self.dispatcher.executeCmd(cmdVar)
         def getParams(cb):
-            print 'Querying Device for params'
+            #print 'Querying Device for params'
             cmdVar = CmdVar (
                 actor = self.name,
                 cmdStr = 'showparams',
@@ -244,6 +244,24 @@ class GenericTests(MirrorCtrlTestBase):
     #     self.dispatcher.executeCmd(cmdVar)
     #     return d
 
+    def testActorBypass(self):
+        d = Deferred()
+        st = "ST"
+        galilCmd = "A=1134426; B=1732577; C=867754; XQ #MOVE"
+        cmdVar1 = CmdVar (
+                actor = self.name,
+                cmdStr = 'galil ' + st,
+                #callFunc = CmdCallback(d),
+            )       
+        cmdVar2 = CmdVar (
+                actor = self.name,
+                cmdStr = 'galil ' + galilCmd,
+                #callFunc = CmdCallback(d),
+            ) 
+        self.dispatcher.executeCmd(cmdVar1)
+        reactor.callLater(0.2, self.dispatcher.executeCmd, cmdVar2)
+        reactor.callLater(3, d.callback, "go")
+        return d
 
     def testUnHomedMove(self):
         """Set isHomed on the fakeGalil to all False. Try to move.
