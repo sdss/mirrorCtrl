@@ -22,8 +22,17 @@ import mirrorCtrl
 import mirrorCtrl.mirrors.mir35mTert
 import mirrorCtrl.mirrors.mir25mSec
 from mirrorCtrl.fakeGalil import FakeGalilFactory, FakePiezoGalilFactory
+import socket
 
 UserPort = 9102 # port for mirror controllers
+
+def getOpenPort():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("",0))
+    s.listen(1)
+    port = s.getsockname()[1]
+    s.close()
+    return port
 
 def showReply(msgStr, *args, **kwargs): # prints what the dispatcher sees
     print 'Keyword Reply: ' + msgStr
@@ -111,7 +120,7 @@ class MirrorCtrlTestBase(TestCase):
         self.mirDev.conn.addStateCallback(connCallback)
         self.mirActor = mirrorCtrl.MirrorCtrl(
             device = self.mirDev,
-            userPort = UserPort,
+            userPort = self.userPort,
         )
         self.addCleanup(self.mirDev.conn.disconnect)
         self.addCleanup(self.mirActor.server.close)
@@ -127,7 +136,7 @@ class MirrorCtrlTestBase(TestCase):
         #     print foo.fullState
         self.cmdConn = TCPConnection(
             host = 'localhost',
-            port = UserPort,
+            port = self.userPort,
             # readCallback = readCB,
             # stateCallback = stateCB,
             readLines = True,
@@ -170,6 +179,9 @@ class GenericTests(MirrorCtrlTestBase):
     """Tests for each command, and how they behave in collisions
     """
     def setVars(self):
+        self.userPort = getOpenPort()
+        #print 'userPort!!!!', self.userPort
+        #self.userPort = UserPort
         self.fakeGalilFactory = FakeGalilFactory
         self.mirror = mirrorCtrl.mirrors.mir35mTert.Mirror
         self.mirDev = mirrorCtrl.GalilDevice
@@ -829,6 +841,8 @@ class PiezoTests(MirrorCtrlTestBase):
     """Tests a piezo mirror setup
     """
     def setVars(self):
+        #self.userPort = UserPort
+        self.userPort = getOpenPort()
         self.fakeGalilFactory = FakePiezoGalilFactory
         self.mirror = mirrorCtrl.mirrors.mir25mSec.Mirror
         self.mirDev = mirrorCtrl.GalilDevice25Sec    

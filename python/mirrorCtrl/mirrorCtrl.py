@@ -23,7 +23,6 @@ RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
 ConvertOrient = numpy.array([MMPerMicron, RadPerArcSec, RadPerArcSec,
                              MMPerMicron, MMPerMicron], dtype = float)
 
-
 class MirrorCtrl(Actor):
     """Mirror controller actor
     """

@@ -14,7 +14,7 @@ from mirrorCtrl.mirror import DirectMirror
 import RO.Comm.Generic
 RO.Comm.Generic.setFramework("twisted")
 from mirrorCtrl.fakeGalil import FakeGalilFactory, FakePiezoGalilFactory
-from testMirrorCtrl import MirrorCtrlTestBase, CmdCallback
+from testMirrorCtrl import MirrorCtrlTestBase, CmdCallback, UserPort, getOpenPort
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
 import mirrorCtrl
@@ -261,6 +261,7 @@ class ConvergenceTestBase(MirrorCtrlTestBase):
 
 class ConvergenceTestActEqEnc(ConvergenceTestBase):
     def setVars(self):
+        self.userPort = getOpenPort()
         self.fakeGalilFactory = FakeGalilFactory
         self.trueMirror = mir35mSec.Mirror
         self.mirror = getActEqEncMir(self.trueMirror)
@@ -291,6 +292,7 @@ class ConvergenceTestActEqEnc(ConvergenceTestBase):
 
 class ConvergenceTestM3(ConvergenceTestBase):
     def setVars(self):
+        self.userPort = getOpenPort()
         self.fakeGalilFactory = FakeGalilFactory
         self.trueMirror = mir35mTert.Mirror
         self.mirror = getActEqEncMir(self.trueMirror)
@@ -302,6 +304,7 @@ class ConvergenceTestM3(ConvergenceTestBase):
 
 class ConvergenceTestSDSSM2(ConvergenceTestBase):
     def setVars(self):
+        self.userPort = getOpenPort()
         self.fakeGalilFactory = FakePiezoGalilFactory
         self.trueMirror = mir25mSec.Mirror
         self.mirror = getActEqEncMir(self.trueMirror)
@@ -317,6 +320,7 @@ class ConvergenceTestSDSSM2(ConvergenceTestBase):
 
 class ConvergenceTestRandAct(ConvergenceTestBase):
     def setVars(self):
+        self.userPort = getOpenPort()
         self.fakeGalilFactory = FakeGalilFactory
         self.trueMirror = mir35mSec.Mirror
         self.mirror = getActRandMove(self.trueMirror, seed=45)
@@ -330,6 +334,7 @@ class ConvergenceTestPerfect(ConvergenceTestBase):
     """model exactly represents truth, no iterations
     """
     def setVars(self):
+        self.userPort = getOpenPort()
         self.fakeGalilFactory = FakeGalilFactory
         self.trueMirror = mir35mSec.Mirror
         self.mirror = copy.deepcopy(mir35mSec.Mirror)
