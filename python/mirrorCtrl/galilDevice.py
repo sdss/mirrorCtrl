@@ -19,7 +19,6 @@ import time
 import itertools
 import math
 import re
-import copy
 
 import numpy
 from RO.StringUtil import quoteStr, strFromException
@@ -209,12 +208,13 @@ class GalilDevice(TCPDevice):
     LargeTranslation = 100. * MMPerMicron
     LargeTilt = 10. * RadPerArcSec    
     CorrectionStrength = 0.9 # scale the determined move offset correction by this much 
-    def __init__(self, mirror, host, port, maxIter = 5, callFunc = None):
+    def __init__(self, mirror, host, port, maxIter=5, callFunc=None):
         """Construct a GalilDevice
 
         @param[in] mirror: an instance of mirrorCtrl.MirrorBase
         @param[in] host: host address of Galil controller
         @param[in] port: port of Galil controller
+        @param[in] maxIter: the maximum number of iterations to refine the mirror position
         @param[in] callFunc: function to call when state of device changes;
             it receives one argument: this device.
             Note that callFunc is NOT called when the connection state changes;
@@ -975,9 +975,11 @@ class GalilDevice25Sec(GalilDevice):
         # look for piezo-specific status
         elif key == 'piezo corrections (microsteps)':
             self.status.piezoCorr = [float(num) for num in dataList]
-            updateStr = self.status._getKeyValStr(["piezoCorr"])
-            outStr = self.formatAsKeyValStr("piezoStatusWord", dataList)
-            self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
+            outStr = "; ".join((
+                self.status._getKeyValStr(["piezoCorr"]),
+                self.formatAsKeyValStr("piezoStatusWord", dataList),
+            ))
+            self.writeToUsers("i", outStr, cmd=self.userCmdOrNone)
             return
         elif key == 'piezo status word':
             self.status.piezoStatus = int(dataList[0])
