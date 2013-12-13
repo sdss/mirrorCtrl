@@ -33,21 +33,20 @@ class MirrorBase(object):
         encoderList=None, minCorrList=None, maxCorrList=None, name=None):
         """Construct a MirrorBase
 
-        Inputs:
-        - actuatorList: List of actuators that support the mirrorCtrl.
-        - fixedLinkList: List of fixed-length links that support the mirror
-        - encoderList:  Encoders associated with actuators. None if there are no encoders,
-                        else a list of items: each an encoder or None if the associated
-                        actuator has no encoder.
-        - minCorrList: if encoderList is not None: specifies the maximum encoder error to correct (steps);
+        @param[in] actuatorList: List of actuators that support the mirrorCtrl.
+        @param[in] fixedLinkList: List of fixed-length links that support the mirror
+        @param[in] encoderList:  Encoders associated with actuators. None if there are no encoders,
+            else a list of items: each an encoder or None if the associated
+            actuator has no encoder.
+        @param[in] minCorrList: if encoderList is not None: specifies the maximum encoder error to correct (steps);
             must have the same number of elements as encoderList;
             if encoderList[i] is None then minCorrList[i] is ignored.
             If encoderList is None then this argument is entirely ignored.
-        - maxCorrList: if encoderList is not None: specifies the maximum encoder error to correct (steps);
+        @param[in] maxCorrList: if encoderList is not None: specifies the maximum encoder error to correct (steps);
             must have the same number of elements as encoderList;
             if encoderList[i] is None then minCorrList[i] is ignored.
             If encoderList is None then this argument is entirely ignored.
-        - name: Mirror name, if you care to specify. Choose from 'Prim', 'Sec', or 'Tert'
+        @param[in] name: Mirror name, if you care to specify. Choose from 'Prim', 'Sec', or 'Tert'
                 this is read by the actor and used to generate appriate keywords
         
         Two configurations are supported:
@@ -179,9 +178,8 @@ class MirrorBase(object):
     def orientFromEncoderMount(self, mount, initOrient=ZeroOrientation):
         """Compute mirror orientation from encoder mount lengths
         
-        Inputs:
-        - mount: encoder mount positions; one per encoder or actuator if the actuator has no associated encoder
-        - initOrient: initial guess as to orientation; may be incomplete
+        @param[in] mount: encoder mount positions; one per encoder or actuator if the actuator has no associated encoder
+        @param[in] initOrient: initial guess as to orientation; may be incomplete
         """
         if len(mount) != len(self.encoderList):
             raise RuntimeError("Need %s values; got %s" % (len(self.encoderList), len(mount)))
@@ -190,9 +188,8 @@ class MirrorBase(object):
     def orientFromActuatorMount(self, mount, initOrient = ZeroOrientation):
         """Compute mirror orientation from actuator mount lengths
         
-        Inputs:
-        - mount: encoder mount positions; one per encoder
-        - initOrient: initial guess as to orientation; may be incomplete
+        @param[in] mount: encoder mount positions; one per encoder
+        @param[in] initOrient: initial guess as to orientation; may be incomplete
         """
         if len(mount) != len(self.actuatorList):
             raise RuntimeError("Need %s values; got %s" % (len(self.actuatorList), len(mount)))
@@ -201,13 +198,16 @@ class MirrorBase(object):
     def actuatorMountFromOrient(self, userOrient, return_adjOrient = False, adjustOrient = True):
         """Compute actuator mount lengths from orientation
         
-        Inputs:
-        - userOrient: an Orientation or collection of 6 items or fewer in the same order.
-            Missing items are treated as 0 or (for uncontrollable axes) properly constrained values.
-        
-        Output:
-        - mountList: list of mount coords for actuator/encoders
-        - adjOrient: adjusted orient based on mirror fixed links
+        @param[in] userOrient: an Orientation or collection of 6 items or fewer in the
+            same order. Keywords are also accepted, undefined fields will be
+            silently replaced as zeros.
+        @param[in] return_adjOrient: bool. Whether or not to return the adjustedOrientation.
+        @param[in] adjustOrient: bool.  Whether or not to adjust orientation, to discover a "best-fit" orientation 
+            that accounts for induced motions due to fixed links
+
+        @return 1 or 2 items:
+            - mountList: list of mount coords for actuator/encoders
+            - adjOrient: adjusted orient based on mirror fixed links
         """
         if len(userOrient) not in set((0, 1, 3, 5, 6)):
             raise RuntimeError('Input orientation must be a list of numbers of \n\
@@ -227,16 +227,18 @@ class MirrorBase(object):
             return mountList
         
     def encoderMountFromOrient(self, userOrient, return_adjOrient = False, adjustOrient = True):
-        """Compute actuator mount lengths from orientation
+        """Compute encoder mount lengths from orientation
         
-        Inputs:
-        - userOrient: an Orientation or collection of 6 items or fewer in the
-        same order. Keywords are also accepted, undefined fields will be
-        silently replaced as zeros.
-        
-        Output:
-        - mountList: list of mount coords for actuator/encoders
-        - adjOrient: adjusted orient based on mirror fixed links
+        @param[in] userOrient: an Orientation or collection of 6 items or fewer in the
+            same order. Keywords are also accepted, undefined fields will be
+            silently replaced as zeros.
+        @param[in] return_adjOrient: bool. Whether or not to return the adjustedOrientation.
+        @param[in] adjustOrient: bool.  Whether or not to adjust orientation, to discover a "best-fit" orientation 
+        that accounts for induced motions due to fixed links
+
+        @return 1 or 2 items:
+            - mountList: list of mount coords for actuator/encoders
+            - adjOrient: adjusted orient based on mirror fixed links
         """
         if len(userOrient) not in set((0, 1, 3, 5, 6)):
             raise RuntimeError('Input orientation must be a list of numbers of \n\
@@ -258,11 +260,10 @@ class MirrorBase(object):
     def _fullOrient(self, orient):
         """Compute fully specified orientation from a partially specified orientation.
         
-        Input:
-        - userOrient: list of orientation values: 0, 1, 3, 5 or 6 values. Missing values are treated as 0.
+        @param[in] orient: list of orientation values: 0, 1, 3, 5 or 6 values. Missing values are treated as 0.
 
         Output:
-        - orient: the full 6-axis orientation as an Orientation. Axes that cannot be controlled
+        @ return orient: the full 6-axis orientation as an Orientation. Axes that cannot be controlled
             are set to their constrained value (which should be nearly 0 for a typical mirror).
         """
 
@@ -304,6 +305,13 @@ class MirrorBase(object):
 
     def _mountFromOrient(self, orient, linkList):
         """Compute link mount length from orientation
+
+        @param[in] orient: a 6 element orientation
+        @param[in] linkList: a list of link objects for which to
+            determin lengths for
+
+        @return mountList: a list of mount lengths (in mount units)
+            corresponding to the links provided in linkList
         """
         phys = self._physFromOrient(orient, linkList)
         mountList = []
@@ -322,16 +330,21 @@ class MirrorBase(object):
         """Compute physical link length from orientation.
         
         Subclasses must override
+
+        @param[in] orient: a 6 element list/array of orientation values
+        @param[in] linkList: a list of link objects for which to
+            determin lengths for
         """
         raise NotImplementedError()
     
     def _orientFromMount(self, mount, linkList, initOrient=ZeroOrientation):
         """Compute orientation from link mount length
 
-        Inputs:
-        - mount: link mount length
-        - linkList: list of Links
-        - initOrient: initial guess as to orientation (may be incomplete)
+        @param[in] mount: link mount length
+        @param[in] linkList: list of Links
+        @param [in] initOrient: initial guess as to orientation (may be incomplete)
+
+        @return orient, a 6 element orientation
         """
         if len(mount) != len(linkList):
             raise RuntimeError("len(mount)=%s != %s=len(linkList)" % (len(mount), len(linkList)))
@@ -341,15 +354,13 @@ class MirrorBase(object):
     def _physMult(self, linkList):
         """Determine multiplier for each actuator to be used in minimization
         
+        @param[in] linkList: list of links
+        
+        @return physMult: error multiplier for each axis.
+
         Computes the effect of a perturbing each axis of orientation by a given amount
         on each link actuator length. This is used to scale the weighting of physical
         length errors when fitting orientation from physical length.
-        
-        Input:
-        - linkList: list of links
-        
-        Output:
-        - physMult: error multiplier for each axis.
         """
         
         maxOrientErr = Orientation(0.0001, 5e-8, 5e-8, 0.0001, 0.0001, 5e-7)
@@ -373,13 +384,11 @@ class MirrorBase(object):
     def _orientFromPhys(self, phys, linkList, initOrient=ZeroOrientation):
         """Compute mirror orientation give the physical position of each actuator. Uses fitting.
         
-        Input:
-        - phys: physical position of each actuator or encoder; the position for fixed links will be ignored
-        - linkList: list of actuators or encoders (not fixed links!)
-        - initOrient: initial guess as to orientation; may be incomplete
+        @param[in] phys: physical position of each actuator or encoder; the position for fixed links will be ignored
+        @param[in] linkList: list of actuators or encoders (not fixed links!)
+        @param[in] initOrient: initial guess as to orientation; may be incomplete
        
-        Output:
-        - orient: mirror orientation (an Orientation)
+        @return orient: mirror orientation (an Orientation)
         """
         givPhys = phys[:]
         # we want to compute orient using fixed link constraints
@@ -428,21 +437,19 @@ class MirrorBase(object):
     def _minOrientErr(self, minOrient, givPhys, physMult, linkList, fitAxes=None, fullOrient=None):
         """Compute physical error given desired orientation and actual physical.
         
-        Inputs: 
-        - minOrient: an orientation to be solved for. If it is less than 6 elements, then fitAxes
+        @param[in] minOrient: an orientation to be solved for. If it is less than 6 elements, then fitAxes
                         must to be specified and must be the same length as minOrient.
-        - givPhys:  list of physical link lengths, must be same length as linkList
-        - physMult: list of multipliers for computing errors
-        - linkList: list of links
-        - fitAxes:  a Python list of axes indices to solve for.
+        @param[in] givPhys:  list of physical link lengths, must be same length as linkList
+        @param[in] physMult: list of multipliers for computing errors
+        @param[in] linkList: list of links
+        @param[in] fitAxes:  a Python list of axes indices to solve for.
                         Ignored if minOrient has 6 elements, else must be the same size as minOrient.
-        - fullOrient: 6 item collection. This is a 'constant' orientation, minOrient is inserted
+        @param[in] fullOrient: 6 item collection. This is a 'constant' orientation, minOrient is inserted
                         into specific axes of fullOrient defined by fitAxes. This way we can define
                         a minimization for an arbitrary amount of orientation axes while leaving 
                         the constant axes untouched by the fitter.
         
-        Output:
-        - sum(physMult * physErrSq**2)
+        @return sum(physMult * physErrSq**2)
         
         @raise IndexError if fitAxes is not a Python list
         """
@@ -463,15 +470,14 @@ class MirrorBase(object):
     def _orient2RotTransMats(self, orient):
         """Compute transformation matrices for mirror positions for a given orientation.
         
-        Compute matrices used to transform cartesian points on the mirror from
-        their location at zero orientation to their location at the specified orientation.
-        
-        Input:
-        - orient:  an Orientation
+        @param[in] orient:  an Orientation
 
-        Outputs: 
+        @return 2 values: 
         - rotMat:  3x3 rotation matrix
         - offsets: 3x1 (x,y,z) offset vector
+
+        Compute matrices used to transform cartesian points on the mirror from
+        their location at zero orientation to their location at the specified orientation.
         """
         orient = Orientation(*orient) # needed for fitting orientFromPhys
         cosX = math.cos(orient.tiltX)
@@ -518,22 +524,21 @@ class DirectMirror(MirrorBase):
     def __init__(self, actuatorList, fixedLinkList, encoderList, minCorrList, maxCorrList, name=None):
         """Construct a Direct mirror
 
-        Inputs:
-        - actuatorList: List of actuators that support the mirrorCtrl.
-        - fixedLinkList: List of fixed-length links that support the mirror
-        - encoderList:  Encoders associated with actuators. None if there are no encoders,
-                        else a list of items: each an encoder or None if the associated
-                        actuator has no encoder.
-        - minCorrList: if encoderList is not None: specifies the minimum actuator error to correct;
+        @param[in] actuatorList: List of actuators that support the mirrorCtrl.
+        @param[in] fixedLinkList: List of fixed-length links that support the mirror
+        @param[in] encoderList:  Encoders associated with actuators. None if there are no encoders,
+            else a list of items: each an encoder or None if the associated
+            actuator has no encoder.
+        @param[in] minCorrList: if encoderList is not None: specifies the minimum actuator error to correct;
             must have the same number of elements as encoderList;
             if encoderList[i] is None then minCorrList[i] is ignored.
             If encoderList is None then this argument is entirely ignored.
-        - maxCorrList: if encoderList is not None: specifies the maximum actuator error to correct;
+        @param[in] maxCorrList: if encoderList is not None: specifies the maximum actuator error to correct;
             must have the same number of elements as encoderList;
             if encoderList[i] is None then minCorrList[i] is ignored.
             If encoderList is None then this argument is entirely ignored.
-        - name: Mirror name, if you care to specify. Choose from 'Prim', 'Sec', or 'Tert'
-                this is read by the actor and used to generate appriate keywords
+        @param[in] name: Mirror name, if you care to specify. Choose from 'Prim', 'Sec', or 'Tert'
+            this is read by the actor and used to generate appriate keywords
         
         Two configurations are supported:
         - control piston, tip and tilt only (no translation or z rotation)
@@ -555,12 +560,10 @@ class DirectMirror(MirrorBase):
         this fact in minimization routines, to solve for correct orientations
         given the fact that in reality phys = 0 for fixed length links.
         
-        Input:
-        - orient: mirror orientation (an Orientation)
-        - linkList: list of actuators, encoders, or fixed length links
+        @param[in] orient: mirror orientation (an Orientation)
+        @param[in] linkList: list of actuators, encoders, or fixed length links
 
-        Output: 
-        - physList: computed physical distance to the mirror (mm), measured from the neutral 
+        @return physList: computed physical distance to the mirror (mm), measured from the neutral 
         position. In reality, fixed lenght links must have a phys of 0. This method doesn't 
         return necessary 0 for fixed links.
                     
@@ -589,18 +592,17 @@ class TipTransMirror(MirrorBase):
         encoderList, minCorrList, maxCorrList, name=None):
         """Construct a Tip-Trans Mirror
         
-        Inputs:
-        - ctrMirZ: z position of center of mirror in neutral position
-        - ctrBaseZ: z position of center of base (ball joint)
-        - fixedLinkList: List of fixed-length links that support the mirror
-        - encoderList:  Encoders associated with actuators. None if there are no encoders,
-                        else a list of items: each an encoder or None if the associated
-                        actuator has no encoder.
-        - minCorrList: if encoderList is not None: specifies the maximum actuator error to correct;
+        @param[in] ctrMirZ: z position of center of mirror in neutral position
+        @param[in] ctrBaseZ: z position of center of base (ball joint)
+        @param[in] fixedLinkList: List of fixed-length links that support the mirror
+        @param[in] encoderList:  Encoders associated with actuators. None if there are no encoders,
+            else a list of items: each an encoder or None if the associated
+            actuator has no encoder.
+        @param[in] minCorrList: if encoderList is not None: specifies the maximum actuator error to correct;
             must have the same number of elements as encoderList;
             if encoderList[i] is None then minCorrList[i] is ignored.
             If encoderList is None then this argument is entirely ignored.
-        - maxCorrList: if encoderList is not None: specifies the maximum actuator error to correct;
+        @param[in] maxCorrList: if encoderList is not None: specifies the maximum actuator error to correct;
             must have the same number of elements as encoderList;
             if encoderList[i] is None then minCorrList[i] is ignored.
             If encoderList is None then this argument is entirely ignored.
@@ -622,19 +624,18 @@ class TipTransMirror(MirrorBase):
     def _rotEqPolMat(self, eqAng, polAng):
         """
         This method was translated from src/subr/cnv/roteqpol.for.
+        
+        @param[in] eqAng:  Equatorial rotation angle (radians) of line in x-y plane (from x to y).
+                   This plane of rotation includes this line and z.
+        @param[in] polAng: Polar rotation angle (radians) from z axis to the line in the x-y plane.
+        
+        @return rotMatEqPol: 3x3 rotation matrix
+
         Defines a matrix that rotates a 3-vector described by equatorial
         and polar angles as follows: The plane of rotation contains the
         z axis and a line in the x-y plane at angle eqAng from the x
         axis towards y. The amount of rotation is angle polAng from the
         z axis towards the line in the x-y plane.
-        
-        Inputs:
-        - eqAng:  Equatorial rotation angle (radians) of line in x-y plane (from x to y).
-                   This plane of rotation includes this line and z.
-        - polAng: Polar rotation angle (radians) from z axis to the line in the x-y plane.
-        
-        Output:
-        - rotMatEqPol: 3x3 rotation matrix
         """ 
         sinEq = math.sin(eqAng) 
         cosEq = math.cos(eqAng)
@@ -656,15 +657,11 @@ class TipTransMirror(MirrorBase):
         
     def _physFromOrient(self, orient, linkList):
         """Compute physical actuator, encoder, or fixed length length given orientation. 
-        This version differs from _physFromOrient because I choose to work in spherical coords
-        for the transverse actuators.
-        
-        Input:
-        - orient:  mirror orientation with 6 axes 6 item list:
-        - linkList: list of actuators or encoders
 
-        Output: 
-        - physList[0:5]: delta length for link length (mm) measured from the neutral position.
+        @param[in] orient:  mirror orientation with 6 axes 6 item list:
+        @param[in] linkList: list of actuators or encoders
+
+        @return physList[0:5]: delta length for link length (mm) measured from the neutral position.
                                 FixedLengthLink can return a non-zero length.
 
         notes: This can return an impossible length in the case of fixed length links. This feature

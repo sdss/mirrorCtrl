@@ -34,10 +34,9 @@ class MirrorCtrl(Actor):
     ):
         """Create a Galil mirror controller actor
         
-        Inputs:
-        - device    A Galil device from galilDevice.py
-        - userPort  port on which to listen for client connections
-        - maxUsers  maximum allowed simultaneous users
+        @param[in] device    A Galil device from galilDevice.py
+        @param[in] userPort  port on which to listen for client connections
+        @param[in] maxUsers  maximum allowed simultaneous users
         """
         # if LogDir is specified as an environment variable
         # begin logging to it.
@@ -100,6 +99,8 @@ class MirrorCtrl(Actor):
 
     def logMsg(self, msgStr):
         """Write a message string to the log.  
+
+        @param[in] msgStr: message to be written to log
         """
         writeToLog(msgStr) # system adds brackets
 
@@ -108,11 +109,8 @@ class MirrorCtrl(Actor):
         """Convert a user specified orientation in um and arcseconds with possibly < 5
         fields specified into an orientation of 5 values in units of radians and mm.
         
-        Input:
-        orientation: [Piston (um), [Tilt X ("), [Tilt Y ("), [Trans X (um), [Trans Y (um)]]]]]
-        
-        Output:
-        numpy.array([Piston (mm), Tilt X (rad), Tilt Y (rad), Trans X (rad), Trans Y (rad)])
+        @param[in] orientation: [Piston (um), [Tilt X ("), [Tilt Y ("), [Trans X (um), [Trans Y (um)]]]]]
+        @return numpy.array([Piston (mm), Tilt X (rad), Tilt Y (rad), Trans X (rad), Trans Y (rad)])
         """
         orientation = numpy.hstack((orientation, numpy.zeros(5-len(orientation))))
         return orientation * ConvertOrient
@@ -121,6 +119,8 @@ class MirrorCtrl(Actor):
     def cmd_move(self, cmd):
         """Move mirror to a commanded orientation, if device isn't busy. 
         
+        @param[in] cmd: new local user command (twistedActor.UserCmd)
+
         Pass 1-5 comma seperated arguements.  Order of arguemnts corresponds to:
         [Piston (um), Tilt X ("), Tilt Y ("), Trans X (um), Trans Y (um)]
         
@@ -150,6 +150,8 @@ class MirrorCtrl(Actor):
             
     def cmd_home(self, cmd):
         """Home specified axes (e.g. A, B, C); home all axes if none specified
+
+        @param[in] cmd: new local user command (twistedActor.UserCmd)
         """
         # split on , and strip leading and trailing whitespace to make a list of single axis letters
         axisList = [arg.strip() for arg in cmd.cmdArgs.split(",") if arg.strip()]
@@ -167,6 +169,8 @@ class MirrorCtrl(Actor):
             
     def cmd_status(self, cmd):
         """Show status of Galil mirror controller
+
+        @param[in] cmd: new local user command (twistedActor.UserCmd)
         """
         # twistedActor status
         Actor.cmd_status(self, cmd)
@@ -185,6 +189,8 @@ class MirrorCtrl(Actor):
         
     def cmd_showparams(self, cmd):
         """Show parameters of Galil mirror controller
+
+        @param[in] cmd: new local user command (twistedActor.UserCmd)
         """
         if not self.dev.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
@@ -196,6 +202,8 @@ class MirrorCtrl(Actor):
         
     def cmd_stop(self, cmd):
         """Abort any executing Galil command, put Galil in known state
+
+        @param[in] cmd: new local user command (twistedActor.UserCmd)
         """
         if not self.dev.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
@@ -207,6 +215,8 @@ class MirrorCtrl(Actor):
     
     def cmd_reset(self, cmd):
         """Reset the Galil using an 'RS' command.
+
+        @param[in] cmd: new local user command (twistedActor.UserCmd)
         """
         if not self.dev.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
@@ -220,9 +230,8 @@ class MirrorCtrl(Actor):
 def runMirrorCtrl(device, userPort):
     """Start up a Galil actor
     
-    Inputs:
-    device      a twistedActor-based Galil Device (see mirrorCtrl/galilDevice.py)
-    userPort    port on which actor accepts user commands
+    @param[in] device: a twistedActor-based Galil Device (see mirrorCtrl/galilDevice.py)
+    @param[in] userPort: port on which actor accepts user commands
     """
     from twisted.internet import reactor
 

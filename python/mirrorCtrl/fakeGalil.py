@@ -47,6 +47,10 @@ class FakeGalilProtocol(Protocol):
     lineEndPattern = re.compile(r"(\r\n|;)")
     
     def __init__(self, factory):
+        """A protocol for a fake Gailil
+
+        @param[in]: factory: a twisted-type Factory 
+        """
         self.factory = factory
         self._buffer = ''
         self.replyTimer = Timer()
@@ -76,23 +80,39 @@ class FakeGalilProtocol(Protocol):
         self.noiseRange = 700 # steps, +/- range for adding steps to a measurement
 
     def dataReceived(self, data):
+        """Called each time data is received.
+
+        @param[in] data: data read from the socket
+        """
         self._buffer += data
         self._checkLine()
 
     def _checkLine(self):
-       res = self.lineEndPattern.split(self._buffer, maxsplit=1)
-       if len(res) > 1:
+        """Split line on linebreakes, and forward each peice to 
+        self.linedReceived on at a time.
+        """
+        res = self.lineEndPattern.split(self._buffer, maxsplit=1)
+        if len(res) > 1:
             line, sep, self._buffer = res
             self.lineReceived(line, sep)
-    
-       if self._buffer:
-           Timer(0.000001, self._checkLine) # or reactor.callLater
+
+        if self._buffer:
+            Timer(0.000001, self._checkLine) # or reactor.callLater
 
     def echo(self, line, delim):
+        """Send line + delim + ":" back, emulating an echo from a galil
+
+        @param[in] line: line received to be written back
+        @param[in] delim: the delimiter
+        """
         self.transport.write(line + delim + ':')
 
     def lineReceived(self, line, delim):
-        """As soon as any data is received, look at it and write something back."""
+        """As soon as any data is received, look at it and write something back.
+
+        @param[in] line: line received
+        @param[in] delim: the delimiter
+        """
         if self.factory.verbose:
             print "received: %r" % (line,)
         cmd = line.strip()
@@ -111,7 +131,11 @@ class FakeGalilProtocol(Protocol):
         self.processCmd(cmd, delim)
         
     def processCmd(self, cmd, delim):
-    
+        """Figure out what was commanded, and emulate galil behavior accordingly
+
+        @param[in] cmd: string, a galil command
+        @param[in] delim: the delimiter        
+        """
 # Is there a use case for setting a variable to -MAXINT?
 #        cmdMatch = re.match(r"([A-F]) *= *(-)?MAXINT$", cmd)
         cmdMatch = re.match(r"([A-F]) *= *MAXINT$", cmd)
@@ -217,12 +241,15 @@ class FakeGalilProtocol(Protocol):
         self.done()
     
     def resetUserNums(self):
+        """Reset user nums"""
         self.userNums[:] = MAXINT
     
     def formatArr(self, fmtStr, arr, suffix):
+        """ Return a comma separated string of values and a suffix"""
         return ", ".join([fmtStr % val for val in arr]) + " " + suffix
     
     def showStatus(self):
+        """Show the status"""
         notHomed = numpy.nonzero(self.isHomed==0)
         cmdPos = self.cmdPos[:]
         measPos = self.measPos[:]
@@ -237,6 +264,7 @@ class FakeGalilProtocol(Protocol):
             self.sendLine(msgStr)
     
     def showParams(self):
+        """Show parameters"""
         for msgStr in [
             "02.10, %d software version, NAXES number of axes" % (self.nAxes,),
             "1, 0, 01 DOAUX aux status? MOFF motors off when idle? NCORR # corrections",
@@ -257,6 +285,8 @@ class FakeGalilProtocol(Protocol):
     
     def moveStart(self, newCmdPos):
         """Start moving to the specified newCmdPos
+
+        @param[in] newCmdPos: [int]*number of actuators.
         """
         # first check that all axes are homed
         # for now, assume all axes need to be homed for a move
@@ -301,6 +331,7 @@ class FakeGalilProtocol(Protocol):
         self.replyTimer.start(moveTime, self.moveDone)
     
     def moveDone(self):
+        """Called when a move is done"""
         self.sendLine(self.formatArr("%09d", self.measPos, "final position"))
         self.done()
     
@@ -314,6 +345,10 @@ class FakeGalilProtocol(Protocol):
         self.sendLine("OK")
     
     def sendLine(self, line):
+        """write a line to the socket
+
+        @param[in] line: string to be written
+        """
         if self.factory.verbose:
             print "sending: %r" % (line,)
         self.transport.write(line + "\r\n")
@@ -331,6 +366,8 @@ class FakeGalilFactory(Factory):
     def buildProtocol(self, addr):
         """Build a FakeGalilProtocol
         
+        @param[in] addr: address?
+
         This override is required because FakeGalilProtocol needs the factory in __init__,
         but default buildProtocol only sets factory after the protocol is constructed
         """
@@ -340,8 +377,9 @@ class FakeGalilFactory(Factory):
     def __init__(self, verbose=True, wakeUpHomed=True, mirror=mir35mTert.Mirror):
         """Create a FakeGalilFactory
         
-        Inputs:
-        - verbose: print input and output?
+        @param[in] verbose: bool. Print extra info to terminal?
+        @param[in] wakeUpHomed: bool. Should actuators be homed upon construction or not
+        @param[in] mirror: a mirrorCtrl.mirror.Mirror object, the mirror this fake galil should emulate
         """
         self.verbose = bool(verbose)
         self.wakeUpHomed = bool(wakeUpHomed)
@@ -349,15 +387,20 @@ class FakeGalilFactory(Factory):
 
         
 class FakePiezoGalilProtocol(FakeGalilProtocol):
-    """A fake Galil with mock piezo behavior like the 2.5m M2 mirror
-    """
     def __init__(self, factory):
+        """A fake Galil with mock piezo behavior like the 2.5m M2 mirror
+
+        @param[in] factory: a twisted Factory
+        """
         FakeGalilProtocol.__init__(self, factory)
         self.cmdPiezoPos = numpy.array([0]*3, dtype=int)
         self.userPiezoNums = numpy.array([MAXINT]*3, dtype=int)
     
     def processCmd(self, cmd, delim):
         """Overwritten from base class to handle piezo commands also
+
+        @param[in] cmd: command string
+        @param[in] delim: the delimiter
         """
         # piezo specifics
         #print 'cmd: ', cmd
@@ -384,11 +427,14 @@ class FakePiezoGalilProtocol(FakeGalilProtocol):
             FakeGalilProtocol.processCmd(self, cmd, delim)
     
     def resetUserNums(self):
+        """Reset user numbers"""
         self.userNums[:] = MAXINT
         self.userPiezoNums[:] = MAXINT
 
     def movePiezo(self, piezoPos):
         """Do a piezo move
+
+        @param[in] piezoPos: [length]*number of peizos, move em here
         """
         self.showStatus()
         self.sendLine("3 piezo status word")
@@ -398,19 +444,25 @@ class FakePiezoGalilProtocol(FakeGalilProtocol):
           
     
 class FakePiezoGalilFactory(FakeGalilFactory):
-    """FakePiezoGalil factory
-    
-    Example of use:
-        
-    from twisted.internet import reactor
-    reactor.listenTCP(port, FakePiezoGalilFactory(verbose=False))
-    reactor.run()
-    """
     def __init__(self, verbose=True, wakeUpHomed=True, mirror=mir25mSec.Mirror):
+        """FakePiezoGalil factory
+        
+        @param[in] verbose: bool. Print extra info to terminal?
+        @param[in] wakeUpHomed: bool. Should actuators be homed upon construction or not
+        @param[in] mirror: a mirrorCtrl.mirror.Mirror object, the mirror this fake galil should emulate
+
+        Example of use:
+            
+        from twisted.internet import reactor
+        reactor.listenTCP(port, FakePiezoGalilFactory(verbose=False))
+        reactor.run()
+        """
         FakeGalilFactory.__init__(self, verbose, wakeUpHomed, mirror)
         
     def buildProtocol(self, addr):
         """Build a FakePiezoGalilProtocol
+
+        @param[in] addr: address
         
         This override is required because FakeGalilProtocol needs the factory in __init__,
         but default buildProtocol only sets factory after the protocol is constructed

@@ -56,28 +56,55 @@ CmdEchoRegEx = re.compile(r'xq *#[a-z]+$', re.IGNORECASE)
 AxisEchoRegEx = re.compile(r'[A-Z]=-?(\d+)', re.IGNORECASE)
 
 
-# if abs(measured orientation - desired orientation) is within, orientation tolerence, 
-# call it good enough
-#OrientationTolerance = numpy.array([1., 1., .01, .01, 1., 40.]) * ConvertOrient
 
-################## KEYWORD CAST VALUES ##################################
-mountCast = lambda mount: ",".join(["%.2f"%x for x in mount])
-orientCast = lambda orient: ",".join(["%.2f"%x for x in (orient/ConvertOrient)])
-floatCast = lambda number: "%.2f"%number
-strArrayCast = lambda strArray: ",".join([str(x) for x in strArray])
+################## KEYWORD CAST DEFINITIONS ##################################
+def floatCast(number):
+    """Cast a float into a string
+
+        @param[in] float: a float
+        @return a string
+    """
+    return "%.2f" % number
+
+def mountCast(mount):
+    """ Cast a mount array into a string.
+        @param[in] mount: Array of mount values
+        @return a string
+    """
+    return ",".join([floatCast(x) for x in mount])
+
+def orientCast(orient):
+    """ Cast an orientation array into a string.
+        @param[in] orientation: numpy array of orientation values in mm and radians
+        @return a string of orientation (in user friendly units, um and arcsec)
+    """    
+    return ",".join([floatCast(x) for x in (orient/ConvertOrient)])
+
+def strArrayCast(strArray):
+    """Turn an array of strings into a single string, comma separated.
+    @param[in] strArray: an array of strings
+    @return a string
+    """
+    ",".join([str(x) for x in strArray])
+
 def intOrNan(anInt):
+    """Return an string int or "nan"
+    @param[in] anInt: either an integer or a nan
+    @return a string
+    """
     try:
         return str(int(anInt))
     except ValueError:
         return "nan"
+
 def statusCast(status):
+    """Return a 
+    @param[in] status: an array of status bits
+    @ return a string, status concatenated into string of comma separated values which are possibly nans
+    """
     statusStr = []
     for element in status:
         statusStr.append(intOrNan(element))
-        # if numpy.isfinite(element):
-        #     statusStr.append("%i"%element)
-        # else:
-        #     statusStr.append("nan")
     return ",".join(statusStr)
 ###########################################################################
 
@@ -120,7 +147,6 @@ class GalilStatus(object):
         # all the Status keyword/value pairs we will cache, and their initial values
         self.maxDuration = numpy.nan
         self.duration = GalilTimer()
-#        self.remainExecTime = numpy.nan
         self.actMount = numpy.asarray([numpy.nan]*self.nAct) # get rid of?
         self.encMount = numpy.asarray([numpy.nan]*self.nAct)
         self.cmdMount = numpy.asarray([numpy.nan]*self.nAct)  # user commanded
@@ -173,20 +199,6 @@ class GalilStatus(object):
             else:
                 val = getattr(self, keyword)
                 strVal = self.castDict[keyword](val)
-#             if keyword in ['duration', 'desOrientAge']:
-#                 # get current execution time
-#                 val = val.getTime()
-# #             if keyword == 'remainExecTime':
-# #                 # get current execution time
-# #                     val = self.maxDuration - self.duration.getTime()
-#             if keyword in ['orient', 'desOrient']:
-#                 # convert to user-friendly units
-#                 val = numpy.divide(val, ConvertOrient)
-#             if type(val) in [list, numpy.ndarray]:
-#                 # val is a list or numpy array, we need to format as comma seperated string
-#                 strVal = ", ".join(str(x) for x in val)
-#             else:
-#                 strVal = str(val)
             strList.append("%s=%s" % (keyword, strVal))
         return "; ".join(strList)
 
@@ -260,6 +272,11 @@ class GalilDevice(TCPDevice):
         return outStr
 
     def init(self, *args, **kwargs):
+        """This is called automatically from twistedActor...
+
+        eg from ConnectDevice
+        dev.init(userCmd=initUserCmd, timeLim=self.timeLim)
+        """
         pass
 
     def parseReply(self, replyStr):
@@ -375,22 +392,14 @@ class GalilDevice(TCPDevice):
                 self.userCmd.setTimeLimit(maxTime + 5)
 
         elif ('commanded position' == key) or ('target position' == key):
-            # in the case where cmdMount == 999999999 set to NaN
-            # this was causing a bug by updating cmdMount
             # cmdMount must not be updated for actuator error determination
             # and subsequent move commands
-            # self.status.cmdMount = [int(x) if int(x) != 999999999 else numpy.nan for x in dataList]
-            # updateStr = self.status._getKeyValStr(["cmdMount"])
-            # self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
             pass
 
         elif ('actual position' == key) or ('final position' == key):
             # measured position (adjusted)
             # account for encoder --> actuator spatial difference
-            #self.status.encMount = numpy.asarray(dataList, dtype=float)
-            # in the case where encMount == 999999999 set to NaN
             self.status.encMount = [int(x) if int(x) != 999999999 else numpy.nan for x in dataList]
-            #self.status.encMount = encMount if encMount != [999999999]*self.nAct else [numpy.nan]*self.nAct
             updateStr = self.status._getKeyValStr(["encMount"])
             self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
             # DesOrient may be nans
@@ -432,8 +441,7 @@ class GalilDevice(TCPDevice):
     def handleReply(self, replyStr):
         """Handle a line of output from the device. Called whenever the device outputs a new line of data.
 
-        Inputs:
-        - replyStr  the reply, minus any terminating \n
+        @param[in] replyStr:  the reply, minus any terminating \n
 
         Tasks include:
         - Parse the reply
@@ -533,8 +541,8 @@ class GalilDevice(TCPDevice):
     def cmdHome(self, axisList, userCmd):
         """Home the specified actuators
 
-        Inputs:
-        - axisList: a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
+        @param[in] axisList: a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
+        @param[in] userCmd: a twistedActor UserCmd associated with the home command
         """
         self.setCurrUserCmd(userCmd)
         if not axisList:
@@ -567,6 +575,9 @@ class GalilDevice(TCPDevice):
 
     def cmdMove(self, orient, userCmd):
         """Accepts an orientation then commands the move.
+
+        @param[in] orient: an orientation.
+        @param[in] userCmd: a twistedActor UserCmd object associated with this move command 
 
         Subsequent moves are commanded until an acceptable orientation is reached (within errors).
         Cmd not tied to state of devCmd, because of subsequent moves.
@@ -606,6 +617,8 @@ class GalilDevice(TCPDevice):
     def cmdReset(self, userCmd):
         """Reset the Galil to its power-on state. All axes will have to be re-homed. Stop is gentler!
 
+        @param[in] userCmd: a twistedActor UserCmd
+
         Send 'RS' to the Galil, causing it to reset to power-up state,
         wait a few seconds,
         send XQ#STOP to make sure it is fully reset,
@@ -619,6 +632,8 @@ class GalilDevice(TCPDevice):
     def cmdStop(self, userCmd):
         """Stop the Galil.
 
+        @param[in] userCmd: a twistedActor UserCmd
+
         Send 'ST' to the Galil, causing it to stop all threads,
         wait a short time,
         send XQ#STOP to make sure it is fully reset,
@@ -631,6 +646,8 @@ class GalilDevice(TCPDevice):
 
     def cmdCachedStatus(self, userCmd):
         """Return a cached status, don't ask the galil for a fresh one
+
+        @param[in] userCmd: a twistedActor UserCmd
         """
         self.writeToUsers("w", "Text=\"Galil is busy executing: %s, showing cached status\"" % self.currDevCmd.cmdStr, cmd = userCmd)
         statusStr = self.status._getKeyValStr([
@@ -652,21 +669,27 @@ class GalilDevice(TCPDevice):
     def cmdStatus(self, userCmd):
         """Return the Galil status to the user.
 
+        @param[in] userCmd: a twistedActor UserCmd
+
         If the Galil is busy then returns cached data.
         """
-        #self.startUserCmd(userCmd, timeLim=5)
         self.setCurrUserCmd(userCmd)
         self.startDevCmd("XQ #STATUS", callFunc = self._statusCallback)
 
     def cmdParams(self, userCmd):
         """Show Galil parameters
+
+        @param[in] userCmd: a twistedActor UserCmd
         """
         #self.startUserCmd(userCmd)
         self.setCurrUserCmd(userCmd)
         self.startDevCmd("XQ #SHOWPAR")
 
     def sendStop(self, callFunc=None):
-        """Send XQ#STOP, then execute callFunc"""
+        """Send XQ#STOP, then execute callFunc
+
+        @param[in] callFunc: callable, will be a callback set on a device command
+        """
         if callFunc == None:
             callFunc = self.sendStatus
         self.startDevCmd("XQ#STOP", callFunc=callFunc)
@@ -676,7 +699,7 @@ class GalilDevice(TCPDevice):
         self.startDevCmd("XQ#STATUS")
 
     def failStop(self):
-        """Send device command XQ#STOP, then XQ#STATUS, and afterwards fail the user Cmd"""
+        """Send device command XQ#STOP, then XQ#STATUS, and afterwards fail the user command"""
         def failStatus():
             self.startDevCmd("XQ#STATUS", callFunc = self._failUserCmd)
         self.startDevCmd("XQ#STOP", callFunc=failStatus)
@@ -684,12 +707,11 @@ class GalilDevice(TCPDevice):
     def startDevCmd(self, cmdStr, callFunc=None, errFunc=None):
         """Start a new device command, replacing self.currDevCmd
 
-        Inputs:
-        - cmdStr: command to send to the Galil
-        - callFunc: function to call when the command finishes; receives no arguments
+        @param[in] cmdStr: command to send to the Galil
+        @param[in] callFunc: function to call when the command finishes; receives no arguments
             (note: _devCmdCallback is called by the device command and is responsible
             for calling callFunc, which is stored in _userCmdNextStep)
-        - errFunc: function to call if device command fails (eg, gailil sends a "?") before
+        @param[in] errFunc: function to call if device command fails (eg, gailil sends a "?") before
             setting userCmd to failed. Intended primarily for a status query prior to user
             command termination.
         """
@@ -734,16 +756,14 @@ class GalilDevice(TCPDevice):
     def _devCmdCallback(self, dumDevCmd=None):
         """Device command callback
 
+        @param[in] dumDevCmd: dummy argument, for callback
+
         startDevCmd always assigns this as the callback, which then calls and clears any user-specified callback.
         """
         # print 'dev cmd state', self.currDevCmd.cmdStr, self.currDevCmd.state, self.currDevCmd._textMsg
         # print "_devCmdCallback(); currDevCmd=%r; _userCmdNextStep=%s" % (self.currDevCmd, self._userCmdNextStep)
         # print "_devCmdCallback(); self.userCmd=%r" % (self.userCmd,)
 
-#         if self.currDevCmd.state == self.currDevCmd.Cancelling:
-#             self.conn.writeLine('ST')
-#             self.currDevCmd.setState(self.currDevCmd.Cancelled)
-#             return
         if self.currDevCmd.state == self.currDevCmd.Cancelled:
             self.writeToUsers("w", "Text=\"Device Command %s Cancelled: %s\"" % (self.currDevCmd.cmdStr, self.currDevCmd._textMsg,), cmd = self.currDevCmd)
             self._cancelUserCmd()
@@ -784,10 +804,8 @@ class GalilDevice(TCPDevice):
             self.userCmd.setState(self.userCmd.Failed, textMsg="Final actuator positions not received from move")
             return
 
-        #actErr = self.status.cmdMount[0:self.nAct] - self.status.actMount[0:self.nAct]
         actErr = [cmd - act for cmd, act in itertools.izip(self.status.cmdMount[0:self.nAct], self.status.actMount[0:self.nAct])]
         self.status.mountErr = actErr[:]
-        #orientationErr = self.status.desOrient - mirror.orientationFromEncoderMount(self.status.encMount)
 
         # error too large to correct?
         if numpy.any(numpy.abs(actErr) > self.mirror.maxCorrList):
@@ -795,9 +813,7 @@ class GalilDevice(TCPDevice):
             return
 
         # perform another iteration?
-        if numpy.any(numpy.abs(actErr) > self.mirror.minCorrList) and (self.status.iter < self.status.maxIter): # and (numpy.any(numpy.abs(orietationErr)/OrientationTolerance > 1)):
-            #self.status.cmdMount += actErr
-            #newCmdActPos = numpy.asarray(actErr)*CorrectionStrength + numpy.asarray(self.status.cmdMountIter)
+        if numpy.any(numpy.abs(actErr) > self.mirror.minCorrList) and (self.status.iter < self.status.maxIter):
             newCmdActPos = [err*self.CorrectionStrength + prevMount for err, prevMount in itertools.izip(actErr, self.status.cmdMountIter)]
             self.status.cmdMountIter = newCmdActPos
             self.status.mountOrient = numpy.asarray(self.mirror.orientFromActuatorMount(newCmdActPos))
@@ -868,17 +884,17 @@ class GalilDevice(TCPDevice):
         self.status.duration.reset()
 
     def formatGalilCommand(self, valueList, cmd, axisPrefix="", valFmt="%0.f", nAxes=None):
-        """Format a Galil command
+        """Format a Galil command.
+
+        Inputs:
+        @param[in] valueList: a list of values
+        @param[in] cmd: the command (e.g. "XQ #MOVE")
+        @param[in] axisPrefix: a string prefixing each axis
+        @param[in] valFmt: value format
+        @param[in] nAxes: number of axes in command; if None use all axes
 
         Values that are None are replaced with MAXINT
         If len(valueList) < number of actuators, the extra axes are also set to MAXINT
-
-        Inputs:
-        - valueList: a list of values
-        - cmd: the command (e.g. "XQ #MOVE")
-        - axisPrefix: a string prefixing each axis
-        - valFmt: value format
-        - nAxes: number of axes in command; if None use all axes
         """
         valueList = list(valueList) # incase of numpy array
         if nAxes is None:
@@ -1006,13 +1022,14 @@ class GalilDevice25Sec(GalilDevice):
         """Overwritten from base class, to allow for a piezo move command after all the
         coarse moves have been finished.
 
-        Inputs:
-        - cmd: passed automatically due to twistedActor callback framework
+        @param[in] *args: passed automatically due to twistedActor callback framework
         """
         self.movePiezos()
 
     def _piezoMoveCallback(self, devCmd=None):
         """Called when the piezos are finished moving
+
+        @param[in] devCmd: passed via callback
         """
         if not self.currDevCmd.isDone:
             return
