@@ -19,24 +19,15 @@ To do:
 __all__ = ["FakeGalilFactory", "FakePiezoGalilFactory"]
 
 # remove this when done testing
-import itertools
-import math
+#import itertools
+#import math
 import numpy
-MMPerMicron = 1 / 1000.0        # millimeters per micron
-RadPerDeg  = math.pi / 180.0    # radians per degree
-ArcSecPerDeg = 60.0 * 60.0      # arcseconds per degree
-RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
-
-ConvertOrient = numpy.asarray([MMPerMicron, RadPerArcSec, RadPerArcSec, MMPerMicron, MMPerMicron])
-
-##
 
 import re
-import sys
-import numpy
+#import sys
 
 from mirrors import mir35mTert, mir25mSec
-from twisted.internet import reactor
+#from twisted.internet import reactor
 from twisted.internet.protocol import Factory, Protocol
 from RO.Comm.TwistedTimer import Timer
 
@@ -97,7 +88,7 @@ class FakeGalilProtocol(Protocol):
             self.lineReceived(line, sep)
 
         if self._buffer:
-            Timer(0.000001, self._checkLine) # or reactor.callLater
+            Timer(0.000001, self._checkLine)
 
     def echo(self, line, delim):
         """Send line + delim + ":" back, emulating an echo from a galil

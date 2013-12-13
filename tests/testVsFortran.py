@@ -4,23 +4,18 @@ import os.path
 import numpy
 import itertools
 import unittest
-import time
+#import time
 import RO.Astro.Tm
 import numpy.random
 from mirrorCtrl.mirrors import mir35mSec, mir35mTert, mir25mSec, mir25mPrim
+from mirrorCtrl.const import convOrient2UMArcsec, convOrient2MMRad, MMPerMicron
 numpy.random.seed(0)
 
 dataDir = os.path.join((os.path.dirname(__file__)), "data")
 
 Mirrors = ['prim', 'sec', 'tert']
 Acts = ['A', 'B', 'C', 'D', 'E', 'F']
-MMPerMicron = 1 / 1000.0        # millimeters per micron
-RadPerDeg  = numpy.pi / 180.0    # radians per degree
-ArcSecPerDeg = 60.0 * 60.0      # arcseconds per degree
-RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
 
-ConvertOrient = numpy.array([MMPerMicron, RadPerArcSec, RadPerArcSec,
-                             MMPerMicron, MMPerMicron, RadPerArcSec], dtype = float)
 MaxOrientErr = numpy.array([.1, .1, .1 , .1 , .1])
 MaxMountErr = 0.15 #um
 MaxMountAdjNoAdjErr = 0.5 # um                            
@@ -62,7 +57,7 @@ class MirVsFortran(unittest.TestCase):
                         self.getErrMsg(
                             mirName, 
                             mirNum, 
-                            numpy.asarray(slurper.fromOrients[ind]) / ConvertOrient,
+                            convOrient2UMArcsec(slurper.fromOrients[ind]),
                             adjMountDiff[ind],
                             unAdjMountDiff[ind],
                             orientDiff[ind],
@@ -75,7 +70,7 @@ class MirVsFortran(unittest.TestCase):
     def _errLogPrint(self, errLog):
         """Print the error log to a file
         """
-        fileDate = time.localtime()
+        #fileDate = time.localtime()
         # minutes and seconds appended to filename
         fileName = 'Errors' + RO.Astro.Tm.isoDateTimeFromPySec(nDig=0, useGMT=False) + ".log"
         with open(fileName, 'w') as f:
@@ -156,7 +151,7 @@ class TheSlurper(object):
     def orientDiff(self): # in um and arcseconds
         # difference between Fortran computed orientation and python computed orientation, from the same mount coordinates
         # note these should differ because python includes induced motions from fixed links.
-        return (self.toOrientsFOR - self.orientsPY)/ ConvertOrient
+        return convOrient2UMArcsec(self.toOrientsFOR - self.orientsPY)
         
     def parseMassOrient(self, massorientfile):
         """return mirror info and orientation/mount data from a massorient file"""
@@ -173,9 +168,9 @@ class TheSlurper(object):
         #for line in lines:
             nums = lines[ind].split()
             nums = [float(num) for num in nums]
-            fromOrients.append(numpy.asarray(nums[:6]) * ConvertOrient) # to mm and radians
+            fromOrients.append(convOrient2MMRad(nums[:6])) # to mm and radians
             mounts.append(numpy.asarray(nums[6:12]))
-            toOrients.append(numpy.asarray(nums[12:]) * ConvertOrient) # to mm and radians
+            toOrients.append(convOrient2MMRad(nums[12:])) # to mm and radians
         return mirFile, mirNum, numpy.asarray(fromOrients), numpy.asarray(mounts), numpy.asarray(toOrients)     
 
     def orients2mounts(self):

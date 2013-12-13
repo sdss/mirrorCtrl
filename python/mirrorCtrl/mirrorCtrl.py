@@ -8,20 +8,13 @@ import os
 import numpy
 import traceback
 import sys
+from const import convOrient2MMRad
 
 from twistedActor import Actor, CommandError, UserCmd, BaseCmd, writeToLog, startLogging, CommandQueue#,startGlobalLogging
 
 Version = 0.1
 
 DefaultMaxUsers = 5
-
-MMPerMicron = 1 / 1000.0        # millimeters per micron
-RadPerDeg  = math.pi / 180.0    # radians per degree
-ArcSecPerDeg = 60.0 * 60.0      # arcseconds per degree
-RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
-
-ConvertOrient = numpy.array([MMPerMicron, RadPerArcSec, RadPerArcSec,
-                             MMPerMicron, MMPerMicron], dtype = float)
 
 class MirrorCtrl(Actor):
     """Mirror controller actor
@@ -113,7 +106,7 @@ class MirrorCtrl(Actor):
         @return numpy.array([Piston (mm), Tilt X (rad), Tilt Y (rad), Trans X (rad), Trans Y (rad)])
         """
         orientation = numpy.hstack((orientation, numpy.zeros(5-len(orientation))))
-        return orientation * ConvertOrient
+        return convOrient2MMRad(orientation)
         
     
     def cmd_move(self, cmd):

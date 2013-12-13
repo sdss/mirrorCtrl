@@ -14,6 +14,7 @@ from mirrorCtrl.mirror import DirectMirror
 import RO.Comm.Generic
 RO.Comm.Generic.setFramework("twisted")
 from mirrorCtrl.fakeGalil import FakeGalilFactory, FakePiezoGalilFactory
+from mirrorCtrl.const import convOrient2MMRad, MMPerMicron, RadPerArcSec
 from testMirrorCtrl import MirrorCtrlTestBase, CmdCallback, UserPort, getOpenPort
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
@@ -26,12 +27,7 @@ tertMoveList = pickle.load(open(os.path.join(pwd, "data/tertMoveList.p")))
 # set max iter to 12
 mirrorCtrl.galilDevice.MaxIter = 12
 
-MMPerMicron = 1. / 1000.0        # millimeters per micron
-RadPerDeg  = math.pi / 180.0    # radians per degree
-ArcSecPerDeg = 60.0 * 60.0      # arcseconds per degree
-RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
 
-ConvertOrient = numpy.asarray([MMPerMicron, RadPerArcSec, RadPerArcSec, MMPerMicron, MMPerMicron])
 RussellsOrient = numpy.asarray([834.26, -24.03, 366.27, -192.64, 1388.21]) # in um, arcsec
 randInds = numpy.random.randint(0, len(secMoveList), 2)# a few random indices from real mirror positions from log
 m2TestOrients = [numpy.asarray(d["desOrient"]) for d in [secMoveList[ind] for ind in randInds]]
@@ -110,7 +106,7 @@ def testConv(modelMirState, trueMirState, desOrient):
         @param[in] trueMirState: MirState object representing the true mirror
         @param[in] desOrient: a collection of 5 items: pistion, tiltx, tilty, transx, transy. units um and arcsec
     """
-    desOrient = desOrient*ConvertOrient
+    desOrient = convOrient2MMRad(desOrient)
     cmdActPos = numpy.asarray(modelMirState.mirror.actuatorMountFromOrient(desOrient)) # get commanded actuator position from your model
     newCmdActPos = cmdActPos[:]
     trueMirState.moveToActPos(cmdActPos) # set the true mirror's actuator lengths
@@ -149,7 +145,7 @@ class ConvergenceTestBase(MirrorCtrlTestBase):
             @param[in] trueMirState: MirState object representing the true mirror
             @param[in] desOrient: a collection of 5 items: pistion, tiltx, tilty, transx, transy. units um and arcsec
         """
-        desOrient = desOrient*ConvertOrient
+        desOrient = convOrient2MMRad(desOrient)
         cmdActPos = numpy.asarray(modelMirState.mirror.actuatorMountFromOrient(desOrient)) # get commanded actuator position from your model
         newCmdActPos = cmdActPos[:]
         trueMirState.moveToActPos(cmdActPos) # set the true mirror's actuator lengths

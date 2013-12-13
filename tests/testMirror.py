@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-import sys
+#import sys
 import unittest
 import numpy
 import numpy.random
-import math
+#import math
 import time
 import itertools
 import copy
@@ -16,9 +16,10 @@ import matplotlib.pyplot as plt
 zeroFlag = False
 
 import RO.Astro.Tm
-from data import genMirrors
+#from data import genMirrors
 #from data import loadMirDat
 import mirrorCtrl
+from mirrorCtrl.const import convOrient2MMRad, MMPerMicron, RadPerArcSec, RadPerDeg
 import mirrorCtrl.mirrors.mir25mPrim
 import mirrorCtrl.mirrors.mir25mSec
 import mirrorCtrl.mirrors.mir35mSec
@@ -26,14 +27,7 @@ import mirrorCtrl.mirrors.mir35mTert
 
 import os
 
-MMPerMicron = 1 / 1000.0        # millimeters per micron
-RadPerDeg  = math.pi / 180.0    # radians per degree
-ArcSecPerDeg = 60.0 * 60.0      # arcseconds per degree
-RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
-ConvertOrient = numpy.asarray([MMPerMicron, RadPerArcSec, RadPerArcSec, MMPerMicron, MMPerMicron, RadPerArcSec])
-
 #Define maximum allowable fitOrient error, reusing from mirror.py, not using z rot
-# MaxOrientErr = numpy.array([0.0001, 5e-8, 5e-8, 0.0001, 0.0001])
 MaxOrientErr = numpy.array([.1 * MMPerMicron, .01 * RadPerArcSec, .01 * RadPerArcSec, .1 * MMPerMicron, .1 * MMPerMicron, 1*RadPerDeg])
 MaxMountErr = 0.03
 MaxMountAdjNoAdjErr = 0.5 # um
@@ -130,9 +124,7 @@ class MirTests(unittest.TestCase):
         for move in moveList[:5]: # only test 5 orientations
             desOrient = numpy.asarray(move["desOrient"])
             desOrient = desOrient
-            encMount, adjOrient = mirror.encoderMountFromOrient(desOrient*ConvertOrient[:5], return_adjOrient=True, adjustOrient = adj)
-            #print 'testing: ' + ",".join(["%.2f"%x for x in desOrient])
-            #print 'adjusted: ' + ",".join(["%.2f"%x for x in numpy.asarray(adjOrient)/ConvertOrient])
+            encMount, adjOrient = mirror.encoderMountFromOrient(convOrient2MMRad(desOrient), return_adjOrient=True, adjustOrient = adj)
             actMountLog = numpy.asarray([mount/(2*act.maxMount) for mount, act in itertools.izip(move["actMount"][:nAxes], mirror.actuatorList[:nAxes])])
             encMountNew = numpy.asarray([mount/(2*act.maxMount) for mount, act in itertools.izip(encMount, mirror.actuatorList[:nAxes])])
             encMountNew = encMountNew[:nAxes]
@@ -277,7 +269,7 @@ class MirTests(unittest.TestCase):
     def _errLogPrint(self, errLog, linkType):
         """Print the error log to a file
         """
-        fileDate = time.localtime()
+        #fileDate = time.localtime()
         # minutes and seconds appended to filename
         fileName = 'Errors' + linkType + '_' + RO.Astro.Tm.isoDateTimeFromPySec(nDig=0, useGMT=False) + ".log"
         with open(fileName, 'w') as f:

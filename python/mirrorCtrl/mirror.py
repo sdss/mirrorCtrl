@@ -17,14 +17,10 @@ numpy.seterr(all='raise')
 
 _FitTol = 1e-8
 _MaxIter = 10000
-# Orientation of mirror; units are mm and radians
+""" Orientation of mirror; units are mm and radians """
 Orientation = collections.namedtuple("Orientation", ["piston", "tiltX", "tiltY", "transX", "transY", "rotZ"])
 ZeroOrientation = Orientation(0, 0, 0, 0, 0, 0)
 
-# def userOrient(orient):
-#     """Return orientation in user-friendly units
-#     """
-#     return 
 
 class MirrorBase(object):
     """Base class for mirrors

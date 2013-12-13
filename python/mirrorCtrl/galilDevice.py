@@ -20,6 +20,7 @@ import itertools
 import math
 import re
 import copy
+from .const import convOrient2UMArcsec, MMPerMicron, RadPerArcSec
 
 import numpy
 from RO.StringUtil import quoteStr, strFromException
@@ -31,14 +32,6 @@ __all__ = ["GalilDevice", "GalilDevice25Sec"]
 
 NullUserCmd = UserCmd(userID=0, cmdStr="") # a blank userCmd that is already done
 NullUserCmd.setState(UserCmd.Done)
-
-MMPerMicron = 1 / 1000.0        # millimeters per micron
-RadPerDeg  = math.pi / 180.0    # radians per degree
-ArcSecPerDeg = 60.0 * 60.0      # arcseconds per degree
-RadPerArcSec = RadPerDeg / ArcSecPerDeg # radians per arcsec
-# scale orient array by this to convert into user-units
-ConvertOrient = numpy.array([MMPerMicron, RadPerArcSec, RadPerArcSec,
-                                        MMPerMicron, MMPerMicron, RadPerArcSec], dtype = float)
 
 GalCancelCmd = 'ST'
 # RegEx stuff up here to keep these from being needlessly re-compiled...
@@ -78,7 +71,7 @@ def orientCast(orient):
         @param[in] orientation: numpy array of orientation values in mm and radians
         @return a string of orientation (in user friendly units, um and arcsec)
     """    
-    return ",".join([floatCast(x) for x in (orient/ConvertOrient)])
+    return ",".join([floatCast(x) for x in convOrient2UMArcsec(orient)])
 
 def strArrayCast(strArray):
     """Turn an array of strings into a single string, comma separated.
