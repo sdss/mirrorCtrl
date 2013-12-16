@@ -9,16 +9,17 @@ import math
 import numpy
 import scipy.optimize  
 import matplotlib.pyplot
-import mpl_toolkits.mplot3d
 
-import link
 
 numpy.seterr(all='raise')
 
+## Tolerance parameter used in scipy minimization routine
 _FitTol = 1e-8
+## Maximum iterations to user in scipy minimization routine
 _MaxIter = 10000
-""" Orientation of mirror; units are mm and radians """
+## Orientation of mirror; units are mm and radians
 Orientation = collections.namedtuple("Orientation", ["piston", "tiltX", "tiltY", "transX", "transY", "rotZ"])
+## A zero orientation
 ZeroOrientation = Orientation(0, 0, 0, 0, 0, 0)
 
 

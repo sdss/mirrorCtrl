@@ -3,14 +3,10 @@ from mirrorCtrl.mirrors import mir35mSec, mir35mTert, mir25mSec
 import numpy
 import itertools
 import copy
-import math
 import numpy.random
 numpy.random.seed(10)
-#from data.mirLogParse import secMoveList
 import pickle
 import os
-from mirrorCtrl.mirror import DirectMirror
-
 import RO.Comm.Generic
 RO.Comm.Generic.setFramework("twisted")
 from mirrorCtrl.fakeGalil import FakeGalilFactory, FakePiezoGalilFactory
@@ -33,18 +29,6 @@ randInds = numpy.random.randint(0, len(secMoveList), 2)# a few random indices fr
 m2TestOrients = [numpy.asarray(d["desOrient"]) for d in [secMoveList[ind] for ind in randInds]]
 m2TestOrients.append(RussellsOrient)
 m3TestOrients = [numpy.asarray(d["desOrient"]) for d in [tertMoveList[ind] for ind in randInds]]
-
-#m2TesetOrients = secMoveList + [RussellsOrient]
-
-#MaxOrientErr = numpy.asarray([1, .01, .01, 1, 1])*ConvertOrient
-
-
-#TrueMirror = mir35mSec.Mirror
-#trueMirror.plotMirror()
-
-# class NoAdjDirMir(DirectMirror):
-#     def actuatorMountFromOrient(self, userOrient, return_adjOrient = False, adjustOrient = False):
-#         return DirectMirror.actuatorMountFromOrient(self, userOrient, return_adjOrient, adjustOrient)
 
 
 def getActEqEncMir(mirror):
@@ -74,7 +58,6 @@ def getActRandMove(mirror, seed=10):
         act.basePos += offset
     for act in mirror.actuatorList[3:]:
         # let offset vary by magnitude of true offset in z direction
-        # zOff = numpy.random.sample()*2.*zTrue - zTrue
         zOff = numpy.random.sample()*2.*lengthScale*0.5 - lengthScale*0.5 
         offset = numpy.asarray([0., 0., zOff])
         act.mirPos += offset
@@ -176,16 +159,6 @@ class ConvergenceTestBase(MirrorCtrlTestBase):
     def _testOrient(self, orient):
         """ @param[in] orientation: 5 element orientation in user-friendly units (um and arcsec)
         """
-        # set encoder noise to zero
-        #self.fakeGalilFactory.proto.noiseRange = 0.#
-        # previoulsy commanded orient
-        # handle 'invalid' data, convert to numpy.nans
-        # prevOrient = self.dispatcher.model.desOrient[:]
-        # try:
-        #     numpy.sum(prevOrient)
-        #     prevOrient = numpy.asarray(prevOrient)/ConvertOrient
-        # except:
-        #     prevOrient = numpy.asarray([numpy.nan]*len(prevOrient))
         # print 'previous orient ', prevOrient
         # print 'testing orient', orient
         trueMirState = MirState(self.trueMirror)
@@ -202,23 +175,10 @@ class ConvergenceTestBase(MirrorCtrlTestBase):
             """Check results after cmdVar is done
             """
             self.assertFalse(cmdVar.didFail)
+            # reason for less than or equal:
             # if new orient is a big difference from the previous, an automatic offset
             # should have been applied, thus taking less iterations to converge
-            # bigMove = True
-            # if numpy.isfinite(numpy.sum(prevOrient)):
-            #     orientDiff = numpy.abs(numpy.asarray(orient)-numpy.asarray(prevOrient)[:5]) #don't care about z-rot
-            #     bigOrient = numpy.asarray([self.mirDev.LargePiston/MMPerMicron, self.mirDev.LargeTilt/RadPerArcSec, self.mirDev.LargeTilt/RadPerArcSec, self.mirDev.LargeTranslation/MMPerMicron, self.mirDev.LargeTranslation/MMPerMicron], dtype=float)
-            #  #   bigMove = numpy.any(orientDiff/bigOrient > 1)
-            # #print 'bigMOve???', bigMove
             self.assertTrue(self.dispatcher.model.iter.valueList[0] <= nIter)
-            # if bigMove:
-            #     # should have gotten in the same amount of steps
-            #     print 'should equal', self.dispatcher.model.iter.valueList[0], nIter
-            #     #self.assertTrue(self.dispatcher.model.iter.valueList[0] == nIter)
-            # else:
-            #     # small move, automatic offset should have been applied
-            #     print 'should not equal', self.dispatcher.model.iter.valueList[0], nIter
-            #     #self.assertTrue(self.dispatcher.model.iter.valueList[0] < nIter)
         d.addCallback(checkResults)   
         self.dispatcher.executeCmd(cmdVar)
         return d
@@ -249,11 +209,6 @@ class ConvergenceTestBase(MirrorCtrlTestBase):
         self.addCleanup(portObj.stopListening)
         #print "Started fake Galil on port", galilPort
         return galilPort
-
-    # def testSmallOffset(self):
-    #     # test that current local error is immediately applied to small
-    #     # moves
-    #     pass
 
 class ConvergenceTestActEqEnc(ConvergenceTestBase):
     def setVars(self):

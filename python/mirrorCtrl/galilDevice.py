@@ -30,22 +30,27 @@ from twisted.internet import reactor
 
 __all__ = ["GalilDevice", "GalilDevice25Sec"]
 
-NullUserCmd = UserCmd(userID=0, cmdStr="") # a blank userCmd that is already done
+## a blank userCmd that is already set as done
+NullUserCmd = UserCmd(userID=0, cmdStr="") 
 NullUserCmd.setState(UserCmd.Done)
 
+## Stop command for direct galil communication
 GalCancelCmd = 'ST'
-# RegEx stuff up here to keep these from being needlessly re-compiled...
+## RegEx stuff up here to keep these from being needlessly re-compiled...
 StartsWithNumRegEx = re.compile(r'^-?[0-9]')
-# find numbers not preceeded by a '/' or a letter and not followed by a letter
+## find numbers not preceeded by a '/' or a letter and not followed by a letter
 GetDataRegEx = re.compile(r'(?<!/|[A-Za-z])[0-9-.]+(?![A-Za-z])')
-# params are uppercase
+## params are uppercase
 ParamRegEx = re.compile(r'^-?[A-Z]')
+## Time estimate regex
 TimeEstRegEx = re.compile(r'^sec +to|^max +sec|^time +for')
+## Match an 'OK' line
 OKLineRegEx = re.compile(r'^OK$', re.IGNORECASE)
-
+## Version regex
 DevSpecVersionRegEx = re.compile(r"version of .+ additions", re.IGNORECASE)
-
+## Matches the returning command echo
 CmdEchoRegEx = re.compile(r'xq *#[a-z]+$', re.IGNORECASE)
+## Matches the echo returning from commanded axes
 AxisEchoRegEx = re.compile(r'[A-Z]=-?(\d+)', re.IGNORECASE)
 
 
@@ -135,28 +140,43 @@ class GalilStatus(object):
         @param[in] device: mirror device
         """
         self.mirror = device.mirror
+        ## number of actuators
         self.nAct = len(self.mirror.actuatorList)
 
         # all the Status keyword/value pairs we will cache, and their initial values
         self.maxDuration = numpy.nan
         self.duration = GalilTimer()
+        ## actuator mount determined from a measured orientation
         self.actMount = numpy.asarray([numpy.nan]*self.nAct) # get rid of?
+        ## encoder mount reported from the galil
         self.encMount = numpy.asarray([numpy.nan]*self.nAct)
-        self.cmdMount = numpy.asarray([numpy.nan]*self.nAct)  # user commanded
-        self.cmdMountIter = numpy.asarray([numpy.nan]*self.nAct) # will be updated upon move iterations
-        self.mountErr = numpy.asarray([0.]*self.nAct) # the last delta-offset applied to a user commanded mount to bump towards convergence
-        # last computed total offset between the first commanded mount position and the last commanded mount position after iteration
+        ## the user commanded mount position
+        self.cmdMount = numpy.asarray([numpy.nan]*self.nAct)
+        ## subsequent commanded mount positions determined during iterations
+        self.cmdMountIter = numpy.asarray([numpy.nan]*self.nAct)
+        ## offset applied to a previously commanded mount, a new mountErr is determined each iteration
+        self.mountErr = numpy.asarray([0.]*self.nAct) 
+        ## last computed total offset between the first commanded mount position and the last commanded mount position after iteration
         self.mountOffset = numpy.asarray([0.]*self.nAct) 
+        ## measured orientation (based on encoder lengths)
         self.orient = numpy.asarray([numpy.nan]*6) # get rid of?
+        ## orientation based on commanded actuator positions
         self.mountOrient = numpy.asarray([numpy.nan]*6)
+        ## desired orientation, user specified, but adjusted for induced motions due to fixed links.
         self.desOrient = numpy.asarray([numpy.nan]*6)
+        ## age of desired orientation
         self.desOrientAge = GalilTimer()
+        ## current move iteration 
         self.iter = numpy.nan
+        ## max number allowed for move iterations
         self.maxIter = device.MaxIter if self.mirror.hasEncoders else 1
+        ## status bits
         self.status = numpy.asarray([numpy.nan]*self.nAct)
+        ## acutators which are currently homing
         self.homing = ["?"]*self.nAct
+        ## actuators which are currently homed
         self.axisHomed = ["?"]*self.nAct
-
+        ## dictionary containing casting strageties to output current gailil status/state info
         self.castDict = {
             "nAct": int,
             "maxDuration": floatCast,
@@ -205,15 +225,22 @@ class GalilDevice(TCPDevice):
     but doing so when the command begins is probably sufficient,
     or when the state is Running.
     """
-    STWaitTime = 1. # one second to wait after sending an st
-    RSWaitTime = 2. # wait two seconds after sending an rs
-    DevCmdTimeout = 2. # initial timeout to use for every device command
-    # the following are thresholds (large moves) beyond which automatic (previously computed)
-    # move offsets should not be used
+    ## one second to wait after sending an st
+    STWaitTime = 1. 
+    ## wait two seconds after sending an rs
+    RSWaitTime = 2. 
+    ## initial timeout to use for every device command
+    ## the following are thresholds (large moves) beyond which automatic (previously computed)
+    ## move offsets should not be used
+    DevCmdTimeout = 2. 
+    ## A big piston , indicating a local saved offset should not be applied
     LargePiston = 500. * MMPerMicron
+    ## A big translation, indicating a local saved offset should not be applied
     LargeTranslation = 100. * MMPerMicron
-    LargeTilt = 10. * RadPerArcSec    
-    CorrectionStrength = 0.9 # scale the determined move offset correction by this much 
+    ## A big tilt, indicating a local saved offset should not be applied
+    LargeTilt = 10. * RadPerArcSec 
+    ## scale the determined move offset correction by this much, eg go only 90%
+    CorrectionStrength = 0.9 
     def __init__(self, mirror, host, port, maxIter = 5, callFunc = None):
         """Construct a GalilDevice
 
@@ -234,14 +261,20 @@ class GalilDevice(TCPDevice):
             callFunc = callFunc,
             cmdInfo = (),
         )
+        ## currently executing (or last completed) device command
         self.currDevCmd = self.cmdClass("")
         self.currDevCmd.setState(self.currDevCmd.Done)
+        ## currently executing (or last completed) user command
         self.userCmd = NullUserCmd
+        ## holds information sent from the galil in response to the current device command
         self.parsedKeyList = []
+        ## number of actuators
         self.nAct = len(self.mirror.actuatorList)
+        ## valid axes for this mirror/galil
         self.validAxisList =  ('A', 'B', 'C', 'D', 'E', 'F')[0:self.nAct]
-        # dictionary of axis name: index, e.g. A: 0, B: 1..., F: 5
+        ## dictionary of axis name: index, e.g. A: 0, B: 1..., F: 5
         self.axisIndexDict = dict((axisName, ind) for ind, axisName in enumerate(self.validAxisList))
+        ## a galil status object
         self.status = GalilStatus(self)
 
     @property
@@ -939,7 +972,7 @@ class GalilDevice25Sec(GalilDevice):
             port = port,
             callFunc = callFunc,
         )
-        # this mirror has extra status entries
+        ## this mirror has extra status entries
         self.status.castDict["piezoStatus"] = int
         self.status.castDict["piezoCorr"] = mountCast
         self.status.piezoStatus = numpy.nan

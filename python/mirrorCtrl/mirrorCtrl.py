@@ -2,15 +2,13 @@
 """
 __all__ = ["MirrorCtrl", "runMirrorCtrl"]
 
-import itertools
-import math
 import os
 import numpy
 import traceback
 import sys
 from const import convOrient2MMRad
 
-from twistedActor import Actor, CommandError, UserCmd, BaseCmd, writeToLog, startLogging, CommandQueue#,startGlobalLogging
+from twistedActor import Actor, CommandError, writeToLog, startLogging, CommandQueue#,startGlobalLogging UserCmd, BaseCmd,
 
 Version = 0.1
 

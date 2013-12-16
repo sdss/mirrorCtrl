@@ -41,7 +41,6 @@ Actuators and Encoders:
   perfectly coaligned, but is assumed to be somewhat nearby.
 """
 import numpy
-import math
 
 class BaseLink(object):
     """
@@ -50,7 +49,7 @@ class BaseLink(object):
     """
     def __init__(self, isAdjustable, basePos, mirPos):
         """
-        @param[in isAdjustable: True for actuators, False for fixed links.
+        @param[in] isAdjustable: True for actuators, False for fixed links.
         @param[in] basePos: cartesian position of end of actuator fixed to the base (mm)
         @param[in] mirPos:  cartesian position of end of actuator attached to the mirror (mm)
             when the mirror is at zero orientation
@@ -173,7 +172,7 @@ class AdjBaseActuator(AdjLengthLink):
         (or none and just use AdjLengthActuator).
         """
         AdjLengthLink.__init__(self, *args, **kwargs)
-        # Unit vector along the axis of motion of the actuator base
+        ## Unit vector along the axis of motion of the actuator base
         self.pistonDir = (self.mirPos - self.basePos) / numpy.linalg.norm((self.mirPos - self.basePos))
         
 #     def physFromMirPos(self, mirPos):
