@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Fake 3.5m M3 Galil.
+"""Fake Galil.
 
 Notes:
 - If a Galil is busy running an XQ# command then:
@@ -16,127 +16,147 @@ To do:
 
 - Figure out how to set status more realistically.
 """
-__all__ = ["FakeGalilFactory", "FakePiezoGalilFactory"]
-
-# remove this when done testing
-#import itertools
-#import math
-import numpy
-
+import collections
 import re
-#import sys
 
-from mirrors import mir35mTert, mir25mSec
-#from twisted.internet import reactor
-from twisted.internet.protocol import Factory, Protocol
+import numpy
 from RO.Comm.TwistedTimer import Timer
+from RO.Comm.TwistedSocket import TCPServer
+
+__all__ = ["FakeGalil", "FakePiezoGalil"]
 
 MAXINT = 2147483647
 MaxCmdTime = 2.0 # maximum time any command can take; sec
 
-class FakeGalilProtocol(Protocol):
-    lineEndPattern = re.compile(r"(\r\n|;)")
-    
-    def __init__(self, factory):
-        """A protocol for a fake Gailil
+class FakeGalil(TCPServer):    
+    def __init__(self, mirror, port=0, verbose=False, wakeUpHomed=True, stateCallback=None):
+        """Fake Galil TCP server
 
-        @param[in]: factory: a twisted-type Factory 
+        @param[in] mirror: a mirrorCtrl.mirror.Mirror object, the mirror this fake galil should emulate
+        @param[in] port: port on which to listen for connections
+        @param[in] verbose: bool. Print extra info to terminal?
+        @param[in] wakeUpHomed: bool. Should actuators be homed upon construction or not
+        @param[in] stateCallback: a function to call when this server changes state; receives one argument: this server
         """
-        self.factory = factory
-        self._buffer = ''
+        self.verbose = bool(verbose)
+        self.wakeUpHomed = bool(wakeUpHomed)
+        self.mirror = mirror
+        self._cmdBuffer = collections.deque()
         self.replyTimer = Timer()
-        self.mirror = self.factory.mirror        
-        self.nAxes = len(self.factory.mirror.actuatorList)
-        
-        
-        homed, notHomed = numpy.array([1]*6, dtype=int)[0:self.nAxes], numpy.array([0]*6, dtype=int)[0:self.nAxes]
-        self.isHomed = homed if self.factory.wakeUpHomed else notHomed
-        self.cmdPos = numpy.array([0]*6, dtype=int)[0:self.nAxes]
-        #self.cmdPos = numpy.array([-117150, -115750, -126700])#  999999999, 999999999], dtype=int) # present from russells tests
-        self.measPos = numpy.array([0]*6, dtype=int)[0:self.nAxes]
-        #self.measPos = numpy.array([129, 1480, -2132])#,  999999999, 999999999])
-        self.userNums = numpy.array([MAXINT]*6, dtype=int)[0:self.nAxes]
+        self.nAxes = len(self.mirror.actuatorList)
+        self.userSocket = None
 
-        self.range = numpy.array([3842048]*3 + [190000]*3, dtype=int)[0:self.nAxes]
-        self.speed = numpy.array([50000]*3 + [5000]*3, dtype=int)[0:self.nAxes]
-        self.homeSpeed = numpy.array([5000]*3 + [500]*3, dtype=int)[0:self.nAxes]
-        self.accel =  numpy.array([500000]*3 + [50000]*3, dtype=int)[0:self.nAxes]
-        self.minCorr = numpy.array([0]*6, dtype=int)[0:self.nAxes]
-        self.maxCorr = numpy.array([1000000]*3 + [15000]*3, dtype=int)[0:self.nAxes]
-        self.st_fs = numpy.array([50]*6, dtype=int)[0:self.nAxes]
-        self.marg = numpy.array([400000]*3 + [5000]*3, dtype=int)[0:self.nAxes]
-        self.indSep = numpy.array([0]*6, dtype=int)[0:self.nAxes]
-        self.encRes =  numpy.array([-3.1496]*3 + [1.5750]*3, dtype=float)[0:self.nAxes]
-        self.status =  numpy.array([8196*6]*6, dtype=int)[0:self.nAxes]
+        TCPServer.__init__(self,
+            port=port,
+            stateCallback=stateCallback,
+            sockStateCallback=self.sockStateCallback,
+            sockReadCallback=self.lineReceived,
+            name="fake %s" % (mirror.name,),
+        )
+
+        self.isHomed = self.arr(wakeUpHomed, dtype=bool)
+        self.cmdPos = self.arr(0)
+        self.measPos = self.arr(0)
+        self.userNums = self.arr(MAXINT)
+
+        self.range = self.arrAB(3842048, 190000)
+        self.speed = self.arrAB(50000, 5000)
+        self.homeSpeed = self.arrAB(5000, 500)
+        self.accel =  self.arrAB(500000, 50000)
+        self.minCorr = self.arr(0)
+        self.maxCorr = self.arrAB(1000000, 15000)
+        self.st_fs = self.arr(50)
+        self.marg = self.arrAB(400000, 5000)
+        self.indSep = self.arr(0)
+        self.encRes =  self.arrAB(-3.1496, 1.5750, dtype=float)
+        self.status =  self.arr(8196*6)
         self.noiseRange = 700 # steps, +/- range for adding steps to a measurement
+    
+    def sockStateCallback(self, sock):
+        if sock.isReady:
+#             print "Set user=", sock
+            self.userSock = sock
+        else:
+#             print "Delete user"
+            self.userSock = None
 
-    def dataReceived(self, data):
-        """Called each time data is received.
-
-        @param[in] data: data read from the socket
+    def arr(self, val, dtype=int):
+        """Make an array of [val0,...] of length self.nAxes
         """
-        self._buffer += data
-        self._checkLine()
+        return numpy.array([val]*self.nAxes, dtype=dtype)
+        
+    def arrAB(self, val0, val1, dtype=int):
+        """Make an array of length self.nAxes as a truncation of [val0, val0, val0, val1, val1, val1]
+        """
+        return numpy.array([val0]*3 + [val1]*3, dtype=dtype)[0:self.nAxes]
+    
+    def lineReceived(self, sock):
+        """Called each time data is received.
+        
+        This does not actually start a command for two reasons:
+        - a single line may contain multiple commands (separated by semicolons)
+        - commands can queue up
 
-    def _checkLine(self):
+        @param[in] sock: socket containing a line of data
+        """
+        line = sock.readLine()
+        if line:
+            self._cmdBuffer.extend(line.split(";"))
+            self._startNextCmd()
+
+    def _startNextCmd(self):
         """Split line on linebreakes, and forward each peice to 
         self.linedReceived on at a time.
         """
-        res = self.lineEndPattern.split(self._buffer, maxsplit=1)
-        if len(res) > 1:
-            line, sep, self._buffer = res
-            self.lineReceived(line, sep)
+        if self._cmdBuffer:
+            cmdStr = self._cmdBuffer.popleft()
+            self.newCmd(cmdStr)
 
-        if self._buffer:
-            Timer(0.000001, self._checkLine)
+            if self._cmdBuffer:
+                Timer(0.000001, self._startNextCmd)
 
-    def echo(self, line, delim):
-        """Send line + delim + ":" back, emulating an echo from a galil
+    def echo(self, line):
+        """Send line + "\n:" back, emulating an echo from a galil
 
         @param[in] line: line received to be written back
-        @param[in] delim: the delimiter
         """
-        self.transport.write(line + delim + ':')
+        if self.userSock:
+            self.userSock.writeLine(line)
 
-    def lineReceived(self, line, delim):
-        """As soon as any data is received, look at it and write something back.
+    def newCmd(self, cmdStr):
+        """New command received
 
-        @param[in] line: line received
-        @param[in] delim: the delimiter
+        @param[in] cmdStr: command
         """
-        if self.factory.verbose:
-            print "received: %r" % (line,)
-        cmd = line.strip()
-        self.echo(cmd, delim)
-        if cmd in ("ST", "RS"):
-            if cmd == "RS":
-                homed = numpy.array([1]*6, dtype=int)[0:self.nAxes]
-                notHomed = numpy.array([0]*6, dtype=int)[0:self.nAxes]
-                #self.isHomed[:] =  homed if self.factory.wakeUpHomed else notHomed
-                self.isHomed = notHomed
-                self.cmdPos = numpy.array([0]*6, dtype=int)[0:self.nAxes]
-                self.measPos = numpy.array([0]*6, dtype=int)[0:self.nAxes]                
-                self.userNums = numpy.array([MAXINT]*6, dtype=int)[0:self.nAxes]
+        if self.verbose:
+            print "received: %r" % (cmdStr,)
+        cmdStr = cmdStr.strip()
+        self.echo(cmdStr)
+        if cmdStr in ("ST", "RS"):
+            if cmdStr == "RS":
+                self.isHomed = self.arr(False, dtype=bool)
+                self.cmdPos = self.arr(0)
+                self.measPos = self.arr(0)
+                self.userNums = self.arr(MAXINT)
             self.replyTimer.cancel()
             return        
-        self.processCmd(cmd, delim)
+        self.processCmd(cmdStr)
         
-    def processCmd(self, cmd, delim):
+    def processCmd(self, cmdStr):
         """Figure out what was commanded, and emulate galil behavior accordingly
 
-        @param[in] cmd: string, a galil command
-        @param[in] delim: the delimiter        
+        @param[in] cmdStr: string, a galil command
         """
 # Is there a use case for setting a variable to -MAXINT?
-#        cmdMatch = re.match(r"([A-F]) *= *(-)?MAXINT$", cmd)
-        cmdMatch = re.match(r"([A-F]) *= *MAXINT$", cmd)
+#        cmdMatch = re.match(r"([A-F]) *= *(-)?MAXINT$", cmdStr)
+        cmdMatch = re.match(r"([A-F]) *= *MAXINT$", cmdStr)
         if cmdMatch:
             axisChar = cmdMatch.groups()[0]
             ind = ord(axisChar) - ord("A")
             self.userNums[ind] = MAXINT
             return
             
-        cmdMatch = re.match(r"([A-F]) *= *((-)?\d+)$", cmd)
+        cmdMatch = re.match(r"([A-F]) *= *((-)?\d+)$", cmdStr)
         if cmdMatch:
             axis = cmdMatch.groups()[0]
             val = int(cmdMatch.groups()[1])
@@ -144,7 +164,7 @@ class FakeGalilProtocol(Protocol):
             self.userNums[ind] = val
             return
             
-        cmdMatch = re.match(r"XQ *#([A-Z]+)", cmd)
+        cmdMatch = re.match(r"XQ *#([A-Z]+)", cmdStr)
         if not cmdMatch:
             self.sendLine("?")
             return
@@ -188,7 +208,7 @@ class FakeGalilProtocol(Protocol):
     def homeStart(self):
         """Start homing
         """
-        self.isHomed[:] = numpy.logical_and(self.isHomed[:], self.userNums == MAXINT)
+        self.isHomed[:] = numpy.logical_and(self.isHomed, self.userNums == MAXINT)
         cmdPos = numpy.where(self.userNums == MAXINT, self.cmdPos, self.cmdPos - self.range)
         deltaPos = numpy.where(self.userNums == MAXINT, 0.0, -self.range)
         deltaTimeArr = numpy.abs(deltaPos / numpy.array(self.speed, dtype=float))
@@ -241,11 +261,11 @@ class FakeGalilProtocol(Protocol):
     
     def showStatus(self):
         """Show the status"""
-        notHomed = numpy.nonzero(self.isHomed==0)
+        notHomedIndices = numpy.nonzero(numpy.logical_not(self.isHomed))
         cmdPos = self.cmdPos[:]
         measPos = self.measPos[:]
-        cmdPos[notHomed] = 999999999
-        measPos[notHomed] = 999999999
+        cmdPos[notHomedIndices] = 999999999
+        measPos[notHomedIndices] = 999999999
         for msgStr in [
             self.formatArr(" %d", self.isHomed, "axis homed"),
             self.formatArr("%09d", cmdPos, "commanded position"),
@@ -284,7 +304,7 @@ class FakeGalilProtocol(Protocol):
         # to do: allow any homed axis to move.
         deltaPos = numpy.abs(newCmdPos - self.cmdPos)
         moveInd = numpy.nonzero(deltaPos) # True elements to be moved
-        toMove = self.isHomed[moveInd] # must be full of ones, otherwise fail the cmd
+        toMove = self.isHomed[moveInd] # must be full of ones, otherwise fail the cmdStr
         if 0 in toMove:
             unhomed = numpy.asarray(numpy.abs(self.isHomed-1), dtype=int)
             unhomed = [str(x) for x in unhomed]
@@ -340,62 +360,36 @@ class FakeGalilProtocol(Protocol):
 
         @param[in] line: string to be written
         """
-        if self.factory.verbose:
+        if self.verbose:
             print "sending: %r" % (line,)
-        self.transport.write(line + "\r\n")
-
-
-class FakeGalilFactory(Factory):
-    """Fake Galil protocol factory
-    
-    Example of use:
-        
-    from twisted.internet import reactor
-    reactor.listenTCP(port, FakeGalilFactory(verbose=False))
-    reactor.run()
-    """
-    def buildProtocol(self, addr):
-        """Build a FakeGalilProtocol
-        
-        @param[in] addr: address?
-
-        This override is required because FakeGalilProtocol needs the factory in __init__,
-        but default buildProtocol only sets factory after the protocol is constructed
-        """
-        self.proto = FakeGalilProtocol(factory = self)
-        return self.proto
-        
-    def __init__(self, verbose=True, wakeUpHomed=True, mirror=mir35mTert.Mirror):
-        """Create a FakeGalilFactory
-        
-        @param[in] verbose: bool. Print extra info to terminal?
-        @param[in] wakeUpHomed: bool. Should actuators be homed upon construction or not
-        @param[in] mirror: a mirrorCtrl.mirror.Mirror object, the mirror this fake galil should emulate
-        """
-        self.verbose = bool(verbose)
-        self.wakeUpHomed = bool(wakeUpHomed)
-        self.mirror = mirror
+        if self.userSock:
+            self.userSock.writeLine(line)
+        else:
+            print "Warning: no socket to send this to:", line
 
         
-class FakePiezoGalilProtocol(FakeGalilProtocol):
-    def __init__(self, factory):
+class FakePiezoGalil(FakeGalil):
+    def __init__(self, mirror, port, verbose=False, wakeUpHomed=True, stateCallback=None):
         """A fake Galil with mock piezo behavior like the 2.5m M2 mirror
 
-        @param[in] factory: a twisted Factory
+        @param[in] mirror: a mirrorCtrl.mirror.Mirror object, the mirror this fake galil should emulate
+        @param[in] port: port on which to listen for connections
+        @param[in] verbose: bool. Print extra info to terminal?
+        @param[in] wakeUpHomed: bool. Should actuators be homed upon construction or not
+        @param[in] stateCallback: a function to call when this server changes state; receives one argument: this server
         """
-        FakeGalilProtocol.__init__(self, factory)
+        FakeGalil.__init__(self, mirror=mirror, port=port, verbose=verbose, wakeUpHomed=wakeUpHomed, stateCallback=stateCallback)
         self.cmdPiezoPos = numpy.array([0]*3, dtype=int)
         self.userPiezoNums = numpy.array([MAXINT]*3, dtype=int)
     
-    def processCmd(self, cmd, delim):
+    def processCmd(self, cmdStr):
         """Overwritten from base class to handle piezo commands also
 
-        @param[in] cmd: command string
-        @param[in] delim: the delimiter
+        @param[in] cmdStr: command string
         """
         # piezo specifics
-        #print 'cmd: ', cmd
-        cmdMatch = re.match(r"LDESPOS([A-F]) *= *((-)?\d+)$", cmd)
+        #print 'cmdStr: ', cmdStr
+        cmdMatch = re.match(r"LDESPOS([A-F]) *= *((-)?\d+)$", cmdStr)
         if cmdMatch:
             axis = cmdMatch.groups()[0]
             val = int(cmdMatch.groups()[1])
@@ -404,7 +398,7 @@ class FakePiezoGalilProtocol(FakeGalilProtocol):
             return
  
  
-        cmdMatch = re.match(r"XQ *#(L[A-Z]+)", cmd)
+        cmdMatch = re.match(r"XQ *#(L[A-Z]+)", cmdStr)
         if cmdMatch and self.replyTimer.isActive:
             # Busy, so reject new command
             self.sendLine("?")
@@ -415,7 +409,7 @@ class FakePiezoGalilProtocol(FakeGalilProtocol):
             self.movePiezo(newCmdPos)
         else:
             # normal stuff
-            FakeGalilProtocol.processCmd(self, cmd, delim)
+            FakeGalil.processCmd(self, cmdStr)
     
     def resetUserNums(self):
         """Reset user numbers"""
@@ -432,35 +426,3 @@ class FakePiezoGalilProtocol(FakeGalilProtocol):
         self.sendLine(self.formatArr("%4.1f", piezoPos, "piezo corrections (microsteps)"))
         #self.replyTimer.start(1, self.done())
         self.done()
-          
-    
-class FakePiezoGalilFactory(FakeGalilFactory):
-    def __init__(self, verbose=True, wakeUpHomed=True, mirror=mir25mSec.Mirror):
-        """FakePiezoGalil factory
-        
-        @param[in] verbose: bool. Print extra info to terminal?
-        @param[in] wakeUpHomed: bool. Should actuators be homed upon construction or not
-        @param[in] mirror: a mirrorCtrl.mirror.Mirror object, the mirror this fake galil should emulate
-
-        Example of use:
-            
-        from twisted.internet import reactor
-        reactor.listenTCP(port, FakePiezoGalilFactory(verbose=False))
-        reactor.run()
-        """
-        FakeGalilFactory.__init__(self, verbose, wakeUpHomed, mirror)
-        
-    def buildProtocol(self, addr):
-        """Build a FakePiezoGalilProtocol
-
-        @param[in] addr: address
-        
-        This override is required because FakeGalilProtocol needs the factory in __init__,
-        but default buildProtocol only sets factory after the protocol is constructed
-        """
-        self.proto = FakePiezoGalilProtocol(factory = self)
-        return self.proto
-        
-
-        
-        

@@ -1,12 +1,13 @@
 #!/usr/bin/env python
-"""Talk to a bench mirror with only 3 axes: same parameters as 3.5m tertiary
+"""Fake 3.5m secondary Galil
 """
 from argparse import ArgumentParser
 from twisted.internet import reactor
 
-from mirrorCtrl.fakeGalil import FakeGalilFactory
+from mirrorCtrl.fakeGalil import FakeGalil
+from mirrorCtrl.mirrors.mir35mSec import Mirror as mirror
 
-DefaultPort = 8000
+DefaultPort = 0
 
 parser = ArgumentParser(description = "Start a fake Galil")
 parser.add_argument("-p", "--port", type = int, default = DefaultPort,
@@ -15,6 +16,8 @@ parser.add_argument("-v", "--verbose", action = "store_true", help = "print inpu
 
 args = parser.parse_args()
 
-reactor.listenTCP(port = args.port, factory = FakeGalilFactory(verbose = args.verbose))
-print "Starting fake Galil on port %s; verbose=%s" % (args.port, args.verbose)
+def stateCallback(server):
+    print "%s is %s; port=%s" % (server.name, server.state, server.port)
+
+FakeGalil(mirror=mirror, port=args.port, verbose=args.verbose, stateCallback=stateCallback)
 reactor.run()

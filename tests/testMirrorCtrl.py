@@ -21,7 +21,8 @@ from RO.Comm.TCPConnection import TCPConnection
 import mirrorCtrl
 import mirrorCtrl.mirrors.mir35mTert
 import mirrorCtrl.mirrors.mir25mSec
-from mirrorCtrl.fakeGalil import FakeGalilFactory, FakePiezoGalilFactory
+from mirrorCtrl.fakeGalil import FakeGalil, FakePiezoGalil
+from mirrorCtrl.fakeGalilMirrorCtrl import FakeGalilMirrorCtrl
 import socket
 
 UserPort = 9102 # port for mirror controllers
@@ -53,7 +54,6 @@ class MirrorCtrlTestBase(TestCase):
         """overwritten by subclasses
         
         must set the following instance variables (shown by example):
-        self.fakeGalilFactory: fake Galil factory, e.g. FakeGalilFactory or FakePiezoGalilFactory
         self.mirror: mirorCtrl Mirror, e.g. mirrorCtrl.mirrors.mir35mTert.Mirror
         self.mirDev: mirror device, e.g. mirrorCtrl.GalilDevice
         self.name: name of keyword dict for this mirror
@@ -63,6 +63,8 @@ class MirrorCtrlTestBase(TestCase):
             
     def setUp(self):
         self.dispatcher = None
+        self.doRun = True
+        self.startDeferred = Deferred()
         if type(self) == MirrorCtrlTestBase:
             # the unit test framework will try to instantiate this class, even though it has no test cases
             # no need to do anything in that case
@@ -75,59 +77,38 @@ class MirrorCtrlTestBase(TestCase):
             link.minMount = -numpy.inf
             link.maxMount = numpy.inf
         # first start up the fake galil listening
-        galilPort = self.startFakeGalil()
-        # connect an actor to it
-        d = self.startMirrorCtrl(galilPort = galilPort)
-        # after that connection is made, connect a dispatcher to the actor
-        d.addCallback(self.startCommander)
-        return d
+        return self.startDeferred
+    
+    def fakeGalilStateCallback(self, fakeGalil):
+        if fakeGalil.isReady:
+            print "fake Galil listening on port %s" % (fakeGalil.port,)
+            self.startMirrorCtrl(galilPort=fakeGalil.port)
         
     def tearDown(self):
         """Tear down things; most of the work is done by addCleanup
         """
         #print "tearDown()"
+        self.doRun = False
         if self.dispatcher is not None:
             self.dispatcher.disconnect()
 
-    def startFakeGalil(self):
-        """Start the fake Galil on a randomly chosen port; return the port number
+    def mirrorCtrlStateCallback(self, mirCtrl):
+        """State of fake mirror controller
         """
-        #print "startFakeGalil()"
-        self.fakeGalilFactory = self.fakeGalilFactory(verbose=False, wakeUpHomed=True)
-        portObj = reactor.listenTCP(port=0, factory=self.fakeGalilFactory)
-        galilPort = portObj.getHost().port
-        self.addCleanup(portObj.stopListening)
-        #print "Started fake Galil on port", galilPort
-        return galilPort
+        print "mirCtrl.isReady=%s, isDone=%s" % (mirCtrl.isReady, mirCtrl.isDone)
         
-    def startMirrorCtrl(self, galilPort):
-        """Start mirror controller
-        """
-        #print "startMirrorCtrl(galilPort=%r)" % (galilPort,)
-        #mirror = mirrorCtrl.mirrors.mir35mTert.Mirror
-        self.mirDev = self.mirDev(
-            mirror = self.mirror,
-            host = 'localhost',
-            port = galilPort,            
-        )
-        
-        d = Deferred()
-        def connCallback(conn, d=d):
-            #print "mirror controller conn state=", conn.state
-            if conn.isConnected:
-                d.callback("success")
-        
-        self.mirDev.conn.addStateCallback(connCallback)
-        self.mirActor = mirrorCtrl.MirrorCtrl(
-            device = self.mirDev,
-            userPort = self.userPort,
-        )
-        self.addCleanup(self.mirDev.conn.disconnect)
-        self.addCleanup(self.mirActor.server.close)
-        return d
+    def mirrorCtrlStateCallback(self, mirCtrl):
+        print "mirCtrl.server.state"
+        if self.doRun:
+            if mirCtrl.isReady:
+                self.startCommander()
 
     def startCommander(self, *args): # *args for the callback result that we don't care about
         """Start a commander"""
+        print "startCommander; port=%s", self.mirCtrl.server.port
+        if not self.doRun:
+            return
+
         #print "startCommander(*args=%r)" % (args,)
         # this doesn't close cleanly
         # def readCB(foo, line):
@@ -136,7 +117,7 @@ class MirrorCtrlTestBase(TestCase):
         #     print foo.fullState
         self.cmdConn = TCPConnection(
             host = 'localhost',
-            port = self.userPort,
+            port = self.mirCtrl.server.port,
             # readCallback = readCB,
             # stateCallback = stateCB,
             readLines = True,
@@ -182,9 +163,9 @@ class GenericTests(MirrorCtrlTestBase):
         self.userPort = getOpenPort()
         #print 'userPort!!!!', self.userPort
         #self.userPort = UserPort
-        self.fakeGalilFactory = FakeGalilFactory
         self.mirror = mirrorCtrl.mirrors.mir35mTert.Mirror
-        self.mirDev = mirrorCtrl.GalilDevice
+        self.mirDev = mirrorCtrl.GalilDevice(mirror=self.mirror, host="localhost", port=0)
+        self.mirCtrl = FakeGalilMirrorCtrl(device=self.mirDev, stateCallback=self.mirrorCtrlStateCallback)
         self.name = "mirror"
                 
     # def testSingleMove(self):
@@ -223,7 +204,7 @@ class GenericTests(MirrorCtrlTestBase):
     #             ))
     #         # encMount should be within the noise range determined
     #         # on the fake Galil
-    #         noiseRng = self.fakeGalilFactory.proto.noiseRange # steps
+    #         noiseRng = self.fakeGalil.proto.noiseRange # steps
     #         encDiff = numpy.abs(numpy.subtract(encMount, self.dispatcher.model.encMount.valueList[:]))
     #         encTruth = numpy.abs(encDiff) < noiseRng
     #         encInRange = False if False in encTruth else True
@@ -282,7 +263,7 @@ class GenericTests(MirrorCtrlTestBase):
         """
         self.test = 'testUnHomedMove'
         # force all axes on the fakeGalil to unhomed
-        self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
+        self.fakeGalil.proto.isHomed = self.fakeGalil.proto.isHomed*0.
         d = Deferred()
         orientation = [10000, 3600, 3600]
         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
@@ -330,7 +311,7 @@ class GenericTests(MirrorCtrlTestBase):
         """
         self.test = 'testHome'
         # force all axes on the fakeGalil to unhomed
-        self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
+        self.fakeGalil.proto.isHomed = self.fakeGalil.proto.isHomed*0.
         d = Deferred()
         cmdStr = 'home A,B,C'        
         cmdVar = CmdVar (
@@ -357,7 +338,7 @@ class GenericTests(MirrorCtrlTestBase):
         """
         self.test = "testStatus"
         # force all axes on the fakeGalil to unhomed
-        self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
+        self.fakeGalil.proto.isHomed = self.fakeGalil.proto.isHomed*0.
         d = Deferred()
         cmdStr = 'status'        
         cmdVar = CmdVar (
@@ -796,7 +777,7 @@ class GenericTests(MirrorCtrlTestBase):
         """
         self.test = "testBadMove"
         # turn off noise added by fakeGalil.  This move should not iterate.
-        self.fakeGalilFactory.proto.encRes = self.fakeGalilFactory.proto.encRes*0.
+        self.fakeGalil.proto.encRes = self.fakeGalil.proto.encRes*0.
         d = Deferred()
         orientation = [10000, 3600, 3600, 10000, 10000, 3600]
         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
@@ -820,7 +801,7 @@ class GenericTests(MirrorCtrlTestBase):
         """
         self.test = "testBadHome"
         # force all axes on the fakeGalil to unhomed
-        self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
+        self.fakeGalil.proto.isHomed = self.fakeGalil.proto.isHomed*0.
         d = Deferred()
         cmdStr = 'home A,B,C,D'        
         cmdVar = CmdVar (
@@ -843,9 +824,9 @@ class PiezoTests(MirrorCtrlTestBase):
     def setVars(self):
         #self.userPort = UserPort
         self.userPort = getOpenPort()
-        self.fakeGalilFactory = FakePiezoGalilFactory
         self.mirror = mirrorCtrl.mirrors.mir25mSec.Mirror
         self.mirDev = mirrorCtrl.GalilDevice25Sec    
+        self.mirCtrl = FakeGalilMirrorCtrl(device=self.mirDev, stateCallback=self.mirrorCtrlStateCallback)
         self.name = "piezomirror"
 
     def testHome(self):
@@ -856,7 +837,7 @@ class PiezoTests(MirrorCtrlTestBase):
         """
         self.test = "piezoTestHome"
         # force all axes on the fakeGalil to unhomed
-        self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
+        self.fakeGalil.proto.isHomed = self.fakeGalil.proto.isHomed*0.
         d = Deferred()
         cmdStr = 'home A,B,C,D,E'        
         cmdVar = CmdVar (

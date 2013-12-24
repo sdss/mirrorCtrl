@@ -20,15 +20,9 @@ def getActEqEncMir(mirror):
 Mirror = getActEqEncMir(Mirror)  # place actuators equal to encoders
 
 UserPort = 3532
-UseFakeGalil = True
 
-if UseFakeGalil:
-    # for testing
-    GalilHost = 'localhost'
-    GalilPort = 8000 # matches fakeGalil.py for testing
-else:
-    GalilHost = "tccserv35m-p"
-    GalilPort = 3500 # port 15
+GalilHost = "tccserv35m-p"
+GalilPort = 3500 # port 15
 
 if __name__ == "__main__":
     device = mirrorCtrl.GalilDevice(

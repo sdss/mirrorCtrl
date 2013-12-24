@@ -9,7 +9,7 @@ import pickle
 import os
 import RO.Comm.Generic
 RO.Comm.Generic.setFramework("twisted")
-from mirrorCtrl.fakeGalil import FakeGalilFactory, FakePiezoGalilFactory
+from mirrorCtrl.fakeGalil import FakeGalil, FakePiezoGalil
 from mirrorCtrl.const import convOrient2MMRad, MMPerMicron, RadPerArcSec
 from testMirrorCtrl import MirrorCtrlTestBase, CmdCallback, UserPort, getOpenPort
 from twisted.internet import reactor
@@ -213,7 +213,7 @@ class ConvergenceTestBase(MirrorCtrlTestBase):
 class ConvergenceTestActEqEnc(ConvergenceTestBase):
     def setVars(self):
         self.userPort = getOpenPort()
-        self.fakeGalilFactory = FakeGalilFactory
+        self.fakeGalilFactory = FakeGalil
         self.trueMirror = mir35mSec.Mirror
         self.mirror = getActEqEncMir(self.trueMirror)
         self.mirDev = mirrorCtrl.GalilDevice
@@ -244,7 +244,7 @@ class ConvergenceTestActEqEnc(ConvergenceTestBase):
 class ConvergenceTestM3(ConvergenceTestBase):
     def setVars(self):
         self.userPort = getOpenPort()
-        self.fakeGalilFactory = FakeGalilFactory
+        self.fakeGalilFactory = FakeGalil
         self.trueMirror = mir35mTert.Mirror
         self.mirror = getActEqEncMir(self.trueMirror)
         self.mirDev = mirrorCtrl.GalilDevice
@@ -256,7 +256,7 @@ class ConvergenceTestM3(ConvergenceTestBase):
 class ConvergenceTestSDSSM2(ConvergenceTestBase):
     def setVars(self):
         self.userPort = getOpenPort()
-        self.fakeGalilFactory = FakePiezoGalilFactory
+        self.fakeGalilFactory = FakePiezoGalil
         self.trueMirror = mir25mSec.Mirror
         self.mirror = getActEqEncMir(self.trueMirror)
         self.mirDev = mirrorCtrl.GalilDevice
@@ -272,7 +272,7 @@ class ConvergenceTestSDSSM2(ConvergenceTestBase):
 class ConvergenceTestRandAct(ConvergenceTestBase):
     def setVars(self):
         self.userPort = getOpenPort()
-        self.fakeGalilFactory = FakeGalilFactory
+        self.fakeGalilFactory = FakeGalil
         self.trueMirror = mir35mSec.Mirror
         self.mirror = getActRandMove(self.trueMirror, seed=45)
         self.mirDev = mirrorCtrl.GalilDevice
@@ -286,7 +286,7 @@ class ConvergenceTestPerfect(ConvergenceTestBase):
     """
     def setVars(self):
         self.userPort = getOpenPort()
-        self.fakeGalilFactory = FakeGalilFactory
+        self.fakeGalilFactory = FakeGalil
         self.trueMirror = mir35mSec.Mirror
         self.mirror = copy.deepcopy(mir35mSec.Mirror)
         self.mirDev = mirrorCtrl.GalilDevice
