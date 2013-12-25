@@ -9,9 +9,10 @@ from mirrorCtrl.fakeMirrorCtrlWrapper import FakeMirrorCtrlWrapper
 
 DefaultPort = 3520
 
-parser = ArgumentParser(description = "Start a fake Galil")
+parser = ArgumentParser(description = "Start a fake 3.5m secondary mirror controller")
 parser.add_argument("-p", "--port", type = int, default = DefaultPort,
     help = "port number (defaults to %s)" % (DefaultPort,))
+parser.add_argument("-v", "--verbose", action = "store_true", help = "print input and output?")
 
 args = parser.parse_args()
 
@@ -23,5 +24,10 @@ def stateCallback(wrapper):
     elif wrapper.isDone:
         print "Fake 35mSec controller shut down"
 
-FakeMirrorCtrlWrapper(mirror=mirror, userPort=args.port, stateCallback=stateCallback)
+FakeMirrorCtrlWrapper(
+    mirror=mirror,
+    userPort=args.port,
+    verbose=args.verbose,
+    stateCallback=stateCallback,
+)
 reactor.run()

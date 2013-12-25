@@ -31,6 +31,7 @@ class FakeMirrorCtrlWrapper(object):
         galilClass = FakeGalil,
         userPort = 0,
         name = "galil",
+        verbose = False,
         wakeUpHomed = True,
         stateCallback = None,
     ):
@@ -39,6 +40,7 @@ class FakeMirrorCtrlWrapper(object):
         @param[in] mirror: the Mirror object used by the fake Galil
         @param[in] galilClass: class of fake Galil
         @param[in] userPort: port for mirror controller connections; 0 to auto-select
+        @param[in] verbose: should the fake Galil run in verbose mode?
         @param[in] wakeUpHomed: should actuators be homed upon construction, or not?
         @param[in] stateCallback: function to call when connection state of hardware controller or actor changes;
             receives one argument: this actor wrapper
@@ -52,8 +54,9 @@ class FakeMirrorCtrlWrapper(object):
         
         self.deviceWrapper = FakeGalilDeviceWrapper(
             mirror=mirror,
-            galilClass = galilClass,
-            wakeUpHomed = True,
+            galilClass=galilClass,
+            verbose=verbose,
+            wakeUpHomed=wakeUpHomed,
             stateCallback=self._deviceWrapperStateChanged,
         )
     
