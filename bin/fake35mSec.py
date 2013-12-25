@@ -4,20 +4,24 @@
 from argparse import ArgumentParser
 from twisted.internet import reactor
 
-from mirrorCtrl.fakeGalil import FakeGalil
 from mirrorCtrl.mirrors.mir35mSec import Mirror as mirror
+from mirrorCtrl.fakeMirrorCtrlWrapper import FakeMirrorCtrlWrapper
 
-DefaultPort = 0
+DefaultPort = 3520
 
 parser = ArgumentParser(description = "Start a fake Galil")
 parser.add_argument("-p", "--port", type = int, default = DefaultPort,
     help = "port number (defaults to %s)" % (DefaultPort,))
-parser.add_argument("-v", "--verbose", action = "store_true", help = "print input and output?")
 
 args = parser.parse_args()
 
-def stateCallback(server):
-    print "%s is %s; port=%s" % (server.name, server.state, server.port)
+def stateCallback(wrapper):
+    if wrapper.isReady:
+        print "Fake 35mSec controller running on port", wrapper.userPort
+    elif wrapper.didFail:
+        print "Fake 35mSec controller error"
+    elif wrapper.isDone:
+        print "Fake 35mSec controller shut down"
 
-FakeGalil(mirror=mirror, port=args.port, verbose=args.verbose, stateCallback=stateCallback)
+FakeMirrorCtrlWrapper(mirror=mirror, userPort=args.port, stateCallback=stateCallback)
 reactor.run()

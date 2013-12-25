@@ -67,12 +67,20 @@ class FakeMirrorCtrlWrapper(object):
                 self.readyDeferred.errback("")
     
     def _makeActor(self):
-        print "_makeActor()"
+        #print "_makeActor()"
         self.actor = MirrorCtrl(
             device=self.deviceWrapper.device,
             userPort=self._userPort,
         )
         self.actor.server.addStateCallback(self._stateChanged)
+    
+    @property
+    def userPort(self):
+        """Return the actor port, if known, else None
+        """
+        if self.actor:
+            return self.actor.server.port
+        return None
         
     @property
     def isReady(self):
@@ -102,7 +110,7 @@ class FakeMirrorCtrlWrapper(object):
     def _stateChanged(self, *args):
         """Called when state changes
         """
-        print "_stateChanged; self.deviceWrapper.isReady=%s, self.actor=%s" % (self.deviceWrapper.isReady, self.actor)
+        #print "_stateChanged; self.deviceWrapper.isReady=%s, self.actor=%s" % (self.deviceWrapper.isReady, self.actor)
         if self._closeDeferred: # closing or closed
             if self.isDone:
                 if not self.readyDeferred.called:

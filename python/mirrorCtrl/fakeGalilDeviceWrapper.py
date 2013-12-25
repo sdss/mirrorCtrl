@@ -64,8 +64,10 @@ class FakeGalilDeviceWrapper(object):
                 self.readyDeferred.errback("")
     
     def _makeDevice(self):
-        port = self.hardwareController.port
-        print "_makeDevice, port=", port
+        port = self.port
+        if port is None:
+            raise RuntimeError("Hardware controller port is unknown")
+        #print "_makeDevice, port=", port
         self.device = GalilDevice(
             mirror=self._mirror,
             host="localhost",
@@ -73,6 +75,12 @@ class FakeGalilDeviceWrapper(object):
         )
         self.device.conn.addStateCallback(self._stateChanged)
         self.device.connect()
+    
+    @property
+    def port(self):
+        """Return port of hardware controller, if known, else None
+        """
+        return self.hardwareController.port
     
     @property
     def isReady(self):
