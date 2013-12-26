@@ -28,18 +28,17 @@ class FakeMirrorCtrlWrapper(object):
     """
     def __init__(self,
         mirror,
-        galilClass = FakeGalil,
         userPort = 0,
-        name = "galil",
+        galilClass = FakeGalil,
         verbose = False,
         wakeUpHomed = True,
         stateCallback = None,
     ):
         """Construct a FakeMirrorCtrlWrapper that manages its fake Galil
 
+        @param[in] userPort: port for mirror controller connections; 0 to auto-select
         @param[in] mirror: the Mirror object used by the fake Galil
         @param[in] galilClass: class of fake Galil
-        @param[in] userPort: port for mirror controller connections; 0 to auto-select
         @param[in] verbose: should the fake Galil run in verbose mode?
         @param[in] wakeUpHomed: should actuators be homed upon construction, or not?
         @param[in] stateCallback: function to call when connection state of hardware controller or actor changes;
@@ -99,7 +98,7 @@ class FakeMirrorCtrlWrapper(object):
     
     @property
     def didFail(self):
-        """Return True if connection or disconnection
+        """Return True if isDone and there was a failure
         """
         return self.isDone and (self.deviceWrapper.didFail or self.actor.server.didFail)
     
@@ -113,14 +112,14 @@ class FakeMirrorCtrlWrapper(object):
     def _stateChanged(self, *args):
         """Called when state changes
         """
-        #print "_stateChanged; self.deviceWrapper.isReady=%s, self.actor=%s" % (self.deviceWrapper.isReady, self.actor)
+#        print "%r; _stateChanged; deviceWrapper.isReady=%s, actor.server.state=%s" % (self, self.deviceWrapper.isReady, self.actor.server.state if self.actor else "?")
         if self._closeDeferred: # closing or closed
             if self.isDone:
                 if not self.readyDeferred.called:
                     self.readyDeferred.cancel()
                 if not self._closeDeferred.called:
+#                    print "*** %s calling closeDeferred ***" % (self,)
                     self._closeDeferred.callback(None)
-                    self._stateCallback = None
                 else:
                     sys.stderr.write("Device wrapper state changed after wrapper closed\n")
         else: # opening or open
@@ -132,6 +131,8 @@ class FakeMirrorCtrlWrapper(object):
 
         if self._stateCallback:
             safeCall(self._stateCallback, self)
+            if self.isDone:
+                self._stateCallback = None
     
     def close(self):
         """Close everything
@@ -144,6 +145,14 @@ class FakeMirrorCtrlWrapper(object):
         self._closeDeferred = Deferred()
         if not self.readyDeferred.called:
             self.readyDeferred.cancel()
-        self.actor.disconnect()
+        if self.actor:
+            self.actor.server.close()
         self.deviceWrapper.close()
         return self._closeDeferred
+    
+    def __str__(self):
+        return "%s" % (type(self).__name__,)
+    
+    def __repr__(self):
+        return "%s; isReady=%s, isDone=%s, didFail=%s" % \
+            (type(self).__name__, self.isReady, self.isDone, self.didFail)

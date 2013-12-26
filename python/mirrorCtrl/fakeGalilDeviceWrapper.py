@@ -101,11 +101,11 @@ class FakeGalilDeviceWrapper(object):
     def isDone(self):
         """Return True if the device and fake hardware controller are fully disconnected
         """
-        return self.hardwareController.isDone and self.device.conn.isDone
+        return self.hardwareController.isDone and self.device.conn.isDisconnected
     
     @property
     def didFail(self):
-        """Return True if connection or disconnection
+        """Return True if isDone and there was a failure
         """
         return self.isDone and (self.hardwareController.didFail or self.device.conn.didFail)
     
@@ -119,15 +119,16 @@ class FakeGalilDeviceWrapper(object):
     def _stateChanged(self, *args):
         """Called when state changes
         """
-        #print "_stateChanged; self.hardwareController.isReady=%s, self.device.conn.state=%s" % (self.hardwareController.isReady, self.device.conn.state)
+#         print "%r; _stateChanged; self.hardwareController.isReady=%s, self.device.conn.state=%s" % \
+#             (self, self.hardwareController.isReady, self.device.conn.state if self.device else "?")
         if self._closeDeferred: # closing or closed
             if self.isDone:
                 self._isReady = False
                 if not self.readyDeferred.called:
                     self.readyDeferred.cancel()
                 if not self._closeDeferred.called:
+#                    print "*** %s calling _closeDeferred ***" % (self,)
                     self._closeDeferred.callback(None)
-                    self._stateCallback = None
                 else:
                     sys.stderr.write("Device wrapper state changed after wrapper closed\n")
         else: # opening or open
@@ -140,18 +141,29 @@ class FakeGalilDeviceWrapper(object):
 
         if self._stateCallback:
             safeCall(self._stateCallback, self)
+            if self.isDone:
+                self._stateCallback = None
     
     def close(self):
         """Close everything
         
         @return a deferred
         """
+        self._isReady = False
         if self._closeDeferred:
             raise RuntimeError("Already closing or closed")
 
         self._closeDeferred = Deferred()
         if not self.readyDeferred.called:
             self.readyDeferred.cancel()
-        self.device.disconnect()
+        if self.device:
+            self.device.disconnect()
         self.hardwareController.close()
         return self._closeDeferred
+    
+    def __str__(self):
+        return "%s" % (type(self).__name__,)
+    
+    def __repr__(self):
+        return "%s; isReady=%s, isDone=%s, didFail=%s" % \
+            (type(self).__name__, self.isReady, self.isDone, self.didFail)
