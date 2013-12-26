@@ -729,6 +729,18 @@ class PiezoTests(TestCase):
     
     def tearDown(self):
         self.dw.close()
+    
+    @property
+    def dispatcher(self):
+        """Return the actor dispatcher that talks to the mirror controller
+        """
+        return self.dw.dispatcher
+    
+    @property
+    def fakeGalil(self):
+        """Return the fake Galil (instance of FakeGalil)
+        """
+        return self.dw.actorWrapper.deviceWrapper.hardwareController
 
     def testHome(self):
         """Sets isHomed to false then tests home command.

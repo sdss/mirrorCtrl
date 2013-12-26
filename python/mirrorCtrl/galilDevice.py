@@ -302,9 +302,9 @@ class GalilDevice(TCPDevice):
         
         Called on disconnection
         """
-#         print "temporary hacked version of init"
-#         userCmd.setState(userCmd.Done)
-        self.cmdStop(userCmd=userCmd)
+        print "temporary hacked version of init"
+        userCmd.setState(userCmd.Done)
+        #self.cmdStop(userCmd=userCmd)
 
     def parseReply(self, replyStr):
         """Parse a reply from the Galil and seperate into key=value format.
