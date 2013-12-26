@@ -302,6 +302,8 @@ class GalilDevice(TCPDevice):
         
         Called on disconnection
         """
+#         print "temporary hacked version of init"
+#         userCmd.setState(userCmd.Done)
         self.cmdStop(userCmd=userCmd)
 
     def parseReply(self, replyStr):

@@ -56,15 +56,6 @@ class FakeGalilDeviceWrapper(object):
             stateCallback=self._hardwareStateChanged,
         )
     
-    def _devConnCallback(self, conn):
-        """Called when the device's connection state changes
-        """
-        if not self.readyDeferred.called:
-            if conn.isConnected:
-                self.readyDeferred.callback("")
-            elif conn.didFail:
-                self.readyDeferred.errback("")
-    
     def _makeDevice(self):
         port = self.port
         if port is None:

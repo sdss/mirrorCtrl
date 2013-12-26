@@ -68,22 +68,11 @@ class FakeDispatcherWrapper(object):
             stateCallback=self._actorWrapperStateChanged,
         )
     
-    def _actorConnCallback(self, conn):
-        """Called when the actor's connection state changes
-        """
-        if not self.readyDeferred.called:
-            if conn.isReady:
-                self.readyDeferred.callback("")
-            elif conn.didFail:
-                self.readyDeferred.errback("")
-    
     def _makeDispatcher(self):
         #print "_makeDispatcher()"
         connection = TCPConnection(
             host = 'localhost',
             port = self.actorWrapper.userPort,
-            readCallback = self._readCallback,
-            stateCallback = self._stateChanged,
             readLines = True,
             name = "mirrorCtrlConn",
         )
@@ -91,6 +80,9 @@ class FakeDispatcherWrapper(object):
             connection = connection,
             name = self._dictName, # name of keyword dictionary
         )
+        connection.addStateCallback(self._stateChanged)
+        if self._readCallback:
+            connection.addReadCallback(self._readCallback)
         connection.connect()
     
     @property
@@ -133,23 +125,24 @@ class FakeDispatcherWrapper(object):
     def _stateChanged(self, *args):
         """Called when state changes
         """
-#         print "%r; _stateChanged; self.actorWrapper.isReady=%s, self.actorWrapper.isDone=%s, self.dispatcher.connection.state=%s, self.closeDeferred.called=%s" % \
-#             (self, self.actorWrapper.isReady, self.actorWrapper.isDone, self.dispatcher.connection.state if self.dispatcher else "?",
-#             self._closeDeferred.called if self._closeDeferred else "?")
+#         print "%r; _stateChanged; self.actorWrapper.isReady=%s, self.actorWrapper.isDone=%s, self.dispatcher.connection.state=%s" % \
+#             (self, self.actorWrapper.isReady, self.actorWrapper.isDone, self.dispatcher.connection.state if self.dispatcher else "?")
         if self._closeDeferred: # closing or closed
             if self.isDone:
                 if not self.readyDeferred.called:
                     self.readyDeferred.cancel()
                 if not self._closeDeferred.called:
-#                    print "\n*** %s calling closeDeferred ***\n" % (self,)
+                    #print "%s calling closeDeferred" % (self,)
                     self._closeDeferred.callback(None)
                 else:
                     sys.stderr.write("Device wrapper state changed after wrapper closed\n")
         else: # opening or open
             if not self.readyDeferred.called:
                 if self.isReady:
+                    #print "%s calling readyDeferred" % (self,)
                     self.readyDeferred.callback(None)
                 elif self.didFail:
+                    #print "%s calling readyDeferred.errback" % (self,)
                     self.readyDeferred.errback("Failed") # probably should not be a string?
 
         if self._stateCallback:

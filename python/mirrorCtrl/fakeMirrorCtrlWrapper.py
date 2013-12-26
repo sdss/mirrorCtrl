@@ -59,15 +59,6 @@ class FakeMirrorCtrlWrapper(object):
             stateCallback=self._deviceWrapperStateChanged,
         )
     
-    def _actorConnCallback(self, conn):
-        """Called when the actor's connection state changes
-        """
-        if not self.readyDeferred.called:
-            if conn.isReady:
-                self.readyDeferred.callback("")
-            elif conn.didFail:
-                self.readyDeferred.errback("")
-    
     def _makeActor(self):
         #print "_makeActor()"
         self.actor = MirrorCtrl(
