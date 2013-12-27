@@ -17,6 +17,7 @@ from twisted.internet.defer import Deferred, gatherResults
 from twisted.internet import reactor
 from opscore.actor import ActorDispatcher, CmdVar
 from RO.Comm.TCPConnection import TCPConnection
+from twistedActor import getOpenPort
 
 import mirrorCtrl
 import mirrorCtrl.mirrors.mir35mTert
@@ -26,13 +27,13 @@ import socket
 
 UserPort = 9102 # port for mirror controllers
 
-def getOpenPort():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(("",0))
-    s.listen(1)
-    port = s.getsockname()[1]
-    s.close()
-    return port
+# def getOpenPort():
+#     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#     s.bind(("",0))
+#     s.listen(1)
+#     port = s.getsockname()[1]
+#     s.close()
+#     return port
 
 def showReply(msgStr, *args, **kwargs): # prints what the dispatcher sees
     print 'Keyword Reply: ' + msgStr

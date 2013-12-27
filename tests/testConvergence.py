@@ -11,7 +11,7 @@ import RO.Comm.Generic
 RO.Comm.Generic.setFramework("twisted")
 from mirrorCtrl.fakeGalil import FakeGalilFactory, FakePiezoGalilFactory
 from mirrorCtrl.const import convOrient2MMRad, MMPerMicron, RadPerArcSec
-from testMirrorCtrl import MirrorCtrlTestBase, CmdCallback, UserPort, getOpenPort
+from testMirrorCtrl import MirrorCtrlTestBase, CmdCallback, getOpenPort #UserPort
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
 import mirrorCtrl
