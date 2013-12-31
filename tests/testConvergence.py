@@ -1,21 +1,23 @@
 #!/usr/bin/env python
-from mirrorCtrl.mirrors import mir35mSec, mir35mTert, mir25mSec
-import numpy
 import itertools
 import copy
+import os
+import pickle
+
+import numpy
 import numpy.random
 numpy.random.seed(10)
-import pickle
-import os
 import RO.Comm.Generic
 RO.Comm.Generic.setFramework("twisted")
-from mirrorCtrl.fakeGalil import FakeGalil, FakePiezoGalil
-from mirrorCtrl.const import convOrient2MMRad, MMPerMicron, RadPerArcSec
-from testMirrorCtrl import MirrorCtrlTestBase, CmdCallback, UserPort, getOpenPort
+from opscore.actor import CmdVar
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
+
+from mirrorCtrl.fakeGalil import FakeGalil, FakePiezoGalil
+from mirrorCtrl.const import convOrient2MMRad, MMPerMicron, RadPerArcSec
+from mirrorCtrl.mirrors import mir35mSec, mir35mTert, mir25mSec
+from testMirrorCtrl import MirrorCtrlTestBase, CmdCallback, UserPort, getOpenPort
 import mirrorCtrl
-from opscore.actor import CmdVar
 
 pwd = os.path.dirname(__file__)
 secMoveList = pickle.load(open(os.path.join(pwd, "data/secMoveList.p")))
@@ -46,7 +48,10 @@ def getActRandMove(mirror, seed=10):
     """ Apply a random xy translation to ABC actuators,
         Apply a random z translation to DE actuators
     """
-    from mirrorCtrl.mirrors.mir35mSec import actRad, encRad
+    enc0BasePos = mir35mSec.encoderList[0].basePos
+    encRad = math.hypot(enc0BasePos[0], enc0BasePos[1])
+    act0BasePos = mir35mSec.actuatorList[0].basePos
+    actRad = math.hypot(act0BasePos[0], act0BasePos[1])
     numpy.random.seed(seed)
     mirror = copy.deepcopy(mirror)
     lengthScale = numpy.abs(actRad - encRad)*2.
@@ -149,7 +154,7 @@ class ConvergenceTestBase(MirrorCtrlTestBase):
         
         must set the following instance variables (shown by example):
         self.fakeGalilFactory: fake Galil factory, e.g. FakeGalilFactory or FakePiezoGalilFactory
-        self.mirror: mirorCtrl Mirror, e.g. mirrorCtrl.mirrors.mir35mTert.Mirror
+        self.mirror: mirorCtrl Mirror, e.g. mirrorCtrl.mirrors.mir35mTert
         self.mirDev: mirror device, e.g. mirrorCtrl.GalilDevice
         self.name: name of keyword dict for this mirror
         """
@@ -214,7 +219,7 @@ class ConvergenceTestActEqEnc(ConvergenceTestBase):
     def setVars(self):
         self.userPort = getOpenPort()
         self.fakeGalilFactory = FakeGalil
-        self.trueMirror = mir35mSec.Mirror
+        self.trueMirror = mir35mSec
         self.mirror = getActEqEncMir(self.trueMirror)
         self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror"    
@@ -245,7 +250,7 @@ class ConvergenceTestM3(ConvergenceTestBase):
     def setVars(self):
         self.userPort = getOpenPort()
         self.fakeGalilFactory = FakeGalil
-        self.trueMirror = mir35mTert.Mirror
+        self.trueMirror = mir35mTert
         self.mirror = getActEqEncMir(self.trueMirror)
         self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror" 
@@ -257,7 +262,7 @@ class ConvergenceTestSDSSM2(ConvergenceTestBase):
     def setVars(self):
         self.userPort = getOpenPort()
         self.fakeGalilFactory = FakePiezoGalil
-        self.trueMirror = mir25mSec.Mirror
+        self.trueMirror = mir25mSec
         self.mirror = getActEqEncMir(self.trueMirror)
         self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror" 
@@ -273,7 +278,7 @@ class ConvergenceTestRandAct(ConvergenceTestBase):
     def setVars(self):
         self.userPort = getOpenPort()
         self.fakeGalilFactory = FakeGalil
-        self.trueMirror = mir35mSec.Mirror
+        self.trueMirror = mir35mSec
         self.mirror = getActRandMove(self.trueMirror, seed=45)
         self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror" 
@@ -287,8 +292,8 @@ class ConvergenceTestPerfect(ConvergenceTestBase):
     def setVars(self):
         self.userPort = getOpenPort()
         self.fakeGalilFactory = FakeGalil
-        self.trueMirror = mir35mSec.Mirror
-        self.mirror = copy.deepcopy(mir35mSec.Mirror)
+        self.trueMirror = mir35mSec
+        self.mirror = copy.deepcopy(mir35mSec)
         self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror" 
 

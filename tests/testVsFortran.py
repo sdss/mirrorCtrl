@@ -119,12 +119,12 @@ class TheSlurper(object):
             if useMirDat:
                 self.mirror = mirDict25[Mirrors[self.mirNum]]
             else:
-                self.mirror = mir25mSec.Mirror if self.mirNum==1 else mir25mPrim.Mirror
+                self.mirror = mir25mSec if self.mirNum==1 else mir25mPrim
         elif self.mirFile == 'mir_35m.dat':
             if useMirDat:
                 self.mirror = mirDict35[Mirrors[self.mirNum]]
             else:
-                self.mirror = mir35mTert.Mirror if self.mirNum==2 else mir35mSec.Mirror
+                self.mirror = mir35mTert if self.mirNum==2 else mir35mSec
         else:
             raise RuntimeError('Unrecognized mirror file')
         # clean up mounts from massorient, remove trailing zeros for non movable axes

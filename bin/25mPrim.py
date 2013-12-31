@@ -2,7 +2,7 @@
 """2.5m primary mirror controller
 """
 import mirrorCtrl
-from mirrorCtrl.mirrors.mir25mPrim import Mirror
+from mirrorCtrl.mirrors import mir25mPrim
 
 UserPort = 2531
 
@@ -12,7 +12,7 @@ GalilPort = 8000 # matches fakeGalil.py for testing
 
 if __name__ == "__main__":
     device = mirrorCtrl.GalilDevice(
-        mirror = Mirror,
+        mirror = mir25mPrim,
         host = GalilHost,
         port = GalilPort,
     )

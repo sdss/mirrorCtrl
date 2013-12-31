@@ -20,10 +20,7 @@ import RO.Astro.Tm
 #from data import loadMirDat
 import mirrorCtrl
 from mirrorCtrl.const import convOrient2MMRad, MMPerMicron, RadPerArcSec, RadPerDeg
-import mirrorCtrl.mirrors.mir25mPrim
-import mirrorCtrl.mirrors.mir25mSec
-import mirrorCtrl.mirrors.mir35mSec
-import mirrorCtrl.mirrors.mir35mTert
+from mirrorCtrl.mirrors import mir25mPrim, mir25mSec, mir35mSec, mir35mTert
 
 import os
 
@@ -89,21 +86,21 @@ def plotABC(mirror):
         ax.plot(act.mirPos[0], act.mirPos[1], 'or')
         ax.annotate(letter, xy=act.mirPos[:2], xycoords='data')
 
-# mirrors can be viewed using the plotMirror() method, eg: mirrorCtrl.mirrors.mir25mPrim.Mirror.plotMirror()
+# mirrors can be viewed using the plotMirror() method, eg: mirrorCtrl.mirrors.mir25mPrim.plotMirror()
 # use the non-fictitous mirrors:
 mirList = [
-    mirrorCtrl.mirrors.mir25mPrim.Mirror,
-    mirrorCtrl.mirrors.mir25mSec.Mirror,
-    mirrorCtrl.mirrors.mir35mSec.Mirror,
-    mirrorCtrl.mirrors.mir35mTert.Mirror,
+    mir25mPrim,
+    mir25mSec,
+    mir35mSec,
+    mir35mTert,
 ]
 print 'mirList len: ', len(mirList)
 #from data.loadMirDat import mirDict35Adj
 #print 'mirDict35', mirDict35["tert"].plotMirror()
-#mirrorCtrl.mirrors.mir35mTert.Mirror.plotMirror()
+#mirrorCtrl.mirrors.mir35mTert.plotMirror()
 # plotABC(mirDict35["tert"])
 # plt.show()
-# plotABC(mirrorCtrl.mirrors.mir35mTert.Mirror)
+# plotABC(mirrorCtrl.mirrors.mir35mTert)
 # plt.show()
 pwd = os.path.dirname(__file__)
 secMoveList = pickle.load(open(os.path.join(pwd, "data/secMoveList.p")))
@@ -137,15 +134,15 @@ class MirTests(unittest.TestCase):
         # plt.show()
 
     def testSecBallPark(self):
-        self._testBallPark(mirrorCtrl.mirrors.mir35mSec.Mirror, secMoveList, .02)
+        self._testBallPark(mirrorCtrl.mirrors.mir35mSec, secMoveList, .02)
 
     def testTertBallPark(self):
-        mirror = mirrorCtrl.mirrors.mir35mTert.Mirror
+        mirror = mirrorCtrl.mirrors.mir35mTert
         self._testBallPark(mirror, tertMoveList, .14)
 
     def testTertNoAdjBallPark(self):
         #mirror = mirDict35Adj["tert"]
-        mirror = mirrorCtrl.mirrors.mir35mTert.Mirror
+        mirror = mirrorCtrl.mirrors.mir35mTert
         self._testBallPark(mirror, tertMoveList, .025, False)
 
     def testRoundTripAct(self):

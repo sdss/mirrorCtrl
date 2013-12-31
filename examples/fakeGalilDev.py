@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from twisted.internet import reactor
 
-from mirrorCtrl.mirrors.mir35mSec import Mirror as mir35mSec
+from mirrorCtrl.mirrors import mir35mSec
 from mirrorCtrl.fakeGalilDeviceWrapper import FakeGalilDeviceWrapper
 
 def foo(wrap):

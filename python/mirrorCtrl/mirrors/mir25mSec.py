@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Configuration of the 2.5m Secondary mirror
+"""Configuration of secondary mirror for 2.5m SDSS telescope
 
 To Do: 
 1. need to incorporate actual encoder positions
@@ -17,9 +17,10 @@ notes:
             Could not measure transverse encoder offset, will assume the 
             same offset as 3.5m secondary for now
 """
-__all__ = ["Mirror"]
+__all__ = ["mir25mSec"]
 
 import numpy
+
 import mirrorCtrl
 from mirrorCtrl.const import MMPerInch
 
@@ -144,5 +145,4 @@ def _makeMirror():
         name = Name,
     )
 
-## The 2.5m Secondary mirror construction
-Mirror = _makeMirror()
+mir25mSec = _makeMirror()

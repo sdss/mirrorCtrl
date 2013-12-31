@@ -19,8 +19,7 @@ from opscore.actor import ActorDispatcher, CmdVar
 from RO.Comm.TCPConnection import TCPConnection
 
 import mirrorCtrl
-import mirrorCtrl.mirrors.mir35mTert
-import mirrorCtrl.mirrors.mir25mSec
+from mirrorCtrl.mirrors import mir25mSec, mir35mTert
 from mirrorCtrl.fakeGalil import FakeGalil, FakePiezoGalil
 from mirrorCtrl.fakeDispatcherWrapper import FakeDispatcherWrapper
 
@@ -45,7 +44,7 @@ class GenericTests(TestCase):
         print "*** setUp"
         self.name = "mirror"
         self.dw = FakeDispatcherWrapper(
-            mirror=mirrorCtrl.mirrors.mir35mTert.Mirror,
+            mirror=mir35mTert,
         )
         return self.dw.readyDeferred
     
@@ -75,16 +74,16 @@ class GenericTests(TestCase):
     #     4. the encoder mount position on the model is within the noise range added by the fakeGalil
     #     """
     #     self.test = 'testSingleMove'
-    #     self.dw.actor.devs.galil.status.maxIter = 0 # turn iteration off
+    #     self.dw.actor.dev.galil.status.maxIter = 0 # turn iteration off
     #     d = Deferred()
     #     orientation = [10000, 3600, 3600]
     #     cmdStr = 'move ' + ', '.join([str(x) for x in orientation])
-    #     encMount = self.dw.actor.devs.galil.mirror.encoderMountFromOrient(
+    #     encMount = self.dw.actor.dev.galil.mirror.encoderMountFromOrient(
     #         self.mirActor.processOrientation(orientation)
     #         )
     #     # round to nearest 50 like the 3.5m Tert Galil
     #     cmdMount = numpy.around(numpy.asarray(
-    #         self.dw.actor.devs.galil.mirror.actuatorMountFromOrient(self.mirActor.processOrientation(orientation)))/50.
+    #         self.dw.actor.dev.galil.mirror.actuatorMountFromOrient(self.mirActor.processOrientation(orientation)))/50.
     #         )*50.
         
     #     cmdVar = CmdVar (
@@ -196,7 +195,7 @@ class GenericTests(TestCase):
             self.assertTrue(cmdVar.didFail)
         d.addCallback(checkResults) 
         # set timeout to a very small number
-        self.dw.actor.devs.galil.DevCmdTimeout = 0.01       
+        self.dw.actor.dev.galil.DevCmdTimeout = 0.01       
         self.dispatcher.executeCmd(cmdVar)
         return d
 
@@ -721,7 +720,7 @@ class PiezoTests(TestCase):
     def setUp(self):
         self.name = "piezomirror"
         self.dw = FakeDispatcherWrapper(
-            mirror=mirrorCtrl.mirrors.mir25mSec.Mirror,
+            mirror=mir25mSec,
             dictName=self.name,
             galilClass=FakePiezoGalil,
         )

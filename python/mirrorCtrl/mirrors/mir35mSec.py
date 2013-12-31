@@ -1,15 +1,14 @@
 #!/usr/bin/env python
-"""This script contains configuration for the 3.5m Secondary mirror, and launches the galil actor.
+"""Configuration of secondary mirror for 3.5m APO telescope
 
 notes: 
-    8/12    - Measured encoder and fixed link positions during 2012 shutdown.
+2012-08 - Measured encoder and fixed link positions during 2012 shutdown.
             actuator radius = 9.08 inches
             encoder radius = 10.25 inches
             
-            - do the transverse encoders lie between the actuator and glass?  I can't remember
-                but I think this is correct
+        - do the transverse encoders lie between the actuator and glass?  I can't remember but I think this is correct
 """
-__all__ = ["Mirror"]
+__all__ = ["mir35mSec"]
 
 import math
 import numpy
@@ -175,6 +174,4 @@ def _makeMirror():
         name = Name,
     )
 
-## The 3.5m Secondary mirror construction
-Mirror = _makeMirror()
-
+mir35mSec = _makeMirror()

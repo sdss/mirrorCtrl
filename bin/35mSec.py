@@ -2,7 +2,7 @@
 """3.5m secondary mirror controller
 """
 import mirrorCtrl
-from mirrorCtrl.mirrors.mir35mSec import Mirror
+from mirrorCtrl.mirrors import mir35mSec
 
 UserPort = 3532
 
@@ -11,7 +11,7 @@ GalilPort = 2800 # port 8
 
 if __name__ == "__main__":
     device = mirrorCtrl.GalilDevice(
-        mirror = Mirror,
+        mirror = mir35mSec,
         host = GalilHost,
         port = GalilPort,
     )
