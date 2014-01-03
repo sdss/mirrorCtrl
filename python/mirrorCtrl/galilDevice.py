@@ -82,7 +82,7 @@ def strArrayCast(strArray):
     @param[in] strArray: an array of strings
     @return a string
     """
-    ",".join([str(x) for x in strArray])
+    return ",".join([str(x) for x in strArray])
 
 def intOrNan(anInt):
     """Return an string int or "nan"
@@ -172,9 +172,9 @@ class GalilStatus(object):
         ## status bits
         self.status = numpy.asarray([numpy.nan]*self.nAct)
         ## acutators which are currently homing
-        self.homing = ["?"]*self.nAct
+        self.homing = numpy.asarray(["?"]*self.nAct)
         ## actuators which are currently homed
-        self.axisHomed = ["?"]*self.nAct
+        self.axisHomed = numpy.asarray(["?"]*self.nAct)
         ## dictionary containing casting strageties to output current gailil status/state info
         self.castDict = {
             "nAct": int,
