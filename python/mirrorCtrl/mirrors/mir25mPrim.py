@@ -1,4 +1,4 @@
-"""Configuration of the 2.5m Primary mirror
+"""Configuration of primary mirror for 2.5m SDSS telescope
 
 notes: may wish to:
     increase mount scale?
@@ -6,12 +6,12 @@ notes: may wish to:
     use actual length links (not inf)?
     attach trans y to mirror vertex?
 """
-__all__ = ["Mirror"]
+__all__ = ["mir25mPrim"]
 
 import numpy
+
 import mirrorCtrl
 
-## Mirror Name 
 Name = 'SDSS Primary'
 
 ## choose the actuator model (adjustable base or adjustable length)
@@ -114,5 +114,4 @@ def _makeMirror():
         name = Name,
     )
     
-## The 2.5m Primary mirror construction
-Mirror = _makeMirror()
+mir25mPrim = _makeMirror()

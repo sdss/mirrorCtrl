@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-"""This script contains configuration for the 3.5m Tertiary mirror, and launches the galil actor.
+"""Configuration of tertiary (flat) mirror for 3.5m APO telescope
 
-The 3.5m tertiary has a different coordinate system convention:
+The 3.5m tertiary has an unusual coordinate system convention:
 +Z points towards secondary
 +Y points towards instrument port
 +X defined by right hand rule
@@ -22,14 +22,14 @@ Differences are:
    
 Notes:
 
-7/12    - Measured encoder / actuator positions during shutdown.
+2012-07 - Measured encoder / actuator positions during shutdown.
             actuator radius = 8.96"
             encoder radius = 10.69"
         - Fixed length links: 2 extend towards A (-y?), 1 extends towards B (+x?). 
             I think this is correct convention.
         - Did not adjust Z positions.
 """
-__all__ = ["Mirror"]
+__all__ = ["mir35mTert"]
 
 import numpy
 import mirrorCtrl
@@ -164,4 +164,4 @@ def _makeMirror():
     )
 
 ## The 3.5m Tertiary mirror construction
-Mirror = _makeMirror()
+mir35mTert = _makeMirror()

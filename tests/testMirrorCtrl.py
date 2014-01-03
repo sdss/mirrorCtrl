@@ -20,20 +20,13 @@ from RO.Comm.TCPConnection import TCPConnection
 from twistedActor import getOpenPort
 
 import mirrorCtrl
-import mirrorCtrl.mirrors.mir35mTert
-import mirrorCtrl.mirrors.mir25mSec
-from mirrorCtrl.fakeGalil import FakeGalilFactory, FakePiezoGalilFactory
-import socket
+from mirrorCtrl.mirrors import mir25mSec, mir35mTert
+from mirrorCtrl.fakeGalil import FakeGalil, FakePiezoGalil
+from mirrorCtrl.fakeDispatcherWrapper import FakeDispatcherWrapper
 
-UserPort = 9102 # port for mirror controllers
-
-# def getOpenPort():
-#     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#     s.bind(("",0))
-#     s.listen(1)
-#     port = s.getsockname()[1]
-#     s.close()
-#     return port
+## speed up fake galil responses
+import mirrorCtrl.fakeGalil
+mirrorCtrl.fakeGalil.MaxCmdTime = 0.25 # seconds, longest any command may take
 
 def showReply(msgStr, *args, **kwargs): # prints what the dispatcher sees
     print 'Keyword Reply: ' + msgStr
@@ -49,213 +42,34 @@ class CmdCallback(object):
             deferred, self.deferred = self.deferred, None
             deferred.callback("done")
 
-class MirrorCtrlTestBase(TestCase):
-    def setVars(self):
-        """overwritten by subclasses
-        
-        must set the following instance variables (shown by example):
-        self.fakeGalilFactory: fake Galil factory, e.g. FakeGalilFactory or FakePiezoGalilFactory
-        self.mirror: mirorCtrl Mirror, e.g. mirrorCtrl.mirrors.mir35mTert.Mirror
-        self.mirDev: mirror device, e.g. mirrorCtrl.GalilDevice
-        self.name: name of keyword dict for this mirror
-        """
-        print "MirrorCtrlTestBase.setVars"
-        raise NotImplementedError()
-            
-    def setUp(self):
-        self.dispatcher = None
-        if type(self) == MirrorCtrlTestBase:
-            # the unit test framework will try to instantiate this class, even though it has no test cases
-            # no need to do anything in that case
-            return
-
-        self.setVars()
-        # overwrite position limits for mirror to inf, 
-        # because we are commanding impossible orientations
-        for link in self.mirror.encoderList + self.mirror.actuatorList:
-            link.minMount = -numpy.inf
-            link.maxMount = numpy.inf
-        # first start up the fake galil listening
-        galilPort = self.startFakeGalil()
-        # connect an actor to it
-        d = self.startMirrorCtrl(galilPort = galilPort)
-        # after that connection is made, connect a dispatcher to the actor
-        d.addCallback(self.startCommander)
-        return d
-        
-    def tearDown(self):
-        """Tear down things; most of the work is done by addCleanup
-        """
-        #print "tearDown()"
-        if self.dispatcher is not None:
-            self.dispatcher.disconnect()
-
-    def startFakeGalil(self):
-        """Start the fake Galil on a randomly chosen port; return the port number
-        """
-        #print "startFakeGalil()"
-        self.fakeGalilFactory = self.fakeGalilFactory(verbose=False, wakeUpHomed=True)
-        portObj = reactor.listenTCP(port=0, factory=self.fakeGalilFactory)
-        galilPort = portObj.getHost().port
-        self.addCleanup(portObj.stopListening)
-        #print "Started fake Galil on port", galilPort
-        return galilPort
-        
-    def startMirrorCtrl(self, galilPort):
-        """Start mirror controller
-        """
-        #print "startMirrorCtrl(galilPort=%r)" % (galilPort,)
-        #mirror = mirrorCtrl.mirrors.mir35mTert.Mirror
-        self.mirDev = self.mirDev(
-            mirror = self.mirror,
-            host = 'localhost',
-            port = galilPort,            
-        )
-        
-        d = Deferred()
-        def connCallback(conn, d=d):
-            #print "mirror controller conn state=", conn.state
-            if conn.isConnected:
-                d.callback("success")
-        
-        self.mirDev.conn.addStateCallback(connCallback)
-        self.mirActor = mirrorCtrl.MirrorCtrl(
-            device = self.mirDev,
-            userPort = self.userPort,
-        )
-        self.addCleanup(self.mirDev.conn.disconnect)
-        self.addCleanup(self.mirActor.server.close)
-        return d
-
-    def startCommander(self, *args): # *args for the callback result that we don't care about
-        """Start a commander"""
-        #print "startCommander(*args=%r)" % (args,)
-        # this doesn't close cleanly
-        # def readCB(foo, line):
-        #     print "socket read", line
-        # def stateCB(foo):
-        #     print foo.fullState
-        self.cmdConn = TCPConnection(
-            host = 'localhost',
-            port = self.userPort,
-            # readCallback = readCB,
-            # stateCallback = stateCB,
-            readLines = True,
-            name = "Commander",
-        )
-
-        self.dispatcher = ActorDispatcher(
-            name = self.name,
-            connection = self.cmdConn,
-#            logFunc = showReply,
-        )
-        d = Deferred()
-        def allReady(cb):
-            # so fire the callback
-            d.callback('whooohooo')
-        def getStatus(conn):
-            #print "commander conn state=", conn.state
-            if conn.isConnected:
-                #print 'Querying Device for status'
-                cmdVar = CmdVar (
-                    actor = self.name,
-                    cmdStr = 'status',
-                    callFunc = getParams,
-                )
-                self.dispatcher.executeCmd(cmdVar)
-        def getParams(cb):
-            #print 'Querying Device for params'
-            cmdVar = CmdVar (
-                actor = self.name,
-                cmdStr = 'showparams',
-                callFunc = allReady,
-            )
-            self.dispatcher.executeCmd(cmdVar)
-        self.cmdConn.addStateCallback(getStatus)
-        self.cmdConn.connect()
-        self.addCleanup(self.cmdConn.disconnect)
-        return d    
-
-class GenericTests(MirrorCtrlTestBase):
+class GenericTests(TestCase):
     """Tests for each command, and how they behave in collisions
     """
-    def setVars(self):
-        self.userPort = getOpenPort()
-        #print 'userPort!!!!', self.userPort
-        #self.userPort = UserPort
-        self.fakeGalilFactory = FakeGalilFactory
-        self.mirror = mirrorCtrl.mirrors.mir35mTert.Mirror
-        self.mirDev = mirrorCtrl.GalilDevice
+    def setUp(self):
+        print "*** setUp"
         self.name = "mirror"
-                
-    # def testSingleMove(self):
-    #     """Turns iteration off, moves once, 
-    #     checks:
-    #     1. command finished without failure
-    #     2. only one iteration was done
-    #     3. the commanded mount on the model matches the expected version, explicitly computed
-    #     4. the encoder mount position on the model is within the noise range added by the fakeGalil
-    #     """
-    #     self.test = 'testSingleMove'
-    #     self.mirDev.status.maxIter = 0 # turn iteration off
-    #     d = Deferred()
-    #     orientation = [10000, 3600, 3600]
-    #     cmdStr = 'move ' + ', '.join([str(x) for x in orientation])
-    #     encMount = self.mirDev.mirror.encoderMountFromOrient(
-    #         self.mirActor.processOrientation(orientation)
-    #         )
-    #     # round to nearest 50 like the 3.5m Tert Galil
-    #     cmdMount = numpy.around(numpy.asarray(
-    #         self.mirDev.mirror.actuatorMountFromOrient(self.mirActor.processOrientation(orientation)))/50.
-    #         )*50.
-        
-    #     cmdVar = CmdVar (
-    #             actor = self.name,
-    #             cmdStr = cmdStr,
-    #             callFunc = CmdCallback(d),
-    #         )
-    #     def checkResults(cb):
-    #         """Check results after cmdVar is done
-    #         """
-    #         self.assertEqual(cmdVar.didFail, False)
-    #         self.assertEqual(1, self.dispatcher.model.iter.valueList[0])
-    #         self.assertTrue(numpy.array_equal(
-    #             cmdMount, self.dispatcher.model.cmdMount.valueList[:]
-    #             ))
-    #         # encMount should be within the noise range determined
-    #         # on the fake Galil
-    #         noiseRng = self.fakeGalilFactory.proto.noiseRange # steps
-    #         encDiff = numpy.abs(numpy.subtract(encMount, self.dispatcher.model.encMount.valueList[:]))
-    #         encTruth = numpy.abs(encDiff) < noiseRng
-    #         encInRange = False if False in encTruth else True
-    #         self.assertTrue(encInRange)            
-    #     d.addCallback(checkResults)        
-    #     self.dispatcher.executeCmd(cmdVar)
-    #     return d
-        
-    # def testIterMove(self):
-    #     """move with allowed iteration
-    #     checks:
-    #     1. command finished without failing
-    #     2. the iter value on the model is > 1
-    #     """
-    #     self.test = 'testiterMove'
-    #     d = Deferred()
-    #     orientation = [10000, 3600, 3600]
-    #     cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
-    #     cmdVar = CmdVar (
-    #             actor = self.name,
-    #             cmdStr = cmdStr,
-    #             callFunc = CmdCallback(d),
-    #         )
-    #     def checkResults(cb):
-    #         """Check results after cmdVar is done
-    #         """
-    #         self.assertFalse(cmdVar.didFail)
-    #         self.assertTrue(self.dispatcher.model.iter.valueList[0] > 1)
-    #     d.addCallback(checkResults)        
-    #     self.dispatcher.executeCmd(cmdVar)
-    #     return d
+        self.dw = FakeDispatcherWrapper(
+            mirror=mir35mTert,
+        )
+        return self.dw.readyDeferred
+    
+    def tearDown(self):
+        d = self.dw.close()
+        print "*** tearDown; d=%s; called=%s" % (d, d.called if d else "?????")
+        return d
+    
+    @property
+    def dispatcher(self):
+        """Return the actor dispatcher that talks to the mirror controller
+        """
+        return self.dw.dispatcher
+    
+    @property
+    def fakeGalil(self):
+        """Return the fake Galil (instance of FakeGalil)
+        """
+        return self.dw.actorWrapper.deviceWrapper.hardwareController
+
 
     def testActorBypass(self):
         d = Deferred()
@@ -283,9 +97,9 @@ class GenericTests(MirrorCtrlTestBase):
         """
         self.test = 'testUnHomedMove'
         # force all axes on the fakeGalil to unhomed
-        self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
+        self.fakeGalil.isHomed = self.fakeGalil.isHomed*0.
         d = Deferred()
-        orientation = [10000, 3600, 3600]
+        orientation = [-2000.0, 150.0, 860.0]
         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
         cmdVar = CmdVar (
                 actor = self.name,
@@ -305,7 +119,7 @@ class GenericTests(MirrorCtrlTestBase):
         """
         self.test = "testMoveTimeout"
         d = Deferred()
-        orientation = [10000, 3600, 3600]
+        orientation = [-2000.0, 150.0, 860.0]
         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
         cmdVar = CmdVar (
                 actor = self.name,
@@ -318,10 +132,9 @@ class GenericTests(MirrorCtrlTestBase):
             self.assertTrue(cmdVar.didFail)
         d.addCallback(checkResults) 
         # set timeout to a very small number
-        self.mirDev.DevCmdTimeout = 0.01       
+        self.dw.actor.dev.galil.DevCmdTimeout = 0.01       
         self.dispatcher.executeCmd(cmdVar)
         return d
-        
 
     def testHome(self):
         """Sets isHomed to false then tests home command.
@@ -331,7 +144,7 @@ class GenericTests(MirrorCtrlTestBase):
         """
         self.test = 'testHome'
         # force all axes on the fakeGalil to unhomed
-        self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
+        self.fakeGalil.isHomed = self.fakeGalil.isHomed*0.
         d = Deferred()
         cmdStr = 'home A,B,C'        
         cmdVar = CmdVar (
@@ -358,7 +171,7 @@ class GenericTests(MirrorCtrlTestBase):
         """
         self.test = "testStatus"
         # force all axes on the fakeGalil to unhomed
-        self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
+        self.fakeGalil.isHomed = self.fakeGalil.isHomed*0.
         d = Deferred()
         cmdStr = 'status'        
         cmdVar = CmdVar (
@@ -433,7 +246,7 @@ class GenericTests(MirrorCtrlTestBase):
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
-        orientation = [10000, 3600, 3600]
+        orientation = [-2000.0, 150.0, 860.0]
         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
         cmdMove = CmdVar (
                 actor = self.name,
@@ -467,7 +280,7 @@ class GenericTests(MirrorCtrlTestBase):
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
-        orientation = [10000, 3600, 3600]
+        orientation = [-2000.0, 150.0, 860.0]
         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
         cmdMove = CmdVar (
                 actor = self.name,
@@ -540,7 +353,7 @@ class GenericTests(MirrorCtrlTestBase):
             )
         cmdMove2 = CmdVar (
                 actor = self.name,
-                cmdStr = 'move 10000, 3600, 3600',
+                cmdStr = 'move -2000, 150, 860',
                 callFunc = CmdCallback(d3),
             )
         def checkResults(cb):
@@ -577,7 +390,7 @@ class GenericTests(MirrorCtrlTestBase):
             )
         cmdMove = CmdVar (
                 actor = self.name,
-                cmdStr = 'move 10000, 3600, 3600',
+                cmdStr = 'move -2000, 150, 860',
                 callFunc = CmdCallback(d3),
             )
         def checkResults(cb):
@@ -614,7 +427,7 @@ class GenericTests(MirrorCtrlTestBase):
             )
         cmdMove = CmdVar (
                 actor = self.name,
-                cmdStr = 'move 10000, 3600, 3600',
+                cmdStr = 'move -2000, 150, 860',
                 callFunc = CmdCallback(d3),
             )
         def checkResults(cb):
@@ -677,7 +490,7 @@ class GenericTests(MirrorCtrlTestBase):
         dBoth = gatherResults([d1,d2])
         cmdMove = CmdVar (
                 actor = self.name,
-                cmdStr = 'move 10000, 3600, 3600',
+                cmdStr = 'move -2000, 150, 860',
                 callFunc = CmdCallback(d1),
             )
         cmdStatus = CmdVar (
@@ -734,7 +547,7 @@ class GenericTests(MirrorCtrlTestBase):
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
-        orientation1 = [10000, 3600, 3600]
+        orientation1 = [-2000.0, 150.0, 860.0]
         orientation2 = [num-50 for num in orientation1]
         cmdStr1 = 'move ' + ', '.join([str(x) for x in orientation1])   
         cmdStr2 = 'move ' + ', '.join([str(x) for x in orientation2])     
@@ -768,7 +581,7 @@ class GenericTests(MirrorCtrlTestBase):
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
-        orientation = [10000, 3600, 3600]
+        orientation = [-2000.0, 150.0, 860.0]
         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
         cmdMove = CmdVar (
                 actor = self.name,
@@ -797,9 +610,9 @@ class GenericTests(MirrorCtrlTestBase):
         """
         self.test = "testBadMove"
         # turn off noise added by fakeGalil.  This move should not iterate.
-        self.fakeGalilFactory.proto.encRes = self.fakeGalilFactory.proto.encRes*0.
+        self.fakeGalil.encRes = self.fakeGalil.encRes*0.
         d = Deferred()
-        orientation = [10000, 3600, 3600, 10000, 10000, 3600]
+        orientation = [-2000.0, 150.0, 860.0, 0.0, -2000.0, 48.0]
         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
         cmdVar = CmdVar (
                 actor = self.name,
@@ -821,7 +634,7 @@ class GenericTests(MirrorCtrlTestBase):
         """
         self.test = "testBadHome"
         # force all axes on the fakeGalil to unhomed
-        self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
+        self.fakeGalil.isHomed = self.fakeGalil.isHomed*0.
         d = Deferred()
         cmdStr = 'home A,B,C,D'        
         cmdVar = CmdVar (
@@ -838,16 +651,32 @@ class GenericTests(MirrorCtrlTestBase):
         self.dispatcher.executeCmd(cmdVar)
         return d    
 
-class PiezoTests(MirrorCtrlTestBase):
+class PiezoTests(TestCase):
     """Tests a piezo mirror setup
     """
-    def setVars(self):
-        #self.userPort = UserPort
-        self.userPort = getOpenPort()
-        self.fakeGalilFactory = FakePiezoGalilFactory
-        self.mirror = mirrorCtrl.mirrors.mir25mSec.Mirror
-        self.mirDev = mirrorCtrl.GalilDevice25Sec    
+    def setUp(self):
         self.name = "piezomirror"
+        self.dw = FakeDispatcherWrapper(
+            mirror=mir25mSec,
+            dictName=self.name,
+            galilClass=FakePiezoGalil,
+        )
+        return self.dw.readyDeferred
+    
+    def tearDown(self):
+        self.dw.close()
+    
+    @property
+    def dispatcher(self):
+        """Return the actor dispatcher that talks to the mirror controller
+        """
+        return self.dw.dispatcher
+    
+    @property
+    def fakeGalil(self):
+        """Return the fake Galil (instance of FakeGalil)
+        """
+        return self.dw.actorWrapper.deviceWrapper.hardwareController
 
     def testHome(self):
         """Sets isHomed to false then tests home command.
@@ -857,7 +686,7 @@ class PiezoTests(MirrorCtrlTestBase):
         """
         self.test = "piezoTestHome"
         # force all axes on the fakeGalil to unhomed
-        self.fakeGalilFactory.proto.isHomed = self.fakeGalilFactory.proto.isHomed*0.
+        self.fakeGalil.isHomed = self.fakeGalil.isHomed*0.
         d = Deferred()
         cmdStr = 'home A,B,C,D,E'        
         cmdVar = CmdVar (
@@ -874,32 +703,6 @@ class PiezoTests(MirrorCtrlTestBase):
         d.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdVar)
         return d  
-        
-    # def testIterMove(self):
-    #     """move with allowed iteration
-    #     checks:
-    #     1. command finished without failing
-    #     2. the iter value on the model is > 1
-    #     3. the piezo correction is non-zero
-    #     """
-    #     self.test = "piezoIterMove"
-    #     d = Deferred()
-    #     orientation = [1000, 360, 360, 1000]
-    #     cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
-    #     cmdVar = CmdVar (
-    #             actor = self.name,
-    #             cmdStr = cmdStr,
-    #             callFunc = CmdCallback(d),
-    #         )
-    #     def checkResults(cb):
-    #         """Check results after cmdVar is done
-    #         """
-    #         self.assertFalse(cmdVar.didFail)
-    #         self.assertTrue(self.dispatcher.model.iter.valueList[0] > 1)
-    #         self.assertTrue(numpy.sum(numpy.abs(self.dispatcher.model.piezoCorr)) > 0)
-    #     d.addCallback(checkResults)        
-    #     self.dispatcher.executeCmd(cmdVar)
-    #     return d
 
 if __name__ == '__main__':
     from unittest import main

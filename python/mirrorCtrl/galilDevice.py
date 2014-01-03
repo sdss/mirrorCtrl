@@ -297,13 +297,14 @@ class GalilDevice(TCPDevice):
         outStr = keyword + '=' + valStr
         return outStr
 
-    def init(self, *args, **kwargs):
-        """This is called automatically from twistedActor...
-
-        eg from ConnectDevice
-        dev.init(userCmd=initUserCmd, timeLim=self.timeLim)
+    def init(self, userCmd=None, timeLim=None):
+        """Initialize Galil
+        
+        Called on disconnection
         """
-        pass
+        print "temporary hacked version of init"
+        userCmd.setState(userCmd.Done)
+        #self.cmdStop(userCmd=userCmd)
 
     def parseReply(self, replyStr):
         """Parse a reply from the Galil and seperate into key=value format.

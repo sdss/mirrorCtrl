@@ -22,12 +22,14 @@ class MirrorCtrl(Actor):
         userPort,
         maxUsers = DefaultMaxUsers,
         name = 'MirrorCtrl',
+        doConnect = True,
     ):
         """Create a Galil mirror controller actor
         
         @param[in] device    A Galil device from galilDevice.py
         @param[in] userPort  port on which to listen for client connections
         @param[in] maxUsers  maximum allowed simultaneous users
+        @param[in] doConnect: if True then connect devices on construction
         """
         # if LogDir is specified as an environment variable
         # begin logging to it.
@@ -45,6 +47,7 @@ class MirrorCtrl(Actor):
             maxUsers = maxUsers,
             version = Version,
             name = name,
+            doConnect = doConnect,
         )
         def killFunc(killThisCmd):
             killThisCmd.setState(killThisCmd.Cancelling)
