@@ -3,10 +3,6 @@
 
 Tests communication and other behavior between the Actor and Device. Commands are dispatched using a 
 dispatcher. 
-
-Note: Orientations tested here are almost certainly unrealistic and these tests were failing.
-They were previously passing because we hadn't discovered the problem in mount/phys conversions (mm vs um).  
-The tests now work because I unset the actuator/encoder limits of motion. 
 """
 import numpy
 
@@ -17,7 +13,6 @@ from twisted.internet.defer import Deferred, gatherResults
 from twisted.internet import reactor
 from opscore.actor import ActorDispatcher, CmdVar
 from RO.Comm.TCPConnection import TCPConnection
-from twistedActor import getOpenPort
 
 import mirrorCtrl
 from mirrorCtrl.mirrors import mir25mSec, mir35mTert
@@ -68,7 +63,7 @@ class GenericTests(TestCase):
     def fakeGalil(self):
         """Return the fake Galil (instance of FakeGalil)
         """
-        return self.dw.actorWrapper.deviceWrapper.controller
+        return self.dw.actorWrapper.deviceWrapperList[0].controller
 
 
     def testActorBypass(self):
@@ -676,7 +671,7 @@ class PiezoTests(TestCase):
     def fakeGalil(self):
         """Return the fake Galil (instance of FakeGalil)
         """
-        return self.dw.actorWrapper.deviceWrapper.controller
+        return self.dw.actorWrapper.deviceWrapperList[0].controller
 
     def testHome(self):
         """Sets isHomed to false then tests home command.
