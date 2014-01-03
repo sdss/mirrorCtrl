@@ -68,7 +68,7 @@ class GenericTests(TestCase):
     def fakeGalil(self):
         """Return the fake Galil (instance of FakeGalil)
         """
-        return self.dw.actorWrapper.deviceWrapper.hardwareController
+        return self.dw.actorWrapper.deviceWrapper.controller
 
 
     def testActorBypass(self):
@@ -676,7 +676,7 @@ class PiezoTests(TestCase):
     def fakeGalil(self):
         """Return the fake Galil (instance of FakeGalil)
         """
-        return self.dw.actorWrapper.deviceWrapper.hardwareController
+        return self.dw.actorWrapper.deviceWrapper.controller
 
     def testHome(self):
         """Sets isHomed to false then tests home command.
