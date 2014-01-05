@@ -9,21 +9,20 @@ import numpy.random
 numpy.random.seed(10)
 import RO.Comm.Generic
 RO.Comm.Generic.setFramework("twisted")
-# <<<<<<< HEAD
-# from mirrorCtrl.fakeGalil import FakeGalilFactory, FakePiezoGalilFactory
-# from mirrorCtrl.const import convOrient2MMRad, MMPerMicron, RadPerArcSec
-# from testMirrorCtrl import MirrorCtrlTestBase, CmdCallback, getOpenPort #UserPort
-# =======
 from opscore.actor import CmdVar
-from twisted.internet import reactor
 from twisted.internet.defer import Deferred
 
-from mirrorCtrl.fakeGalil import FakeGalil, FakePiezoGalil
 from mirrorCtrl.const import convOrient2MMRad, MMPerMicron, RadPerArcSec
 from mirrorCtrl.mirrors import mir35mSec, mir35mTert, mir25mSec
-from testMirrorCtrl import MirrorCtrlTestBase, CmdCallback, getOpenPort #, UserPort, 
+from testMirrorCtrl import  CmdCallback #getOpenPort #, UserPort, MirrorCtrlTestBase,
+from mirrorCtrl.fakeDispatcherWrapper import FakeDispatcherWrapper
+from mirrorCtrl.galilDevice import GalilDevice
 import mirrorCtrl
 import math
+from twisted.trial.unittest import TestCase
+
+import mirrorCtrl.fakeGalil
+mirrorCtrl.fakeGalil.MaxCmdTime = 0.25
 
 pwd = os.path.dirname(__file__)
 secMoveList = pickle.load(open(os.path.join(pwd, "data/secMoveList.p")))
@@ -38,6 +37,7 @@ m2TestOrients = [numpy.asarray(d["desOrient"]) for d in [secMoveList[ind] for in
 m2TestOrients.append(RussellsOrient)
 m3TestOrients = [numpy.asarray(d["desOrient"]) for d in [tertMoveList[ind] for ind in randInds]]
 
+LargePiston, LargeTilt, LargeTranslation = GalilDevice.LargePiston, GalilDevice.LargeTilt, GalilDevice.LargeTranslation
 
 def getActEqEncMir(mirror):
     """ Returns the same mirror as input, except actuators are moved to be exactly aligned with actuators
@@ -95,44 +95,36 @@ class MirState(object):
     def setMountOffset(self, offset):
         self.mountOffset = offset
 
-def testConv(modelMirState, trueMirState, desOrient):
-    """ @param[in] modelMirrorState: MirState object representing an imperfect model
-        @param[in] trueMirState: MirState object representing the true mirror
-        @param[in] desOrient: a collection of 5 items: pistion, tiltx, tilty, transx, transy. units um and arcsec
-    """
-    desOrient = convOrient2MMRad(desOrient)
-    cmdActPos = numpy.asarray(modelMirState.mirror.actuatorMountFromOrient(desOrient)) # get commanded actuator position from your model
-    newCmdActPos = cmdActPos[:]
-    trueMirState.moveToActPos(cmdActPos) # set the true mirror's actuator lengths
-    for iters in range(1,10):
-        trueOrient = numpy.asarray(trueMirState.orientation[0:5])
-        measActPos = numpy.asarray(modelMirState.mirror.actuatorMountFromOrient(trueOrient))
-        actDiff = cmdActPos - measActPos
-        # check if actuator error is small enough to exit
-        if numpy.all(numpy.abs(actDiff)/trueMirState.mirror.minCorrList < 1.):
-            break
-        newCmdActPos = actDiff*0.9 + newCmdActPos
-        trueMirState.moveToActPos(newCmdActPos)
-    finalOffset = cmdActPos - newCmdActPos
-    return iters, finalOffset
-
-
-class ConvergenceTestBase(MirrorCtrlTestBase):
+class ConvergenceTestBase(object):
 
     def setUp(self):
-        self.dispatcher = None
-        if type(self) == ConvergenceTestBase:
-            # the unit test framework will try to instantiate this class, even though it has no test cases
-            # no need to do anything in that case
-            return
         self.setVars()
-        # first start up the fake galil listening
-        galilPort = self.startFakeGalil()
-        # connect an actor to it
-        d = self.startMirrorCtrl(galilPort = galilPort)
-        # after that connection is made, connect a dispatcher to the actor
-        d.addCallback(self.startCommander)
+        print "*** setUp"
+        self.dw = FakeDispatcherWrapper(
+            mirror=self.trueMirror,
+        )
+        def overwriteMirror(foo=None):
+            assert(self.dw.actorWrapper.deviceWrapperList[0].device.mirror is not None)
+            self.dw.actorWrapper.deviceWrapperList[0].device.mirror = self.mirror
+        self.dw.readyDeferred.addCallback(overwriteMirror)
+        return self.dw.readyDeferred        
+
+    def tearDown(self):
+        d = self.dw.close()
+        print "*** tearDown; d=%s; called=%s" % (d, d.called if d else "?????")
         return d
+
+    @property
+    def dispatcher(self):
+        """Return the actor dispatcher that talks to the mirror controller
+        """
+        return self.dw.dispatcher
+
+    @property
+    def mirDev(self):
+        """return the device talking to the fake galil
+        """
+        self.dw.actorWrapper.deviceWrapperList[0].device
 
     def _testConv(self, modelMirState, trueMirState, desOrient):
         """ @param[in] modelMirrorState: MirState object representing an imperfect model
@@ -210,31 +202,20 @@ class ConvergenceTestBase(MirrorCtrlTestBase):
         doNext()
         return outerD
 
-    def startFakeGalil(self):
-        """Start the fake Galil on a randomly chosen port; return the port number
-        """
-        #print "startFakeGalil()"
-        self.fakeGalilFactory = self.fakeGalilFactory(verbose=False, wakeUpHomed=True, mirror=self.trueMirror)
-        portObj = reactor.listenTCP(port=0, factory=self.fakeGalilFactory)
-        galilPort = portObj.getHost().port
-        self.addCleanup(portObj.stopListening)
-        #print "Started fake Galil on port", galilPort
-        return galilPort
-
-class ConvergenceTestActEqEnc(ConvergenceTestBase):
+class ConvergenceTestActEqEnc(ConvergenceTestBase, TestCase):
     def setVars(self):
-        self.userPort = getOpenPort()
-        self.fakeGalilFactory = FakeGalil
+        # self.userPort = getOpenPort()
+        # self.fakeGalilFactory = FakeGalil
         self.trueMirror = mir35mSec
         self.mirror = getActEqEncMir(self.trueMirror)
-        self.mirDev = mirrorCtrl.GalilDevice
+        # self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror"    
 
     def testOrients(self):
         return self._testOrients(m2TestOrients)    
 
     def testSmallMoves(self):
-        bigOrient = bigOrient = numpy.asarray([self.mirDev.LargePiston/MMPerMicron, self.mirDev.LargeTilt/RadPerArcSec, self.mirDev.LargeTilt/RadPerArcSec, self.mirDev.LargeTranslation/MMPerMicron, self.mirDev.LargeTranslation/MMPerMicron], dtype=float)
+        bigOrient = numpy.asarray([LargePiston/MMPerMicron, LargeTilt/RadPerArcSec, LargeTilt/RadPerArcSec, LargeTranslation/MMPerMicron, LargeTranslation/MMPerMicron], dtype=float)
         orient1 = numpy.asarray(m2TestOrients[0], dtype=float)
         orient2 = orient1 + 0.5*bigOrient
         orient3 = orient2 + 0.75*bigOrient
@@ -246,31 +227,31 @@ class ConvergenceTestActEqEnc(ConvergenceTestBase):
         return self._testOrients([orient1]*3) # should automatically add offsets
 
     def testBigMoves(self):
-        bigOrient = bigOrient = numpy.asarray([self.mirDev.LargePiston/MMPerMicron, self.mirDev.LargeTilt/RadPerArcSec, self.mirDev.LargeTilt/RadPerArcSec, self.mirDev.LargeTranslation/MMPerMicron, self.mirDev.LargeTranslation/MMPerMicron], dtype=float)
+        bigOrient = numpy.asarray([LargePiston/MMPerMicron, LargeTilt/RadPerArcSec, LargeTilt/RadPerArcSec, LargeTranslation/MMPerMicron, LargeTranslation/MMPerMicron], dtype=float)
         orient1 = numpy.asarray(m2TestOrients[0], dtype=float)
         orient2 = orient1 + 1.5*bigOrient
         orient3 = orient2 + 2.75*bigOrient
         return self._testOrients([orient1, orient2, orient3])      # no added offset  
 
-class ConvergenceTestM3(ConvergenceTestBase):
+class ConvergenceTestM3(ConvergenceTestBase, TestCase):
     def setVars(self):
-        self.userPort = getOpenPort()
-        self.fakeGalilFactory = FakeGalil
+        # self.userPort = getOpenPort()
+        # self.fakeGalilFactory = FakeGalil
         self.trueMirror = mir35mTert
         self.mirror = getActEqEncMir(self.trueMirror)
-        self.mirDev = mirrorCtrl.GalilDevice
+        # self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror" 
 
     def testOrients(self):
         return self._testOrients(m3TestOrients)
 
-class ConvergenceTestSDSSM2(ConvergenceTestBase):
+class ConvergenceTestSDSSM2(ConvergenceTestBase, TestCase):
     def setVars(self):
-        self.userPort = getOpenPort()
-        self.fakeGalilFactory = FakePiezoGalil
+        # self.userPort = getOpenPort()
+        # self.fakeGalilFactory = FakePiezoGalil
         self.trueMirror = mir25mSec
         self.mirror = getActEqEncMir(self.trueMirror)
-        self.mirDev = mirrorCtrl.GalilDevice
+        # self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror" 
 
     def testOrients(self):
@@ -280,27 +261,27 @@ class ConvergenceTestSDSSM2(ConvergenceTestBase):
         ]
         return self._testOrients(orientList)
 
-class ConvergenceTestRandAct(ConvergenceTestBase):
+class ConvergenceTestRandAct(ConvergenceTestBase, TestCase):
     def setVars(self):
-        self.userPort = getOpenPort()
-        self.fakeGalilFactory = FakeGalil
+        # self.userPort = getOpenPort()
+        # self.fakeGalilFactory = FakeGalil
         self.trueMirror = mir35mSec
         self.mirror = getActRandMove(self.trueMirror, seed=45)
-        self.mirDev = mirrorCtrl.GalilDevice
+        # self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror" 
 
     def testOrients(self):
         return self._testOrients(m2TestOrients)
 
-class ConvergenceTestPerfect(ConvergenceTestBase):
+class ConvergenceTestPerfect(ConvergenceTestBase, TestCase):
     """model exactly represents truth, no iterations
     """
     def setVars(self):
-        self.userPort = getOpenPort()
-        self.fakeGalilFactory = FakeGalil
+        # self.userPort = getOpenPort()
+        # self.fakeGalilFactory = FakeGalil
         self.trueMirror = mir35mSec
         self.mirror = copy.deepcopy(mir35mSec)
-        self.mirDev = mirrorCtrl.GalilDevice
+        # self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror" 
 
     def testOrients(self):
