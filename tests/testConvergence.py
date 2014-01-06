@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import itertools
 import copy
+import math
 import os
 import pickle
 
@@ -11,25 +12,21 @@ import RO.Comm.Generic
 RO.Comm.Generic.setFramework("twisted")
 from opscore.actor import CmdVar
 from twisted.internet.defer import Deferred
+from twisted.trial.unittest import TestCase
 
 from mirrorCtrl.const import convOrient2MMRad, MMPerMicron, RadPerArcSec
 from mirrorCtrl.mirrors import mir35mSec, mir35mTert, mir25mSec
 from testMirrorCtrl import  CmdCallback #getOpenPort #, UserPort, MirrorCtrlTestBase,
 from mirrorCtrl.fakeDispatcherWrapper import FakeDispatcherWrapper
 from mirrorCtrl.galilDevice import GalilDevice
-import mirrorCtrl
-import math
-from twisted.trial.unittest import TestCase
-
 import mirrorCtrl.fakeGalil
-mirrorCtrl.fakeGalil.MaxCmdTime = 0.25
 
 pwd = os.path.dirname(__file__)
 secMoveList = pickle.load(open(os.path.join(pwd, "data/secMoveList.p")))
 tertMoveList = pickle.load(open(os.path.join(pwd, "data/tertMoveList.p")))
-# set max iter to 12
-mirrorCtrl.galilDevice.MaxIter = 12
 
+mirrorCtrl.galilDevice.MaxIter = 12
+mirrorCtrl.fakeGalil.MaxCmdTime = 0.025
 
 RussellsOrient = numpy.asarray([834.26, -24.03, 366.27, -192.64, 1388.21]) # in um, arcsec
 randInds = numpy.random.randint(0, len(secMoveList), 2)# a few random indices from real mirror positions from log
@@ -96,10 +93,8 @@ class MirState(object):
         self.mountOffset = offset
 
 class ConvergenceTestBase(object):
-
     def setUp(self):
         self.setVars()
-        print "*** setUp"
         self.dw = FakeDispatcherWrapper(
             mirror=self.trueMirror,
         )
@@ -111,7 +106,6 @@ class ConvergenceTestBase(object):
 
     def tearDown(self):
         d = self.dw.close()
-        print "*** tearDown; d=%s; called=%s" % (d, d.called if d else "?????")
         return d
 
     @property
@@ -156,7 +150,6 @@ class ConvergenceTestBase(object):
         self.mirDev: mirror device, e.g. mirrorCtrl.GalilDevice
         self.name: name of keyword dict for this mirror
         """
-        print "MirrorCtrlTestBase.setVars"
         raise NotImplementedError()
 
     def _testOrient(self, orient):
