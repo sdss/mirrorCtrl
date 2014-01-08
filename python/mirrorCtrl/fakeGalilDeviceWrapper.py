@@ -38,6 +38,7 @@ class FakeGalilDeviceWrapper(DeviceWrapper):
         @param[in] wakeUpHomed: should actuators be homed upon construction, or not?
         @param[in] stateCallback: function to call when connection state of hardware controller or device changes;
             receives one argument: this device wrapper
+        @param[in] port: the port for the fake Galil
         """
         self._mirror = mirror
         controller = galilClass(

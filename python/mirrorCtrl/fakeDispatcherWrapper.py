@@ -2,7 +2,6 @@
 """Fake Galil actor wrapper.
 """
 from twistedActor import DispatcherWrapper
-from opscore.actor import ActorDispatcher
 
 from .fakeGalil import FakeGalil
 from .fakeMirrorCtrlWrapper import FakeMirrorCtrlWrapper
@@ -60,10 +59,3 @@ class FakeDispatcherWrapper(DispatcherWrapper):
         )
         self._mirror = mirror
         self.dispatcher = None # the ActorDispatcher, once it's built
-    
-    def _makeDispatcher(self, connection):
-        #print "_makeDispatcher(connection=%s)" % (connection,)
-        self.dispatcher = ActorDispatcher(
-            connection = connection,
-            name = self._dictName, # name of keyword dictionary
-        )
