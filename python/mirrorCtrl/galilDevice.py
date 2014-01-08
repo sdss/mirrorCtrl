@@ -669,7 +669,7 @@ class GalilDevice(TCPDevice):
         self.setCurrUserCmd(userCmd)
         #self.conn.writeLine('ST')
         #reactor.callLater(1, self.sendStop) # wait 1 second then command stop, then status
-        self.startDevCmd("XQ#STOP", callFunc=self.sendStatus)
+        self.startDevCmd("ST;XQ#STOP", callFunc=self.sendStatus)
 
     def cmdCachedStatus(self, userCmd):
         """Return a cached status, don't ask the galil for a fresh one

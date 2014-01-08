@@ -4,19 +4,17 @@
 Tests communication and other behavior between the Actor and Device. Commands are dispatched using a 
 dispatcher. 
 """
-import numpy
 
 import RO.Comm.Generic
 RO.Comm.Generic.setFramework("twisted")
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import Deferred, gatherResults
 from twisted.internet import reactor
-from opscore.actor import ActorDispatcher, CmdVar
-from RO.Comm.TCPConnection import TCPConnection
+from opscore.actor import CmdVar
 
 import mirrorCtrl
 from mirrorCtrl.mirrors import mir25mSec, mir35mTert
-from mirrorCtrl.fakeGalil import FakeGalil, FakePiezoGalil
+from mirrorCtrl.fakeGalil import FakePiezoGalil
 from mirrorCtrl.fakeDispatcherWrapper import FakeDispatcherWrapper
 
 ## speed up fake galil responses
