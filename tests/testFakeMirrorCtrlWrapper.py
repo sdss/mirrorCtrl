@@ -1,11 +1,8 @@
 #!/usr/bin/env python
-import RO.Comm.Generic
-RO.Comm.Generic.setFramework("twisted")
 from twisted.trial.unittest import TestCase
-from twisted.internet import reactor
 
 from mirrorCtrl.mirrors import mir35mTert
-from mirrorCtrl.fakeMirrorCtrlWrapper import FakeMirrorCtrlWrapper
+from mirrorCtrl import FakeMirrorCtrlWrapper
 
 class TestFakeMirrorCtrlWrapper(TestCase):
     """Test basics of FakeMirrorCtrlWrapper

@@ -4,24 +4,19 @@
 Tests communication and other behavior between the Actor and Device. Commands are dispatched using a 
 dispatcher. 
 """
-import numpy
-
-import RO.Comm.Generic
-RO.Comm.Generic.setFramework("twisted")
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import Deferred, gatherResults
 from twisted.internet import reactor
-from opscore.actor import ActorDispatcher, CmdVar
-from RO.Comm.TCPConnection import TCPConnection
+import RO.Comm.Generic
+RO.Comm.Generic.setFramework("twisted")
+from opscore.actor import CmdVar
 
-import mirrorCtrl
 from mirrorCtrl.mirrors import mir25mSec, mir35mTert
-from mirrorCtrl.fakeGalil import FakeGalil, FakePiezoGalil
-from mirrorCtrl.fakeDispatcherWrapper import FakeDispatcherWrapper
+from mirrorCtrl import FakePiezoGalil, FakeDispatcherWrapper
 
 ## speed up fake galil responses
 import mirrorCtrl.fakeGalil
-mirrorCtrl.fakeGalil.MaxCmdTime = 0.25 # seconds, longest any command may take
+mirrorCtrl.fakeGalil.MaxCmdTime = 0.025 # seconds, longest any command may take
 
 def showReply(msgStr, *args, **kwargs): # prints what the dispatcher sees
     print 'Keyword Reply: ' + msgStr
@@ -41,7 +36,6 @@ class GenericTests(TestCase):
     """Tests for each command, and how they behave in collisions
     """
     def setUp(self):
-        print "*** setUp"
         self.name = "mirror"
         self.dw = FakeDispatcherWrapper(
             mirror=mir35mTert,
@@ -49,9 +43,7 @@ class GenericTests(TestCase):
         return self.dw.readyDeferred
     
     def tearDown(self):
-        d = self.dw.close()
-        print "*** tearDown; d=%s; called=%s" % (d, d.called if d else "?????")
-        return d
+        return self.dw.close()
     
     @property
     def dispatcher(self):
