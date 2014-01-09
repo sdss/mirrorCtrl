@@ -131,7 +131,6 @@ class FakeGalil(TCPServer):
         if self.verbose:
             print "received: %r" % (cmdStr,)
         cmdStr = cmdStr.strip()
-        self.echo(cmdStr)
         if cmdStr in ("ST", "RS"):
             if cmdStr == "RS":
                 self.isHomed = self.arr(False, dtype=bool)
@@ -139,7 +138,8 @@ class FakeGalil(TCPServer):
                 self.measPos = self.arr(0)
                 self.userNums = self.arr(MAXINT)
             self.replyTimer.cancel()
-            return        
+            return   
+        self.echo(cmdStr) # ST and RS are not echoed     
         self.processCmd(cmdStr)
         
     def processCmd(self, cmdStr):
