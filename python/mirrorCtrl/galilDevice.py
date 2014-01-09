@@ -544,25 +544,21 @@ class GalilDevice(TCPDevice):
                 self.actOnKey(key=key, dataList=[data], replyStr=replyStr)
                 self.parsedKeyList.append(key)
 
-    def setCurrUserCmd(self, userCmd, forceKill=False):
+    def setCurrUserCmd(self, userCmd):
         """Set self.userCmd
         
         @param[in] userCmd: new userCmd, or None if none
             (in which case a blank "done" command is used)
-        @param[in] forceKill: boolean. If true any currently running userCmd will be killed
-        
+           
         @raise RuntimeError if the existing userCmd and is not done and forceKill is not True
         """
         if not self.userCmd.isDone:
-        #     if forceKill:
-        #         self.userCmd.setState(self.userCmd.Cancelled, textMsg="userCmd: %s killed by ST or RS"%self.userCmd.cmdStr)
-        #     else:
-                raise RuntimeError('User command collision! Cannot replace userCmd unless previous is done!')
+            raise RuntimeError('User command collision! Cannot replace userCmd unless previous is done!')
         # add a callback to cancel device cmd if the userCmd was cancelled...
         def cancelDev(cbUserCmd):
             if (cbUserCmd.state == cbUserCmd.Cancelling):
                 self.currDevCmd.setState(self.currDevCmd.Cancelling)
-                self.writeToGalil(GalCancelCmd)
+                self.conn.writeLine(GalCancelCmd)
 
         if userCmd is None:
             userCmd = NullUserCmd
@@ -654,9 +650,9 @@ class GalilDevice(TCPDevice):
         Send 'RS' to the Galil, causing it to reset to power-up state,
         """
         #self.startUserCmd(userCmd, doCancel=True, timeLim=10)
-        self.setCurrUserCmd(userCmd, forceKill=False)
+        self.setCurrUserCmd(userCmd)
         self.startDevCmd("RS")
-        # self.writeToGalil('RS')
+        # self.conn.writeLine('RS')
         # reactor.callLater(self.RSWaitTime, self.sendStop) # wait 3 seconds then command stop, then status
 
     def cmdStop(self, userCmd):
@@ -666,8 +662,8 @@ class GalilDevice(TCPDevice):
 
         Send 'ST;XQ#STATUS' to the Galil, causing it to stop all threads,
         """
-        self.setCurrUserCmd(userCmd, forceKill=False)
-        #self.writeToGalil('ST')
+        self.setCurrUserCmd(userCmd)
+        #self.conn.writeLine('ST')
         #reactor.callLater(1, self.sendStop) # wait 1 second then command stop, then status
         self.startDevCmd("ST;XQ#STATUS") # , callFunc=self.sendStatus)
 
@@ -756,7 +752,7 @@ class GalilDevice(TCPDevice):
         self.parsedKeyList = []
         try:
             self.logMsg("DevCmd(%s)" % (devCmd.cmdStr,))
-            self.writeToGalil(devCmd.cmdStr)
+            self.conn.writeLine(devCmd.cmdStr)
             devCmd.setState(devCmd.Running)
         except Exception, e:
             devCmd.setState(devCmd.Failed, textMsg=strFromException(e))
@@ -800,7 +796,7 @@ class GalilDevice(TCPDevice):
             userCmdCatchFail, self._userCmdCatchFail = self._userCmdCatchFail, None
             if userCmdCatchFail:
                 # don't do this if cmd was 'cancelled', only if 'failed'
-                self.writeToGalil("ST")
+                self.conn.writeLine("ST")
                 reactor.callLater(self.STWaitTime, userCmdCatchFail) # I imagine will almost always be self.failStop()
             else:
                 self._failUserCmd()
@@ -944,13 +940,13 @@ class GalilDevice(TCPDevice):
 
         return "%s; %s" % ("; ".join(argList), cmd)
 
-    def writeToGalil(self, galilCmd):
-        """Write a line via TCP Connnection to the galil.
+    # def conn.writeLine(self, galilCmd):
+    #     """Write a line via TCP Connnection to the galil.
 
-        @param[in] galilCmd: string to be written to socket.
-        """
-        self.logMsg("Sent To Galil(%s)"%galilCmd)
-        self.conn.writeLine(galilCmd)
+    #     @param[in] galilCmd: string to be written to socket.
+    #     """
+    #     self.logMsg("Sent To Galil(%s)"%galilCmd)
+    #     self.conn.writeLine(galilCmd)
 
 
 class GalilDevice25Sec(GalilDevice):
