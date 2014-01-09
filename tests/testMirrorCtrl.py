@@ -47,6 +47,7 @@ class GenericTests(TestCase):
         return self.dw.readyDeferred
     
     def tearDown(self):
+        self.actor.logMsg("Ending Test: %s" % self.test)
         d = self.dw.close()
         print "*** tearDown; d=%s; called=%s" % (d, d.called if d else "?????")
         return d
@@ -63,6 +64,9 @@ class GenericTests(TestCase):
         """
         return self.dw.actorWrapper.deviceWrapperList[0].controller
 
+    @property
+    def actor(self):
+        return self.dw.actorWrapper.actor
 
     def testActorBypass(self):
         d = Deferred()

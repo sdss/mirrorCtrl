@@ -303,8 +303,8 @@ class GalilDevice(TCPDevice):
         Called on disconnection
         """
         #print "temporary hacked version of init"
-        userCmd.setState(userCmd.Done)
-        #self.logMsg('init called')
+        #userCmd.setState(userCmd.Done)
+        self.logMsg('init called')
         self.cmdStop(userCmd=userCmd)
 
     def parseReply(self, replyStr):
@@ -544,16 +544,20 @@ class GalilDevice(TCPDevice):
                 self.actOnKey(key=key, dataList=[data], replyStr=replyStr)
                 self.parsedKeyList.append(key)
 
-    def setCurrUserCmd(self, userCmd):
+    def setCurrUserCmd(self, userCmd, forceKill=False):
         """Set self.userCmd
         
         @param[in] userCmd: new userCmd, or None if none
             (in which case a blank "done" command is used)
-           
+        @param[in] forceKill: bool. If this userCmd is associated with an ST or RS, kill anything running
         @raise RuntimeError if the existing userCmd and is not done and forceKill is not True
         """
         if not self.userCmd.isDone:
-            raise RuntimeError('User command collision! Cannot replace userCmd unless previous is done!')
+            if forceKill:
+                # kill current userCmd
+                self.userCmd.setState(self.userCmd.Cancelled, textMsg="%s cancelled by RS or ST"%self.userCmd.cmdStr)
+            else:
+                raise RuntimeError('User command collision! %s blocked by currently running %s!'%(userCmd.cmdStr, self.userCmd.cmdStr))
         # add a callback to cancel device cmd if the userCmd was cancelled...
         def cancelDev(cbUserCmd):
             if (cbUserCmd.state == cbUserCmd.Cancelling):
@@ -650,8 +654,8 @@ class GalilDevice(TCPDevice):
         Send 'RS' to the Galil, causing it to reset to power-up state,
         """
         #self.startUserCmd(userCmd, doCancel=True, timeLim=10)
-        self.setCurrUserCmd(userCmd)
-        self.startDevCmd("RS")
+        self.setCurrUserCmd(userCmd, forceKill = True)
+        self.startDevCmd("RS", forceKill = True)
         # self.conn.writeLine('RS')
         # reactor.callLater(self.RSWaitTime, self.sendStop) # wait 3 seconds then command stop, then status
 
@@ -662,10 +666,10 @@ class GalilDevice(TCPDevice):
 
         Send 'ST;XQ#STATUS' to the Galil, causing it to stop all threads,
         """
-        self.setCurrUserCmd(userCmd)
+        self.setCurrUserCmd(userCmd, forceKill = True)
         #self.conn.writeLine('ST')
         #reactor.callLater(1, self.sendStop) # wait 1 second then command stop, then status
-        self.startDevCmd("ST;XQ#STATUS") # , callFunc=self.sendStatus)
+        self.startDevCmd("ST;XQ#STOP", forceKill = True) # , callFunc=self.sendStatus)
 
     def cmdCachedStatus(self, userCmd):
         """Return a cached status, don't ask the galil for a fresh one
@@ -727,7 +731,7 @@ class GalilDevice(TCPDevice):
             self.startDevCmd("XQ#STATUS", callFunc = self._failUserCmd)
         self.startDevCmd("XQ#STOP", callFunc=failStatus)
 
-    def startDevCmd(self, cmdStr, callFunc=None, errFunc=None):
+    def startDevCmd(self, cmdStr, callFunc=None, errFunc=None, forceKill=False):
         """Start a new device command, replacing self.currDevCmd
 
         @param[in] cmdStr: command to send to the Galil
@@ -737,13 +741,18 @@ class GalilDevice(TCPDevice):
         @param[in] errFunc: function to call if device command fails (eg, gailil sends a "?") before
             setting userCmd to failed. Intended primarily for a status query prior to user
             command termination.
+        @param[in] forceKill: bool. If true, this is an ST or RS, it should kill anything running
         """
         # print "startDevCmd(cmdStr=%s, timeLimt=%s, callFunc=%s)" % (cmdStr, timeLim, callFunc)
         # print "self.userCmd=%r" % (self.userCmd,)
         # print "self.devCmd=%r" % (self.currDevCmd,)
         if not self.currDevCmd.isDone:
-            # this should never happen, but...just in case
-            raise RuntimeError("Cannot start new device command: %s , %s is currently running" % (cmdStr, self.currDevCmd,))
+            if forceKill:
+                self.currDevCmd.setState(self.currDevCmd.Cancelled, textMsg="Dev Cmd: %s killed by ST or RS" % self.currDevCmd.cmdStr)
+                self._cleanup()
+            else:
+                # this should never happen, but...just in case
+                raise RuntimeError("Cannot start new device command: %s , %s is currently running" % (cmdStr, self.currDevCmd,))
 
         self._userCmdNextStep = callFunc
         self._userCmdCatchFail = errFunc
