@@ -5,7 +5,7 @@ from argparse import ArgumentParser
 from twisted.internet import reactor
 
 from mirrorCtrl.mirrors import mir35mSec
-from mirrorCtrl.fakeMirrorCtrlWrapper import FakeMirrorCtrlWrapper
+from mirrorCtrl import FakeMirrorCtrlWrapper
 
 DefaultPort = 3520
 

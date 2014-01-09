@@ -17,8 +17,7 @@ from twisted.trial.unittest import TestCase
 from mirrorCtrl.const import convOrient2MMRad, MMPerMicron, RadPerArcSec
 from mirrorCtrl.mirrors import mir35mSec, mir35mTert, mir25mSec
 from testMirrorCtrl import  CmdCallback #getOpenPort #, UserPort, MirrorCtrlTestBase,
-from mirrorCtrl.fakeDispatcherWrapper import FakeDispatcherWrapper
-from mirrorCtrl.galilDevice import GalilDevice
+from mirrorCtrl import FakeDispatcherWrapper, GalilDevice
 import mirrorCtrl.fakeGalil
 
 pwd = os.path.dirname(__file__)
