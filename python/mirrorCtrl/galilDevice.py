@@ -302,9 +302,10 @@ class GalilDevice(TCPDevice):
         
         Called on disconnection
         """
-        print "temporary hacked version of init"
+        #print "temporary hacked version of init"
         userCmd.setState(userCmd.Done)
-        #self.cmdStop(userCmd=userCmd)
+        #self.logMsg('init called')
+        self.cmdStop(userCmd=userCmd)
 
     def parseReply(self, replyStr):
         """Parse a reply from the Galil and seperate into key=value format.
@@ -543,21 +544,25 @@ class GalilDevice(TCPDevice):
                 self.actOnKey(key=key, dataList=[data], replyStr=replyStr)
                 self.parsedKeyList.append(key)
 
-    def setCurrUserCmd(self, userCmd):
+    def setCurrUserCmd(self, userCmd, forceKill=False):
         """Set self.userCmd
         
         @param[in] userCmd: new userCmd, or None if none
             (in which case a blank "done" command is used)
+        @param[in] forceKill: boolean. If true any currently running userCmd will be killed
         
-        @raise RuntimeError if the existing userCmd and is not done
+        @raise RuntimeError if the existing userCmd and is not done and forceKill is not True
         """
         if not self.userCmd.isDone:
-            raise RuntimeError('User command collision! Cannot replace userCmd unless previous is done!')
+        #     if forceKill:
+        #         self.userCmd.setState(self.userCmd.Cancelled, textMsg="userCmd: %s killed by ST or RS"%self.userCmd.cmdStr)
+        #     else:
+                raise RuntimeError('User command collision! Cannot replace userCmd unless previous is done!')
         # add a callback to cancel device cmd if the userCmd was cancelled...
         def cancelDev(cbUserCmd):
             if (cbUserCmd.state == cbUserCmd.Cancelling):
                 self.currDevCmd.setState(self.currDevCmd.Cancelling)
-                self.conn.writeLine(GalCancelCmd)
+                self.writeToGalil(GalCancelCmd)
 
         if userCmd is None:
             userCmd = NullUserCmd
@@ -647,29 +652,24 @@ class GalilDevice(TCPDevice):
         @param[in] userCmd: a twistedActor UserCmd
 
         Send 'RS' to the Galil, causing it to reset to power-up state,
-        wait a few seconds,
-        send XQ#STOP to make sure it is fully reset,
-        then send XQ#STATUS to report current state.
         """
         #self.startUserCmd(userCmd, doCancel=True, timeLim=10)
-        self.setCurrUserCmd(userCmd)
-        self.conn.writeLine('RS')
-        reactor.callLater(self.RSWaitTime, self.sendStop) # wait 3 seconds then command stop, then status
+        self.setCurrUserCmd(userCmd, forceKill=False)
+        self.startDevCmd("RS")
+        # self.writeToGalil('RS')
+        # reactor.callLater(self.RSWaitTime, self.sendStop) # wait 3 seconds then command stop, then status
 
     def cmdStop(self, userCmd):
         """Stop the Galil.
 
         @param[in] userCmd: a twistedActor UserCmd
 
-        Send 'ST' to the Galil, causing it to stop all threads,
-        wait a short time,
-        send XQ#STOP to make sure it is fully reset,
-        then send XQ#STATUS to report current state.
+        Send 'ST;XQ#STATUS' to the Galil, causing it to stop all threads,
         """
-        self.setCurrUserCmd(userCmd)
-        #self.conn.writeLine('ST')
+        self.setCurrUserCmd(userCmd, forceKill=False)
+        #self.writeToGalil('ST')
         #reactor.callLater(1, self.sendStop) # wait 1 second then command stop, then status
-        self.startDevCmd("ST;XQ#STOP", callFunc=self.sendStatus)
+        self.startDevCmd("ST;XQ#STATUS") # , callFunc=self.sendStatus)
 
     def cmdCachedStatus(self, userCmd):
         """Return a cached status, don't ask the galil for a fresh one
@@ -756,7 +756,7 @@ class GalilDevice(TCPDevice):
         self.parsedKeyList = []
         try:
             self.logMsg("DevCmd(%s)" % (devCmd.cmdStr,))
-            self.conn.writeLine(devCmd.cmdStr)
+            self.writeToGalil(devCmd.cmdStr)
             devCmd.setState(devCmd.Running)
         except Exception, e:
             devCmd.setState(devCmd.Failed, textMsg=strFromException(e))
@@ -800,7 +800,7 @@ class GalilDevice(TCPDevice):
             userCmdCatchFail, self._userCmdCatchFail = self._userCmdCatchFail, None
             if userCmdCatchFail:
                 # don't do this if cmd was 'cancelled', only if 'failed'
-                self.conn.writeLine("ST")
+                self.writeToGalil("ST")
                 reactor.callLater(self.STWaitTime, userCmdCatchFail) # I imagine will almost always be self.failStop()
             else:
                 self._failUserCmd()
@@ -943,6 +943,14 @@ class GalilDevice(TCPDevice):
         argList = ["%s%s=%s" % (axisPrefix, self.validAxisList[ind], formatValue(val)) for ind, val in enumerate(fullValueList)]
 
         return "%s; %s" % ("; ".join(argList), cmd)
+
+    def writeToGalil(self, galilCmd):
+        """Write a line via TCP Connnection to the galil.
+
+        @param[in] galilCmd: string to be written to socket.
+        """
+        self.logMsg("Sent To Galil(%s)"%galilCmd)
+        self.conn.writeLine(galilCmd)
 
 
 class GalilDevice25Sec(GalilDevice):
