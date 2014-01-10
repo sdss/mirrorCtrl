@@ -277,6 +277,11 @@ class GalilDevice(TCPDevice):
         ## a galil status object
         self.status = GalilStatus(self)
 
+    def logMsg(self, msg):
+        """Temporary log routine, incase of logging prior to actor
+        """
+        print 'temp log', msg
+
     @property
     def userCmdOrNone(self):
         """return self.userCmd if not done, else None
@@ -304,7 +309,7 @@ class GalilDevice(TCPDevice):
         """
         #print "temporary hacked version of init"
         #userCmd.setState(userCmd.Done)
-        self.logMsg('init called')
+        # self.logMsg('init called')
         self.cmdStop(userCmd=userCmd)
 
     def parseReply(self, replyStr):

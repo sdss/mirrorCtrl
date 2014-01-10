@@ -133,12 +133,15 @@ class FakeGalil(TCPServer):
         cmdStr = cmdStr.strip()
         self.echo(cmdStr)
         if cmdStr in ("ST", "RS"):
+            self.replyTimer.cancel()
             if cmdStr == "RS":
+                # flush the buffer
+                self._cmdBuffer = collections.deque()
                 self.isHomed = self.arr(False, dtype=bool)
                 self.cmdPos = self.arr(0)
                 self.measPos = self.arr(0)
                 self.userNums = self.arr(MAXINT)
-            self.replyTimer.cancel()
+                self.restart()
             return       
         self.processCmd(cmdStr)
         
@@ -205,6 +208,13 @@ class FakeGalil(TCPServer):
             self.sendLine("?")
             self.done()
     
+    def restart(self):
+        """Restart the galil
+        """
+        str1 = "Mirror controller version  0000000002.1000 started"
+        self.sendLine(str1)
+        self.replyTimer.start(0.2, self.sendLine, "OK")
+
     def homeStart(self):
         """Start homing
         """

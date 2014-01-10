@@ -63,6 +63,7 @@ class GenericTests(TestCase):
         return self.dw.actorWrapper.actor
 
     def testActorBypass(self):
+        self.actor.logMsg("testActorBypass")
         d = Deferred()
         st = "ST"
         galilCmd = "A=1134426; B=1732577; C=867754; XQ #MOVE"
@@ -86,7 +87,7 @@ class GenericTests(TestCase):
         checks:
         1. the command fails
         """
-        self.test = 'testUnHomedMove'
+        self.actor.logMsg('testUnHomedMove')
         # force all axes on the fakeGalil to unhomed
         self.fakeGalil.isHomed = self.fakeGalil.isHomed*0.
         d = Deferred()
@@ -108,7 +109,7 @@ class GenericTests(TestCase):
     def testMoveTimeout(self):
         """Let a move command time out, be sure it is handled correctly
         """
-        self.test = "testMoveTimeout"
+        self.actor.logMsg("testMoveTimeout")
         d = Deferred()
         orientation = [-2000.0, 150.0, 860.0]
         cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
@@ -133,7 +134,7 @@ class GenericTests(TestCase):
         1. command doesn't fail
         2. all axes are set to homed on the model.
         """
-        self.test = 'testHome'
+        self.actor.logMsg('testHome')
         # force all axes on the fakeGalil to unhomed
         self.fakeGalil.isHomed = self.fakeGalil.isHomed*0.
         d = Deferred()
@@ -160,7 +161,7 @@ class GenericTests(TestCase):
         1. command completes without failure
         2. isHomed = False for all axes.
         """
-        self.test = "testStatus"
+        self.actor.logMsg("testStatus")
         # force all axes on the fakeGalil to unhomed
         self.fakeGalil.isHomed = self.fakeGalil.isHomed*0.
         d = Deferred()
@@ -186,7 +187,7 @@ class GenericTests(TestCase):
         1. command completes without failure
         2. isHomed = False for all axes
         """
-        self.test = "testReset"
+        self.actor.logMsg("testReset")
         d = Deferred()
         cmdStr = 'reset'        
         cmdVar = CmdVar (
@@ -211,7 +212,7 @@ class GenericTests(TestCase):
         """
         self.test="testStop"
         d = Deferred()
-        cmdStr = 'reset'        
+        cmdStr = 'stop'        
         cmdVar = CmdVar (
                 actor = self.name,
                 cmdStr = cmdStr,
@@ -233,7 +234,7 @@ class GenericTests(TestCase):
         1. the move fails
         2. the stop succeeds.
         """          
-        self.test = "testStopInterrupt"
+        self.actor.logMsg("testStopInterrupt")
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
@@ -267,7 +268,7 @@ class GenericTests(TestCase):
         2. the reset succeeds.
         3. check that isHomed == False (due to the reset)
         """          
-        self.test = "testResetInterrupt"
+        self.actor.logMsg("testResetInterrupt")
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
@@ -298,7 +299,7 @@ class GenericTests(TestCase):
         """send a status then a home, 
         home should finish after status.
         """
-        self.test = "testCmdQueueHome"
+        self.actor.logMsg("testCmdQueueHome")
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
@@ -327,7 +328,7 @@ class GenericTests(TestCase):
         """send status, move, move.
         2nd move should finish, 1st move and status should finish
         """
-        self.test = "testDoubleQueueMoveMove"
+        self.actor.logMsg("testDoubleQueueMoveMove")
         d1 = Deferred()
         d2 = Deferred()
         d3 = Deferred()
@@ -364,7 +365,7 @@ class GenericTests(TestCase):
         """send status, move, home.
         move should finish, home should be rejected, and status should finish
         """
-        self.test = "testDoubleQueueMoveHome"
+        self.actor.logMsg("testDoubleQueueMoveHome")
         d1 = Deferred()
         d2 = Deferred()
         d3 = Deferred()
@@ -401,7 +402,7 @@ class GenericTests(TestCase):
         """send status, home, move.
         home should finish, move rejected, and status should finish
         """
-        self.test = "testDoubleQueueHomeMove"
+        self.actor.logMsg("testDoubleQueueHomeMove")
         d1 = Deferred()
         d2 = Deferred()
         d3 = Deferred()
@@ -438,7 +439,7 @@ class GenericTests(TestCase):
         """send a status then a home then a stop, 
         stop should succeed rest should fail
         """
-        self.test = "testCmdQueueSuperseded"
+        self.actor.logMsg("testCmdQueueSuperseded")
         d1 = Deferred()
         d2 = Deferred()
         d3 = Deferred()
@@ -475,7 +476,7 @@ class GenericTests(TestCase):
         """send a staus then a move.
         move should finish after status
         """
-        self.test = "testCmdQueueMove"
+        self.actor.logMsg("testCmdQueueMove")
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
@@ -506,7 +507,7 @@ class GenericTests(TestCase):
         1. Status succeeds
         2. Home succeeds
         """
-        self.test = 'testStatusCollide'
+        self.actor.logMsg('testStatusCollide')
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
@@ -534,7 +535,7 @@ class GenericTests(TestCase):
     def testMoveSupersede(self):
         """Send two move commands, the second should supersede the first
         """
-        self.test = "testMoveSupersede"
+        self.actor.logMsg("testMoveSupersede")
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
@@ -568,7 +569,7 @@ class GenericTests(TestCase):
         1. The move command is cancelled
         2. The home command succeeds
         """
-        self.test = "testMoveCollide"
+        self.actor.logMsg("testMoveCollide")
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
@@ -599,7 +600,7 @@ class GenericTests(TestCase):
         checks:
         1. command fails
         """
-        self.test = "testBadMove"
+        self.actor.logMsg("testBadMove")
         # turn off noise added by fakeGalil.  This move should not iterate.
         self.fakeGalil.encRes = self.fakeGalil.encRes*0.
         d = Deferred()
@@ -623,7 +624,7 @@ class GenericTests(TestCase):
         checks:
         1. command fails
         """
-        self.test = "testBadHome"
+        self.actor.logMsg("testBadHome")
         # force all axes on the fakeGalil to unhomed
         self.fakeGalil.isHomed = self.fakeGalil.isHomed*0.
         d = Deferred()
@@ -655,7 +656,7 @@ class PiezoTests(TestCase):
         return self.dw.readyDeferred
     
     def tearDown(self):
-        self.dw.close()
+        return self.dw.close()
     
     @property
     def dispatcher(self):
@@ -663,6 +664,10 @@ class PiezoTests(TestCase):
         """
         return self.dw.dispatcher
     
+    @property
+    def actor(self):
+        return self.dw.actorWrapper.actor
+
     @property
     def fakeGalil(self):
         """Return the fake Galil (instance of FakeGalil)
@@ -675,7 +680,7 @@ class PiezoTests(TestCase):
         1. command doesn't fail
         2. all axes are set to homed on the model.
         """
-        self.test = "piezoTestHome"
+        self.actor.logMsg("piezoTestHome")
         # force all axes on the fakeGalil to unhomed
         self.fakeGalil.isHomed = self.fakeGalil.isHomed*0.
         d = Deferred()
