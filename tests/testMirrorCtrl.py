@@ -44,6 +44,7 @@ class GenericTests(TestCase):
         return self.dw.readyDeferred
     
     def tearDown(self):
+        #self.actor.statusTimer.cancel()
         return self.dw.close()
     
     @property

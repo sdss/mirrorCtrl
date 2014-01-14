@@ -3,12 +3,15 @@
 __all__ = ["MirrorCtrl", "runMirrorCtrl"]
 
 import os
-import numpy
 import traceback
 import sys
+
+import numpy
+from twistedActor import Actor, CommandError, writeToLog, startLogging, CommandQueue, UserCmd#,startGlobalLogging UserCmd, BaseCmd,
+from RO.Comm.TwistedTimer import Timer
+
 from const import convOrient2MMRad
 
-from twistedActor import Actor, CommandError, writeToLog, startLogging, CommandQueue#,startGlobalLogging UserCmd, BaseCmd,
 
 Version = 0.1
 
@@ -41,6 +44,8 @@ class MirrorCtrl(Actor):
             startLogging(LogDir)
         # give the device logging capabilities
         device.logMsg = self.logMsg
+        # add a slot for a status timer, to be triggered after stop and reset commands
+        self.statusTimer = Timer()
         Actor.__init__(self,
             userPort = userPort,
             devs = [device],
@@ -204,7 +209,10 @@ class MirrorCtrl(Actor):
         try:
             self.cmdQueue.addCmd(cmd, lambda: self.dev.galil.cmdStop(userCmd=cmd))
         except Exception, e:
-            raise CommandError(str(e))     
+            raise CommandError(str(e))   
+        # command a status for 1 second later (roughly 2x stopping time from max speed)
+        dummyCmd = UserCmd()
+        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, lambda: self.cmd_staus(dummyCmd))   
         return True
     
     def cmd_reset(self, cmd):
@@ -218,6 +226,8 @@ class MirrorCtrl(Actor):
             self.cmdQueue.addCmd(cmd, lambda: self.dev.galil.cmdReset(userCmd=cmd))
         except Exception, e:
             raise CommandError(str(e))        
+        dummyCmd = UserCmd()
+        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, lambda: self.cmd_staus(dummyCmd))   
         return True
           
   
