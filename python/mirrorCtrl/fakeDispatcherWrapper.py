@@ -31,6 +31,7 @@ class FakeDispatcherWrapper(DispatcherWrapper):
         wakeUpHomed = True,
         readCallback = None,
         stateCallback = None,
+        debug = False,
     ):
         """Construct a FakeDispatcherWrapper that manages everything
 
@@ -43,6 +44,7 @@ class FakeDispatcherWrapper(DispatcherWrapper):
         @param[in] readCallback: function to call when the dispatcher has data to read
         @param[in] stateCallback: function to call when connection state of hardware controller or actor changes;
             receives one argument: this actor wrapper
+        @param[in] debug: print debug messages to stdout?
         """
         actorWrapper = FakeMirrorCtrlWrapper(
             mirror=mirror,
@@ -50,12 +52,14 @@ class FakeDispatcherWrapper(DispatcherWrapper):
             userPort=userPort,
             verbose=verbose,
             wakeUpHomed=wakeUpHomed,
+            debug=debug,
         )
         DispatcherWrapper.__init__(self,
             dictName=dictName,
             actorWrapper=actorWrapper,
             readCallback=readCallback,
             stateCallback=stateCallback,
+            debug=debug,
         )
         self._mirror = mirror
         self.dispatcher = None # the ActorDispatcher, once it's built

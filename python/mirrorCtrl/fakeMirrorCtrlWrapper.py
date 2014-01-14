@@ -30,6 +30,7 @@ class FakeMirrorCtrlWrapper(ActorWrapper):
         verbose = False,
         wakeUpHomed = True,
         stateCallback = None,
+        debug = False,
     ):
         """Construct a FakeMirrorCtrlWrapper that manages its fake Galil
 
@@ -40,6 +41,7 @@ class FakeMirrorCtrlWrapper(ActorWrapper):
         @param[in] wakeUpHomed: should actuators be homed upon construction, or not?
         @param[in] stateCallback: function to call when connection state of hardware controller or actor changes;
             receives one argument: this actor wrapper
+        @param[in] debug: print debug messages to stdout?
         """
         self._mirror = mirror
         self._userPort = userPort
@@ -49,8 +51,9 @@ class FakeMirrorCtrlWrapper(ActorWrapper):
             galilClass=galilClass,
             verbose=verbose,
             wakeUpHomed=wakeUpHomed,
+            debug=debug,
         )
-        ActorWrapper.__init__(self, deviceWrapperList=[deviceWrapper], stateCallback=stateCallback)
+        ActorWrapper.__init__(self, deviceWrapperList=[deviceWrapper], stateCallback=stateCallback, debug=debug)
 
     def _basicClose(self):
         if self.actor:
