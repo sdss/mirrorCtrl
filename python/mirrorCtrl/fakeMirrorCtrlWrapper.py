@@ -55,11 +55,6 @@ class FakeMirrorCtrlWrapper(ActorWrapper):
         )
         ActorWrapper.__init__(self, deviceWrapperList=[deviceWrapper], stateCallback=stateCallback, debug=debug)
 
-    def _basicClose(self):
-        if self.actor:
-            self.actor.statusTimer.cancel()
-        ActorWrapper._basicClose(self)
-
     def _makeActor(self):
         #print "_makeActor()"
         self.actor = MirrorCtrl(

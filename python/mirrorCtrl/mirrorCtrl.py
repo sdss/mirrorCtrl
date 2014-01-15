@@ -94,7 +94,12 @@ class MirrorCtrl(Actor):
             action = CommandQueue.CancelNew,
             newCmds = ['showparams'],
             queuedCmds = ['showparams'],
-        )  
+        )
+
+    def _cancelTimers(self):
+        """Cancel all timers
+        """
+        self.statusTimer.cancel()
 
     def logMsg(self, msgStr):
         """Write a message string to the log.  
