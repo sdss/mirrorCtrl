@@ -29,6 +29,7 @@ class FakeGalilDeviceWrapper(DeviceWrapper):
         wakeUpHomed = True,
         stateCallback = None,
         port = 0,
+        debug = False,
     ):
         """Construct a FakeGalilDeviceWrapper that manages its fake Galil
 
@@ -39,6 +40,7 @@ class FakeGalilDeviceWrapper(DeviceWrapper):
         @param[in] stateCallback: function to call when connection state of hardware controller or device changes;
             receives one argument: this device wrapper
         @param[in] port: the port for the fake Galil
+        @param[in] debug: print debug messages to stdout?
         """
         self._mirror = mirror
         controller = galilClass(
@@ -47,7 +49,7 @@ class FakeGalilDeviceWrapper(DeviceWrapper):
             verbose=verbose,
             wakeUpHomed=wakeUpHomed,
         )
-        DeviceWrapper.__init__(self, stateCallback=stateCallback, controller=controller)
+        DeviceWrapper.__init__(self, name=mirror.name, stateCallback=stateCallback, controller=controller, debug=debug)
     
     def _makeDevice(self):
         port = self.port
