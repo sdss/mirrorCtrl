@@ -24,7 +24,7 @@ from .const import convOrient2UMArcsec, MMPerMicron, RadPerArcSec
 import numpy
 from RO.StringUtil import quoteStr, strFromException
 from RO.SeqUtil import asSequence
-from twistedActor import TCPDevice, CommandError, UserCmd
+from twistedActor import TCPDevice, CommandError, UserCmd, writeToLog
 from twisted.internet import reactor
 
 __all__ = ["GalilDevice", "GalilDevice25Sec"]
@@ -277,10 +277,10 @@ class GalilDevice(TCPDevice):
         ## a galil status object
         self.status = GalilStatus(self)
 
-    def logMsg(self, msg):
-        """Temporary log routine, incase of logging prior to actor
-        """
-        print 'temp log', msg
+    # def logMsg(self, msg):
+    #     """Temporary log routine, incase of logging prior to actor
+    #     """
+    #     print 'temp log', msg
 
     @property
     def userCmdOrNone(self):
@@ -309,7 +309,7 @@ class GalilDevice(TCPDevice):
         """
         #print "temporary hacked version of init"
         #userCmd.setState(userCmd.Done)
-        # self.logMsg('init called')
+        # writeToLog('init called')
         self.cmdStop(userCmd=userCmd)
 
     def parseReply(self, replyStr):
@@ -483,7 +483,7 @@ class GalilDevice(TCPDevice):
         - Parse status to update the model parameters
         - If a command has finished, call the appropriate command callback
         """
-        self.logMsg('Galil Reply(%s)' % (replyStr,))
+        writeToLog('Galil Reply(%s)' % (replyStr,))
         replyStr = replyStr.replace(":", "").strip(' ;\r\n\x01\x03\x18\x00')
         #print "handleReply(replyStr=%r)" % (replyStr,)
         if self.currDevCmd.isDone:
@@ -765,7 +765,7 @@ class GalilDevice(TCPDevice):
         self.currDevCmd = devCmd
         self.parsedKeyList = []
         try:
-            self.logMsg("DevCmd(%s)" % (devCmd.cmdStr,))
+            writeToLog("DevCmd(%s)" % (devCmd.cmdStr,))
             self.conn.writeLine(devCmd.cmdStr)
             devCmd.setState(devCmd.Running)
         except Exception, e:
@@ -959,7 +959,7 @@ class GalilDevice(TCPDevice):
 
     #     @param[in] galilCmd: string to be written to socket.
     #     """
-    #     self.logMsg("Sent To Galil(%s)"%galilCmd)
+    #     writeToLog("Sent To Galil(%s)"%galilCmd)
     #     self.conn.writeLine(galilCmd)
 
 

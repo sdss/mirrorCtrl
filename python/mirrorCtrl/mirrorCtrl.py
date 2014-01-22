@@ -8,6 +8,7 @@ import sys
 
 import numpy
 from twistedActor import Actor, CommandError, writeToLog, startLogging, CommandQueue, UserCmd#,startGlobalLogging UserCmd, BaseCmd,
+import twistedActor.log as log
 from RO.Comm.TwistedTimer import Timer
 
 from const import convOrient2MMRad
@@ -41,9 +42,8 @@ class MirrorCtrl(Actor):
         except KeyError:
             pass # logging will not start
         else:
-            startLogging(LogDir)
+            startLogging(LogDir, "mirrorCtrl.log")
         # give the device logging capabilities
-        device.logMsg = self.logMsg
         # add a slot for a status timer, to be triggered after stop and reset commands
         self.statusTimer = Timer()
         Actor.__init__(self,
@@ -101,7 +101,7 @@ class MirrorCtrl(Actor):
 
         @param[in] msgStr: message to be written to log
         """
-        writeToLog(msgStr) # system adds brackets
+        writeToLog(msgStr)
 
 
     def processOrientation(self, orientation):
