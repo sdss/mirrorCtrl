@@ -181,7 +181,7 @@ class MirrorCtrl(Actor):
         if not self.dev.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.cmdQueue.addCmd(cmd, lambda: self.dev.galil.cmdStatus(userCmd=cmd))
+            self.cmdQueue.addCmd(cmd, lambda: self.dev.galil.cmdStatus(cmd))
         except Exception, e:
             raise CommandError(str(e))
         else:
@@ -199,7 +199,7 @@ class MirrorCtrl(Actor):
         if not self.dev.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.cmdQueue.addCmd(cmd, lambda: self.dev.galil.cmdParams(userCmd=cmd))
+            self.cmdQueue.addCmd(cmd, lambda: self.dev.galil.cmdParams(cmd))
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -212,12 +212,14 @@ class MirrorCtrl(Actor):
         if not self.dev.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.cmdQueue.addCmd(cmd, lambda: self.dev.galil.cmdStop(userCmd=cmd))
+            self.cmdQueue.addCmd(cmd, lambda: self.dev.galil.cmdStop(cmd))
         except Exception, e:
             raise CommandError(str(e))   
         # command a status for 1 second later (roughly 2x stopping time from max speed)
-        dummyCmd = UserCmd()
-        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, lambda: self.cmd_staus(dummyCmd))   
+        dummyCmd = UserCmd(cmdStr="%i status"%cmd.userID)
+        dummyCmd.cmdVerb = "status"
+        dummyCmd.userID = cmd.userID
+        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, lambda: self.dev.galil.cmdStatus(dummyCmd))   
         return True
     
     def cmd_reset(self, cmd):
@@ -228,11 +230,13 @@ class MirrorCtrl(Actor):
         if not self.dev.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.cmdQueue.addCmd(cmd, lambda: self.dev.galil.cmdReset(userCmd=cmd))
+            self.cmdQueue.addCmd(cmd, lambda: self.dev.galil.cmdReset(cmd))
         except Exception, e:
             raise CommandError(str(e))        
-        dummyCmd = UserCmd()
-        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, lambda: self.cmd_staus(dummyCmd))   
+        dummyCmd = UserCmd(cmdStr="%i status"%cmd.userID)
+        dummyCmd.cmdVerb = "status"
+        dummyCmd.userID = cmd.userID
+        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, lambda: self.self.dev.galil.cmdStatus(dummyCmd))   
         return True
           
   
