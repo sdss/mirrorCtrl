@@ -17,7 +17,6 @@ All mirrors w/ encoders, disable subsequent moves, we handle them here now
 """
 import time
 import itertools
-import math
 import re
 from .const import convOrient2UMArcsec, MMPerMicron, RadPerArcSec
 
@@ -575,12 +574,12 @@ class GalilDevice(TCPDevice):
             userCmd.addCallback(cancelDev)
         self.userCmd = userCmd
 
-    def cmdHome(self, axisList, userCmd):
+    def cmdHome(self, userCmd, axisList):
         """Home the specified actuators
 
-        @param[in] axisList: a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
         @param[in] userCmd: a twistedActor UserCmd associated with the home command
-        """
+        @param[in] axisList: a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
+         """
         self.setCurrUserCmd(userCmd)
         if not axisList:
             axisList = self.validAxisList
@@ -610,11 +609,11 @@ class GalilDevice(TCPDevice):
         self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
         self.startDevCmd(cmdStr, errFunc=self.failStop)
 
-    def cmdMove(self, orient, userCmd):
+    def cmdMove(self, userCmd, orient):
         """Accepts an orientation then commands the move.
 
-        @param[in] orient: an orientation.
         @param[in] userCmd: a twistedActor UserCmd object associated with this move command 
+        @param[in] orient: an orientation.
 
         Subsequent moves are commanded until an acceptable orientation is reached (within errors).
         Cmd not tied to state of devCmd, because of subsequent moves.
