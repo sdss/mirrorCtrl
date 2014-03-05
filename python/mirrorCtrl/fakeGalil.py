@@ -8,7 +8,7 @@ Notes:
   Warning: ST and RS may stop output in mid-stream.
 - Unlike a real Galil, this one receives entire lines at a time
   (though perhaps tweaking some network setting could fix that)
-    
+
 To do:
 - Add proper support for different mirrors:
   - Set nAxes appropriate (3-6)
@@ -28,7 +28,7 @@ __all__ = ["FakeGalil", "FakePiezoGalil"]
 MAXINT = 2147483647
 MaxCmdTime = 2.0 # maximum time any command can take; sec
 
-class FakeGalil(TCPServer):    
+class FakeGalil(TCPServer):
     def __init__(self, mirror, port=0, verbose=False, wakeUpHomed=True, stateCallback=None):
         """Fake Galil TCP server
 
@@ -53,7 +53,6 @@ class FakeGalil(TCPServer):
             sockReadCallback=self.lineReceived,
             name="fake %s" % (mirror.name,),
         )
-
         self.isHomed = self.arr(wakeUpHomed, dtype=bool)
         self.cmdPos = self.arr(0)
         self.measPos = self.arr(0)
@@ -71,7 +70,12 @@ class FakeGalil(TCPServer):
         self.encRes =  self.arrAB(-3.1496, 1.5750, dtype=float)
         self.status =  self.arr(8196*6)
         self.noiseRange = 700 # steps, +/- range for adding steps to a measurement
-    
+
+    def close(self):
+        # overridden to shut down timer upon close
+        self.replyTimer.cancel()
+        return TCPServer.close(self)
+
     def sockStateCallback(self, sock):
         if sock.isReady:
 #             print "Set user=", sock
@@ -84,15 +88,15 @@ class FakeGalil(TCPServer):
         """Make an array of [val0,...] of length self.nAxes
         """
         return numpy.array([val]*self.nAxes, dtype=dtype)
-        
+
     def arrAB(self, val0, val1, dtype=int):
         """Make an array of length self.nAxes as a truncation of [val0, val0, val0, val1, val1, val1]
         """
         return numpy.array([val0]*3 + [val1]*3, dtype=dtype)[0:self.nAxes]
-    
+
     def lineReceived(self, sock):
         """Called each time data is received.
-        
+
         This does not actually start a command for two reasons:
         - a single line may contain multiple commands (separated by semicolons)
         - commands can queue up
@@ -105,7 +109,7 @@ class FakeGalil(TCPServer):
             self._startNextCmd()
 
     def _startNextCmd(self):
-        """Split line on linebreakes, and forward each peice to 
+        """Split line on linebreakes, and forward each peice to
         self.linedReceived on at a time.
         """
         if self._cmdBuffer:
@@ -142,9 +146,9 @@ class FakeGalil(TCPServer):
                 self.measPos = self.arr(0)
                 self.userNums = self.arr(MAXINT)
                 self.restart()
-            return       
+            return
         self.processCmd(cmdStr)
-        
+
     def processCmd(self, cmdStr):
         """Figure out what was commanded, and emulate galil behavior accordingly
 
@@ -158,7 +162,7 @@ class FakeGalil(TCPServer):
             ind = ord(axisChar) - ord("A")
             self.userNums[ind] = MAXINT
             return
-            
+
         cmdMatch = re.match(r"([A-F]) *= *((-)?\d+)$", cmdStr)
         if cmdMatch:
             axis = cmdMatch.groups()[0]
@@ -166,12 +170,12 @@ class FakeGalil(TCPServer):
             ind = ord(axis) - ord("A")
             self.userNums[ind] = val
             return
-            
+
         cmdMatch = re.match(r"XQ *#([A-Z]+)", cmdStr)
         if not cmdMatch:
             self.sendLine("?")
             return
-        
+
         if self.replyTimer.isActive:
             # Busy, so reject new command
             self.sendLine("?")
@@ -189,25 +193,25 @@ class FakeGalil(TCPServer):
             deltaPos = numpy.where(self.userNums == MAXINT, 0, self.userNums)
             newCmdPos = self.cmdPos + deltaPos
             self.move(newCmdPos)
-        
+
         elif cmdVerb == "STATUS":
             self.showStatus()
             self.done()
-        
+
         elif cmdVerb == "SHOWPAR":
             self.showParams()
             self.done()
-        
+
         elif cmdVerb == "HOME":
             self.homeStart()
-            
+
         elif cmdVerb == "STOP":
             self.done()
 
         else:
             self.sendLine("?")
             self.done()
-    
+
     def restart(self):
         """Restart the galil
         """
@@ -223,11 +227,11 @@ class FakeGalil(TCPServer):
         deltaPos = numpy.where(self.userNums == MAXINT, 0.0, -self.range)
         deltaTimeArr = numpy.abs(deltaPos / numpy.array(self.speed, dtype=float))
         moveTime = min(deltaTimeArr.max(), MaxCmdTime)
-        
+
         self.sendLine(self.formatArr("%6.1f", deltaTimeArr, "max sec to find reverse limit switch"))
-        
+
         self.replyTimer.start(moveTime, self.homeFoundHome)
-        
+
     def homeFoundHome(self):
         """Home, second step: found reverse limit, now move away
         """
@@ -244,7 +248,7 @@ class FakeGalil(TCPServer):
         """
         self.sendLine("Finding next full step")
         self.replyTimer.start(0.1, self.homeDone)
-        
+
     def homeDone(self):
         """Homing finished
         """
@@ -260,15 +264,15 @@ class FakeGalil(TCPServer):
         self.showStatus()
         self.showParams()
         self.done()
-    
+
     def resetUserNums(self):
         """Reset user nums"""
         self.userNums[:] = MAXINT
-    
+
     def formatArr(self, fmtStr, arr, suffix):
         """ Return a comma separated string of values and a suffix"""
         return ", ".join([fmtStr % val for val in arr]) + " " + suffix
-    
+
     def showStatus(self):
         """Show the status"""
         notHomedIndices = numpy.nonzero(numpy.logical_not(self.isHomed))
@@ -283,7 +287,7 @@ class FakeGalil(TCPServer):
             self.formatArr("%09d", self.status, "status word"),
         ]:
             self.sendLine(msgStr)
-    
+
     def showParams(self):
         """Show parameters"""
         for msgStr in [
@@ -303,7 +307,7 @@ class FakeGalil(TCPServer):
             self.formatArr("%09.4f", self.encRes, "ENCRESx encoder resolution (microsteps/tick)"),
         ]:
             self.sendLine(msgStr)
-    
+
     def moveStart(self, newCmdPos):
         """Start moving to the specified newCmdPos
 
@@ -322,7 +326,7 @@ class FakeGalil(TCPServer):
             self.sendLine('?HMERR: some axes to be moved have not been homed: %s' % unhomed)
             self.done()
             return
-            
+
         #deltaPos = numpy.abs(newCmdPos - self.cmdPos)
         deltaTimeArr = deltaPos / numpy.array(self.speed, dtype=float)
         moveTime = min(deltaTimeArr.max(), MaxCmdTime)
@@ -350,21 +354,21 @@ class FakeGalil(TCPServer):
         self.sendLine(self.formatArr("%4.1f", deltaTimeArr, "max sec for move"))
         self.sendLine(self.formatArr("%09d", self.cmdPos, "target position"))
         self.replyTimer.start(moveTime, self.moveDone)
-    
+
     def moveDone(self):
         """Called when a move is done"""
         self.sendLine(self.formatArr("%09d", self.measPos, "final position"))
         self.done()
-    
+
     def done(self):
         """Call when an XQ command is finished
-        
+
         Reset userNums (A-F) and print OK
         """
         self.replyTimer.cancel()
         self.resetUserNums()
         self.sendLine("OK")
-    
+
     def sendLine(self, line):
         """write a line to the socket
 
@@ -377,7 +381,7 @@ class FakeGalil(TCPServer):
         else:
             print "Warning: no socket to send this to:", line
 
-        
+
 class FakePiezoGalil(FakeGalil):
     def __init__(self, mirror, port, verbose=False, wakeUpHomed=True, stateCallback=None):
         """A fake Galil with mock piezo behavior like the 2.5m M2 mirror
@@ -391,7 +395,7 @@ class FakePiezoGalil(FakeGalil):
         FakeGalil.__init__(self, mirror=mirror, port=port, verbose=verbose, wakeUpHomed=wakeUpHomed, stateCallback=stateCallback)
         self.cmdPiezoPos = numpy.array([0]*3, dtype=int)
         self.userPiezoNums = numpy.array([MAXINT]*3, dtype=int)
-    
+
     def processCmd(self, cmdStr):
         """Overwritten from base class to handle piezo commands also
 
@@ -406,8 +410,8 @@ class FakePiezoGalil(FakeGalil):
             ind = ord(axis) - ord("A")
             self.userPiezoNums[ind] = val
             return
- 
- 
+
+
         cmdMatch = re.match(r"XQ *#(L[A-Z]+)", cmdStr)
         if cmdMatch and self.replyTimer.isActive:
             # Busy, so reject new command
@@ -420,7 +424,7 @@ class FakePiezoGalil(FakeGalil):
         else:
             # normal stuff
             FakeGalil.processCmd(self, cmdStr)
-    
+
     def resetUserNums(self):
         """Reset user numbers"""
         self.userNums[:] = MAXINT
