@@ -29,7 +29,7 @@ class MirrorCtrl(Actor):
         doConnect = True,
     ):
         """Create a Galil mirror controller actor
-        
+
         @param[in] device    A Galil device from galilDevice.py
         @param[in] userPort  port on which to listen for client connections
         @param[in] maxUsers  maximum allowed simultaneous users
@@ -89,7 +89,7 @@ class MirrorCtrl(Actor):
             action = CommandQueue.CancelNew,
             newCmds = ['status'],
             queuedCmds = ['status'],
-        )        
+        )
         self.cmdQueue.addRule(
             action = CommandQueue.CancelNew,
             newCmds = ['showparams'],
@@ -102,7 +102,7 @@ class MirrorCtrl(Actor):
         self.statusTimer.cancel()
 
     def logMsg(self, msgStr):
-        """Write a message string to the log.  
+        """Write a message string to the log.
 
         @param[in] msgStr: message to be written to log
         """
@@ -112,29 +112,29 @@ class MirrorCtrl(Actor):
     def processOrientation(self, orientation):
         """Convert a user specified orientation in um and arcseconds with possibly < 5
         fields specified into an orientation of 5 values in units of radians and mm.
-        
+
         @param[in] orientation: [Piston (um), [Tilt X ("), [Tilt Y ("), [Trans X (um), [Trans Y (um)]]]]]
         @return numpy.array([Piston (mm), Tilt X (rad), Tilt Y (rad), Trans X (rad), Trans Y (rad)])
         """
         orientation = numpy.hstack((orientation, numpy.zeros(5-len(orientation))))
         return convOrient2MMRad(orientation)
-        
-    
+
+
     def cmd_move(self, cmd):
-        """Move mirror to a commanded orientation, if device isn't busy. 
-        
+        """Move mirror to a commanded orientation, if device isn't busy.
+
         @param[in] cmd: new local user command (twistedActor.UserCmd)
 
         Pass 1-5 comma seperated arguements.  Order of arguemnts corresponds to:
         [Piston (um), Tilt X ("), Tilt Y ("), Trans X (um), Trans Y (um)]
-        
+
         Non-specified orientation values are commanded as zeros. When an orientation
         is specified for a non adjustable degree of freedom (eg, 3.5m tert translation),
         it is silently replaced with the constrained value (typically nearly zero).
         """
         if not cmd or not cmd.cmdArgs:
             raise CommandError("No orientation specified")
-        try:    
+        try:
             cmdArgList = numpy.asarray(cmd.cmdArgs.split(","), dtype=float)
         except Exception:
             raise CommandError("Could not parse %s as a comma-separated list of floats" % (cmd.cmdArgs,))
@@ -149,9 +149,9 @@ class MirrorCtrl(Actor):
         except Exception, e:
             traceback.print_exc(file=sys.stderr)
             raise CommandError(str(e))
-            
+
         return True
-            
+
     def cmd_home(self, cmd):
         """Home specified axes (e.g. A, B, C); home all axes if none specified
 
@@ -170,7 +170,7 @@ class MirrorCtrl(Actor):
         except Exception, e:
             raise CommandError(str(e))
         return True
-            
+
     def cmd_status(self, cmd):
         """Show status of Galil mirror controller
 
@@ -185,12 +185,12 @@ class MirrorCtrl(Actor):
         except Exception, e:
             raise CommandError(str(e))
         else:
-            # if status was queued or cancelled (not running), send 
+            # if status was queued or cancelled (not running), send
             # a cached status
             if not cmd.isActive:
                 self.dev.galil.cmdCachedStatus(cmd)
         return True
-        
+
     def cmd_showparams(self, cmd):
         """Show parameters of Galil mirror controller
 
@@ -203,25 +203,30 @@ class MirrorCtrl(Actor):
         except Exception, e:
             raise CommandError(str(e))
         return True
-        
+
     def cmd_stop(self, cmd):
         """Abort any executing Galil command, put Galil in known state
 
         @param[in] cmd: new local user command (twistedActor.UserCmd)
         """
+
         if not self.dev.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
             self.cmdQueue.addCmd(cmd, self.dev.galil.cmdStop)
         except Exception, e:
-            raise CommandError(str(e))   
+            raise CommandError(str(e))
         # command a status for 1 second later (roughly 2x stopping time from max speed)
         dummyCmd = UserCmd(cmdStr="%i status"%cmd.userID)
         dummyCmd.cmdVerb = "status"
         dummyCmd.userID = cmd.userID
-        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.dev.galil.cmdStatus)   
+        # def queCmdLater():
+        #     self.cmdQueue.addCmd(dummyCmd, self.dev.galil.cmdStatus)
+        # self.statusTimer.start(1., queCmdLater)
+       # self.cmdQueue.addCmd(dummyCmd, self.dev.galil.cmdStatus)
+        #self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.dev.galil.cmdStatus)
         return True
-    
+
     def cmd_reset(self, cmd):
         """Reset the Galil using an 'RS' command.
 
@@ -232,17 +237,21 @@ class MirrorCtrl(Actor):
         try:
             self.cmdQueue.addCmd(cmd, self.dev.galil.cmdReset)
         except Exception, e:
-            raise CommandError(str(e))        
+            raise CommandError(str(e))
         dummyCmd = UserCmd(cmdStr="%i status"%cmd.userID)
         dummyCmd.cmdVerb = "status"
         dummyCmd.userID = cmd.userID
-        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.dev.galil.cmdStatus)   
+       # self.cmdQueue.addCmd(dummyCmd, self.dev.galil.cmdStatus)
+        # def queCmdLater():
+        #     self.cmdQueue.addCmd(dummyCmd, self.dev.galil.cmdStatus)
+        # self.statusTimer.start(1., queCmdLater)
+        # self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.dev.galil.cmdStatus)
         return True
-          
-  
+
+
 def runMirrorCtrl(device, userPort):
     """Start up a Galil actor
-    
+
     @param[in] device: a twistedActor-based Galil Device (see mirrorCtrl/galilDevice.py)
     @param[in] userPort: port on which actor accepts user commands
     """
@@ -251,7 +260,7 @@ def runMirrorCtrl(device, userPort):
     Actor = MirrorCtrl(
         device = device,
         userPort = userPort,
-    )    
+    )
 
     print "%s mirror controller starting on port %s" % (device.mirror.name, userPort,)
-    reactor.run()    
+    reactor.run()

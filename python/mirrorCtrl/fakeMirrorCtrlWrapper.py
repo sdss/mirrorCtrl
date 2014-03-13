@@ -11,12 +11,12 @@ __all__ = ["FakeMirrorCtrlWrapper"]
 
 class FakeMirrorCtrlWrapper(ActorWrapper):
     """A wrapper for a MirrorCtrl talking to a fake Galil
-    
+
     This wrapper is responsible for starting and stopping a fake Galil and a MirrorCtrl:
     - It builds a FakeGalilDeviceWrapper on construction, using an auto-selected port
     - It builds a MirrorCtrl when the fake Galil is ready
     - It stops both on close()
-    
+
     Public attributes include:
     - deviceWrapper: the fake Galil
     - actor: the MirrorCtrl (None until ready)
@@ -62,3 +62,4 @@ class FakeMirrorCtrlWrapper(ActorWrapper):
             userPort=self._userPort,
         )
         self.actor.server.addStateCallback(self._stateChanged)
+

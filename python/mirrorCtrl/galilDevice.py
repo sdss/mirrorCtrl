@@ -29,7 +29,7 @@ from twisted.internet import reactor
 __all__ = ["GalilDevice", "GalilDevice25Sec"]
 
 ## a blank userCmd that is already set as done
-NullUserCmd = UserCmd(userID=0, cmdStr="") 
+NullUserCmd = UserCmd(userID=0, cmdStr="")
 NullUserCmd.setState(UserCmd.Done)
 
 ## Stop command for direct galil communication
@@ -73,7 +73,7 @@ def orientCast(orient):
     """ Cast an orientation array into a string.
         @param[in] orientation: numpy array of orientation values in mm and radians
         @return a string of orientation (in user friendly units, um and arcsec)
-    """    
+    """
     return ",".join([floatCast(x) for x in convOrient2UMArcsec(orient)])
 
 def strArrayCast(strArray):
@@ -94,7 +94,7 @@ def intOrNan(anInt):
         return "nan"
 
 def statusCast(status):
-    """Return a 
+    """Return a
     @param[in] status: an array of status bits
     @ return a string, status concatenated into string of comma separated values which are possibly nans
     """
@@ -153,9 +153,9 @@ class GalilStatus(object):
         ## subsequent commanded mount positions determined during iterations
         self.cmdMountIter = numpy.asarray([numpy.nan]*self.nAct)
         ## offset applied to a previously commanded mount, a new mountErr is determined each iteration
-        self.mountErr = numpy.asarray([0.]*self.nAct) 
+        self.mountErr = numpy.asarray([0.]*self.nAct)
         ## last computed total offset between the first commanded mount position and the last commanded mount position after iteration
-        self.mountOffset = numpy.asarray([0.]*self.nAct) 
+        self.mountOffset = numpy.asarray([0.]*self.nAct)
         ## measured orientation (based on encoder lengths)
         self.orient = numpy.asarray([numpy.nan]*6) # get rid of?
         ## orientation based on commanded actuator positions
@@ -164,7 +164,7 @@ class GalilStatus(object):
         self.desOrient = numpy.asarray([numpy.nan]*6)
         ## age of desired orientation
         self.desOrientAge = GalilTimer()
-        ## current move iteration 
+        ## current move iteration
         self.iter = numpy.nan
         ## max number allowed for move iterations
         self.maxIter = device.MaxIter if self.mirror.hasEncoders else 1
@@ -224,21 +224,21 @@ class GalilDevice(TCPDevice):
     or when the state is Running.
     """
     ## one second to wait after sending an st
-    STWaitTime = 1. 
+    STWaitTime = 1.
     ## wait two seconds after sending an rs
-    RSWaitTime = 2. 
+    RSWaitTime = 2.
     ## initial timeout to use for every device command
     ## the following are thresholds (large moves) beyond which automatic (previously computed)
     ## move offsets should not be used
-    DevCmdTimeout = 2. 
+    DevCmdTimeout = 2.
     ## A big piston , indicating a local saved offset should not be applied
     LargePiston = 500. * MMPerMicron
     ## A big translation, indicating a local saved offset should not be applied
     LargeTranslation = 100. * MMPerMicron
     ## A big tilt, indicating a local saved offset should not be applied
-    LargeTilt = 10. * RadPerArcSec 
+    LargeTilt = 10. * RadPerArcSec
     ## scale the determined move offset correction by this much, eg go only 90%
-    CorrectionStrength = 0.9 
+    CorrectionStrength = 0.9
     def __init__(self, mirror, host, port, maxIter = 5, callFunc = None):
         """Construct a GalilDevice
 
@@ -303,7 +303,7 @@ class GalilDevice(TCPDevice):
 
     def init(self, userCmd=None, timeLim=None):
         """Initialize Galil
-        
+
         Called on disconnection
         """
         #print "temporary hacked version of init"
@@ -550,7 +550,7 @@ class GalilDevice(TCPDevice):
 
     def setCurrUserCmd(self, userCmd, forceKill=False):
         """Set self.userCmd
-        
+
         @param[in] userCmd: new userCmd, or None if none
             (in which case a blank "done" command is used)
         @param[in] forceKill: bool. If this userCmd is associated with an ST or RS, kill anything running
@@ -612,7 +612,7 @@ class GalilDevice(TCPDevice):
     def cmdMove(self, userCmd, orient):
         """Accepts an orientation then commands the move.
 
-        @param[in] userCmd: a twistedActor UserCmd object associated with this move command 
+        @param[in] userCmd: a twistedActor UserCmd object associated with this move command
         @param[in] orient: an orientation.
 
         Subsequent moves are commanded until an acceptable orientation is reached (within errors).
@@ -647,7 +647,7 @@ class GalilDevice(TCPDevice):
         self.status.desOrientAge.startTimer()
         statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "cmdMount", "maxIter", "iter"])
         self.writeToUsers('i', statusStr, cmd=self.userCmdOrNone)
-        self.startDevCmd(cmdMoveStr, callFunc=self._moveIter, errFunc=self.failStop)#timeLim=0.03, 
+        self.startDevCmd(cmdMoveStr, callFunc=self._moveIter, errFunc=self.failStop)#timeLim=0.03,
 
 
     def cmdReset(self, userCmd):
@@ -705,7 +705,7 @@ class GalilDevice(TCPDevice):
         If the Galil is busy then returns cached data.
         """
         self.setCurrUserCmd(userCmd)
-        self.startDevCmd("XQ #STATUS", callFunc = self._statusCallback)
+        self.startDevCmd("XQ#STATUS", callFunc = self._statusCallback)
 
     def cmdParams(self, userCmd):
         """Show Galil parameters
@@ -716,18 +716,18 @@ class GalilDevice(TCPDevice):
         self.setCurrUserCmd(userCmd)
         self.startDevCmd("XQ #SHOWPAR")
 
-    def sendStop(self, callFunc=None):
-        """Send XQ#STOP, then execute callFunc
+    # def sendStop(self, callFunc=None):
+    #     """Send XQ#STOP, then execute callFunc
 
-        @param[in] callFunc: callable, will be a callback set on a device command
-        """
-        if callFunc == None:
-            callFunc = self.sendStatus
-        self.startDevCmd("XQ#STOP", callFunc=callFunc)
+    #     @param[in] callFunc: callable, will be a callback set on a device command
+    #     """
+    #     if callFunc == None:
+    #         callFunc = self.sendStatus
+    #     self.startDevCmd("XQ#STOP", callFunc=callFunc)
 
-    def sendStatus(self):
-        """Send device command XQ#STATUS"""
-        self.startDevCmd("XQ#STATUS")
+    # def sendStatus(self):
+    #     """Send device command XQ#STATUS"""
+    #     self.startDevCmd("XQ#STATUS")
 
     def failStop(self):
         """Send device command XQ#STOP, then XQ#STATUS, and afterwards fail the user command"""
@@ -756,7 +756,14 @@ class GalilDevice(TCPDevice):
                 self._cleanup()
             else:
                 # this should never happen, but...just in case
-                raise RuntimeError("Cannot start new device command: %s , %s is currently running" % (cmdStr, self.currDevCmd,))
+                # if cmdStr == "XQ#STATUS":
+                #     # this is a known bug that seems to only occur in trial based unit testing
+                #     # the cmd_stop and cmd_reset add a status to the command queue on a timer
+                #     # I don't know why they are breaking through the queue.
+                #     writeToLog("Known Bug?: Adding a status command on a timer to the command queue", log.WARNING)
+                #     self.cmdCachedStatus(self.userCmd)
+                #     return
+                raise RuntimeError("Cannot start new device command: %s , %s is currently running" % (cmdStr, self.currDevCmd))
 
         self._userCmdNextStep = callFunc
         self._userCmdCatchFail = errFunc
@@ -912,7 +919,7 @@ class GalilDevice(TCPDevice):
         """Clean up between device commands
         """
         if not self.currDevCmd.isDone:
-            raise RuntimeError('currend dev cmd must be finished before cleanup')
+            raise RuntimeError('current dev cmd must be finished before cleanup')
         self.parsedKeyList = []
         self.status.iter = numpy.nan
         self.status.homing = [0]*self.nAct
