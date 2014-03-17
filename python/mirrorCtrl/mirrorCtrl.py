@@ -224,7 +224,7 @@ class MirrorCtrl(Actor):
         #     self.cmdQueue.addCmd(dummyCmd, self.dev.galil.cmdStatus)
         # self.statusTimer.start(1., queCmdLater)
        # self.cmdQueue.addCmd(dummyCmd, self.dev.galil.cmdStatus)
-        #self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.dev.galil.cmdStatus)
+        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.dev.galil.cmdStatus)
         return True
 
     def cmd_reset(self, cmd):
