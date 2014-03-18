@@ -23,7 +23,7 @@ from .const import convOrient2UMArcsec, MMPerMicron, RadPerArcSec
 import numpy
 from RO.StringUtil import quoteStr, strFromException
 from RO.SeqUtil import asSequence
-from twistedActor import TCPDevice, CommandError, UserCmd, writeToLog
+from twistedActor import TCPDevice, CommandError, UserCmd, writeToLog, LinkCommands
 from twisted.internet import reactor
 
 __all__ = ["GalilDevice", "GalilDevice25Sec"]
@@ -548,6 +548,75 @@ class GalilDevice(TCPDevice):
                 self.actOnKey(key=key, dataList=[data], replyStr=replyStr)
                 self.parsedKeyList.append(key)
 
+
+    def runCommand(self, userCmd, galilCmdStr, forceKill=False):
+        """Begin executing a device command (or series of device commands) in reponse to a userCmd.
+
+        @param[in] userCmd: a user command, passed from the mirrorCtrl
+        @param[in] galilCmdStr: string, to be sent directly to the galil.
+        @param[in] forceKill: bool. Should this command kill any currently executing command
+
+        @raise RuntimeError if a userCommand is currently executing and a forceKill is is not requested.
+        """
+        if forceKill:
+            self.userCmd.setState(self.userCmd.Cancelled, textMsg="%s cancelled by RS or ST"%self.userCmd.cmdStr)
+        if not self.userCmd.isDone:
+            raise RuntimeError("User command collision! %s blocked by currently running %s!"%(userCmd.cmdStr, self.userCmd.cmdStr))
+        userCmd.addCallback(self._userCmdCallback)
+        devCmd = self.cmdClass(cmdStr, timeLim = self.DevCmdTimeout, callFunc=self._devCmdCallback)
+        self.currCmds = LinkCommands(mainCmd = userCmd, subCmdList = [devCmd])
+
+    def _userCmdCallback(self, userCmd):
+        """Callback to be added to every user command
+
+        @param[in] userCmd: a user command, passed from the mirrorCtrl
+        """
+        if userCmd.state in [userCmd.Failed, userCmd.Cancelled, userCmd.Failing, userCmd.Cancelling]:
+            self.clearAll()
+
+    def _devCmdCallback(self, dumDevCmd=None):
+        """Device command callback
+
+        @param[in] dumDevCmd: dummy argument, for callback
+
+        startDevCmd always assigns this as the callback, which then calls and clears any user-specified callback.
+        """
+        # print 'dev cmd state', self.currDevCmd.cmdStr, self.currDevCmd.state, self.currDevCmd._textMsg
+        # print "_devCmdCallback(); currDevCmd=%r; _userCmdNextStep=%s" % (self.currDevCmd, self._userCmdNextStep)
+        # print "_devCmdCallback(); self.userCmd=%r" % (self.userCmd,)
+
+        if self.currDevCmd.state == self.currDevCmd.Cancelled:
+            self.writeToUsers("w", "Text=\"Device Command %s Cancelled: %s\"" % (self.currDevCmd.cmdStr, self.currDevCmd._textMsg,), cmd = self.currDevCmd)
+            self._cancelUserCmd()
+            return
+        if self.currDevCmd.state == self.currDevCmd.Failed:
+            self.writeToUsers("w", "Text=\"Device Command %s Failed: %s\"" % (self.currDevCmd.cmdStr, self.currDevCmd._textMsg,), cmd = self.currDevCmd)
+            userCmdCatchFail, self._userCmdCatchFail = self._userCmdCatchFail, None
+            if userCmdCatchFail:
+                # don't do this if cmd was 'cancelled', only if 'failed'
+                self.conn.writeLine("ST")
+                reactor.callLater(self.STWaitTime, userCmdCatchFail) # I imagine will almost always be self.failStop()
+            else:
+                self._failUserCmd()
+            return
+
+        if not self.currDevCmd.isDone:
+            return
+        userCmdNextStep, self._userCmdNextStep = self._userCmdNextStep, None
+        if userCmdNextStep:
+            # start next step of user command
+            userCmdNextStep()
+        else:
+            # nothing more to do; user command must be finished!
+            self.userCmd.setState(self.userCmd.Done)
+            self._cleanup()
+
+    def clearAll(self):
+        """Kill any currently running commands if any, put in state to receive new commands
+        """
+        # loop through self.currCmds.subCmdList and kill em
+        pass
+
     def setCurrUserCmd(self, userCmd, forceKill=False):
         """Set self.userCmd
 
@@ -796,42 +865,7 @@ class GalilDevice(TCPDevice):
         self.userCmd.setState(self.userCmd.Cancelled,
             textMsg="Galil command %s cancelled" % (self.userCmd.cmdStr,))
 
-    def _devCmdCallback(self, dumDevCmd=None):
-        """Device command callback
 
-        @param[in] dumDevCmd: dummy argument, for callback
-
-        startDevCmd always assigns this as the callback, which then calls and clears any user-specified callback.
-        """
-        # print 'dev cmd state', self.currDevCmd.cmdStr, self.currDevCmd.state, self.currDevCmd._textMsg
-        # print "_devCmdCallback(); currDevCmd=%r; _userCmdNextStep=%s" % (self.currDevCmd, self._userCmdNextStep)
-        # print "_devCmdCallback(); self.userCmd=%r" % (self.userCmd,)
-
-        if self.currDevCmd.state == self.currDevCmd.Cancelled:
-            self.writeToUsers("w", "Text=\"Device Command %s Cancelled: %s\"" % (self.currDevCmd.cmdStr, self.currDevCmd._textMsg,), cmd = self.currDevCmd)
-            self._cancelUserCmd()
-            return
-        if self.currDevCmd.state == self.currDevCmd.Failed:
-            self.writeToUsers("w", "Text=\"Device Command %s Failed: %s\"" % (self.currDevCmd.cmdStr, self.currDevCmd._textMsg,), cmd = self.currDevCmd)
-            userCmdCatchFail, self._userCmdCatchFail = self._userCmdCatchFail, None
-            if userCmdCatchFail:
-                # don't do this if cmd was 'cancelled', only if 'failed'
-                self.conn.writeLine("ST")
-                reactor.callLater(self.STWaitTime, userCmdCatchFail) # I imagine will almost always be self.failStop()
-            else:
-                self._failUserCmd()
-            return
-
-        if not self.currDevCmd.isDone:
-            return
-        userCmdNextStep, self._userCmdNextStep = self._userCmdNextStep, None
-        if userCmdNextStep:
-            # start next step of user command
-            userCmdNextStep()
-        else:
-            # nothing more to do; user command must be finished!
-            self.userCmd.setState(self.userCmd.Done)
-            self._cleanup()
         #print "_devCmdCallback()END; self.userCmd=%r" % (self.userCmd,)
 
     def _moveIter(self):
