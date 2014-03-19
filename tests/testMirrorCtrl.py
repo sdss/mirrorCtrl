@@ -29,7 +29,7 @@ class CmdCallback(object):
         self.deferred = deferred
 
     def __call__(self, cmd):
-        print "generic command callback: %r, %s" % (cmd, cmd.lastCode)
+        # print "generic command callback: %r, %s" % (cmd, cmd.lastCode)
         if cmd.isDone:
             deferred, self.deferred = self.deferred, None
             deferred.callback("done")
