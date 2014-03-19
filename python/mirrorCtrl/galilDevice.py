@@ -17,6 +17,7 @@ All mirrors w/ encoders, disable subsequent moves, we handle them here now
 """
 import time
 import itertools
+import functools
 import re
 from .const import convOrient2UMArcsec, MMPerMicron, RadPerArcSec
 
@@ -24,13 +25,14 @@ import numpy
 from RO.StringUtil import quoteStr, strFromException
 from RO.SeqUtil import asSequence
 from twistedActor import TCPDevice, CommandError, UserCmd, writeToLog, LinkCommands
-from twisted.internet import reactor
 
 __all__ = ["GalilDevice", "GalilDevice25Sec"]
 
 ## a blank userCmd that is already set as done
-NullUserCmd = UserCmd(userID=0, cmdStr="")
-NullUserCmd.setState(UserCmd.Done)
+def getNullUserCmd(state):
+    nullUserCmd = UserCmd(userID=0, cmdStr="Null UserCmd")
+    nullUserCmd.setState(state)
+    return nullUserCmd
 
 ## Stop command for direct galil communication
 GalCancelCmd = 'ST'
@@ -264,7 +266,7 @@ class GalilDevice(TCPDevice):
         self.currDevCmd = self.cmdClass("")
         self.currDevCmd.setState(self.currDevCmd.Done)
         ## currently executing (or last completed) user command
-        self.userCmd = NullUserCmd
+        self.userCmd = getNullUserCmd(state=UserCmd.Done)
         ## holds information sent from the galil in response to the current device command
         self.parsedKeyList = []
         ## number of actuators
@@ -489,11 +491,8 @@ class GalilDevice(TCPDevice):
             # ignore unsolicited input
             return
         if self.currDevCmd.state == self.currDevCmd.Cancelling:
-            # wait for cancel echo before failing the cmd
-            if GalCancelCmd == replyStr:
-                # the echo of the cancel string sent to the galil has returned.
-                self.currDevCmd.setState(self.currDevCmd.Cancelled)
-            return
+            raise RuntimeError("Should not be set to Cancelling")
+
         #replyStr = unicode(replyStr, errors='ignore')
         #replyStr = replyStr.encode("ascii", errors = "ignore")
 
@@ -549,99 +548,103 @@ class GalilDevice(TCPDevice):
                 self.parsedKeyList.append(key)
 
 
-    def runCommand(self, userCmd, galilCmdStr, forceKill=False):
+    def runCommand(self, userCmd, galilCmdStr, nextDevCmdCall=None, forceKill=False):
         """Begin executing a device command (or series of device commands) in reponse to a userCmd.
 
         @param[in] userCmd: a user command, passed from the mirrorCtrl
-        @param[in] galilCmdStr: string, to be sent directly to the galil.
+        @param[in] nextDevCmdCall: None, or callable.  The callable must at some point call code that explicitly
+           sets self.currCmds.allowToFinish().
         @param[in] forceKill: bool. Should this command kill any currently executing command
 
         @raise RuntimeError if a userCommand is currently executing and a forceKill is is not requested.
         """
-        if forceKill:
-            self.userCmd.setState(self.userCmd.Cancelled, textMsg="%s cancelled by RS or ST"%self.userCmd.cmdStr)
+        # print 'in runCommand userCmd: %r, galilCmdStr: %s, forceKill: %s' % (userCmd, galilCmdStr, str(forceKill))
+        # print 'in runCommand curr dev cmd? %r' % self.currDevCmd
         if not self.userCmd.isDone:
-            raise RuntimeError("User command collision! %s blocked by currently running %s!"%(userCmd.cmdStr, self.userCmd.cmdStr))
-        userCmd.addCallback(self._userCmdCallback)
-        devCmd = self.cmdClass(cmdStr, timeLim = self.DevCmdTimeout, callFunc=self._devCmdCallback)
-        self.currCmds = LinkCommands(mainCmd = userCmd, subCmdList = [devCmd])
+            if forceKill:
+                print 'SAW FORCEKILL'
+                self.clearAll()
+                # self.userCmd.setState(self.userCmd.Cancelled, textMsg="%s cancelled by RS or ST"%self.userCmd.cmdStr)
+            else:
+                raise RuntimeError("User command collision! %s blocked by currently running %s!"%(userCmd.cmdStr, self.userCmd.cmdStr))
+        if userCmd is None:
+            userCmd = getNullUserCmd(UserCmd.Running)
+        if not userCmd.state == userCmd.Running:
+            userCmd.setState(UserCmd.Running)
+        # greedy = True means if any device command fails, then the user command is failed instantly (other device commands are not waited for)
+        self.currCmds = LinkCommands(mainCmd = userCmd, subCmdList = [], greedyToFail=True, allowedToFinish = False)
+        # self.clearAll()
+        self.userCmd = userCmd
+        self.userCmd.addCallback(self._userCmdCallback)
+        self.startDevCmd(galilCmdStr, nextDevCmdCall)
+
+
+    def startDevCmd(self, galilCmdStr, nextDevCmdCall=None):
+        """
+        @param[in] galilCmdStr: string, to be sent directly to the galil.
+        @param[in] nextDevCmdCall: The callable must at some point call code that explicitly
+           sets self.currCmds.allowToFinish().
+        """
+        if not self.currDevCmd.isDone:
+            raise RuntimeError("Device Command Collisions! userCmd: %r CurrDevCmd: %r, Colliding Command: %s"%(self.userCmd, self.currDevCmd, galilCmdStr))
+        devCmd = self.cmdClass(galilCmdStr, timeLim = self.DevCmdTimeout, callFunc=functools.partial(self._devCmdCallback, nextDevCmdCall=nextDevCmdCall))
+        self.currDevCmd = devCmd
+        self.currCmds.addSubCmd(devCmd)
+        if nextDevCmdCall is None:
+            self.currCmds.allowToFinish()
+        self.parsedKeyList = []
+        # not self.clearAll()?
+        try:
+            writeToLog("DevCmd(%s)" % (galilCmdStr,))
+            self.conn.writeLine(galilCmdStr)
+            devCmd.setState(devCmd.Running)
+        except Exception, e:
+            devCmd.setState(devCmd.Failed, textMsg=strFromException(e))
+
 
     def _userCmdCallback(self, userCmd):
         """Callback to be added to every user command
 
         @param[in] userCmd: a user command, passed from the mirrorCtrl
         """
-        if userCmd.state in [userCmd.Failed, userCmd.Cancelled, userCmd.Failing, userCmd.Cancelling]:
-            self.clearAll()
+        print 'usercmd callback: %r' % userCmd
+        if userCmd.state == userCmd.Cancelling:
+            print "SAW CANCELLING STATE"
+            self.clearAll(calledFrom="usercmdcallbackkkkkk")
+        # if userCmd.isDone or userCmd.state == userCmd.Cancelling:
+        #     self.clearAll()
 
-    def _devCmdCallback(self, dumDevCmd=None):
+    def _devCmdCallback(self, devCmd, nextDevCmdCall=None):
         """Device command callback
 
-        @param[in] dumDevCmd: dummy argument, for callback
+        @param[in] devCmd: the device command, passed via callback
+        @param[in] nextDevCmdCall: callable with no arguements or None.  Must at some point call startDevCmd
 
         startDevCmd always assigns this as the callback, which then calls and clears any user-specified callback.
         """
-        # print 'dev cmd state', self.currDevCmd.cmdStr, self.currDevCmd.state, self.currDevCmd._textMsg
-        # print "_devCmdCallback(); currDevCmd=%r; _userCmdNextStep=%s" % (self.currDevCmd, self._userCmdNextStep)
-        # print "_devCmdCallback(); self.userCmd=%r" % (self.userCmd,)
-
-        if self.currDevCmd.state == self.currDevCmd.Cancelled:
-            self.writeToUsers("w", "Text=\"Device Command %s Cancelled: %s\"" % (self.currDevCmd.cmdStr, self.currDevCmd._textMsg,), cmd = self.currDevCmd)
-            self._cancelUserCmd()
+        # print 'in dev command callback devCmd %r, userCommand %r'%(devCmd, self.userCmd)
+        if not devCmd.isDone:
             return
-        if self.currDevCmd.state == self.currDevCmd.Failed:
-            self.writeToUsers("w", "Text=\"Device Command %s Failed: %s\"" % (self.currDevCmd.cmdStr, self.currDevCmd._textMsg,), cmd = self.currDevCmd)
-            userCmdCatchFail, self._userCmdCatchFail = self._userCmdCatchFail, None
-            if userCmdCatchFail:
-                # don't do this if cmd was 'cancelled', only if 'failed'
-                self.conn.writeLine("ST")
-                reactor.callLater(self.STWaitTime, userCmdCatchFail) # I imagine will almost always be self.failStop()
-            else:
-                self._failUserCmd()
-            return
+        if devCmd.didFail:
+            return # user command should fail also, no point in continuing
+        if nextDevCmdCall is not None:
+            nextDevCmdCall()
+        # all done, nothing else to do
 
-        if not self.currDevCmd.isDone:
-            return
-        userCmdNextStep, self._userCmdNextStep = self._userCmdNextStep, None
-        if userCmdNextStep:
-            # start next step of user command
-            userCmdNextStep()
-        else:
-            # nothing more to do; user command must be finished!
-            self.userCmd.setState(self.userCmd.Done)
-            self._cleanup()
-
-    def clearAll(self):
+    def clearAll(self, calledFrom=None):
         """Kill any currently running commands if any, put in state to receive new commands
         """
         # loop through self.currCmds.subCmdList and kill em
-        pass
-
-    def setCurrUserCmd(self, userCmd, forceKill=False):
-        """Set self.userCmd
-
-        @param[in] userCmd: new userCmd, or None if none
-            (in which case a blank "done" command is used)
-        @param[in] forceKill: bool. If this userCmd is associated with an ST or RS, kill anything running
-        @raise RuntimeError if the existing userCmd and is not done and forceKill is not True
-        """
-        if not self.userCmd.isDone:
-            if forceKill:
-                # kill current userCmd
-                self.userCmd.setState(self.userCmd.Cancelled, textMsg="%s cancelled by RS or ST"%self.userCmd.cmdStr)
-            else:
-                raise RuntimeError('User command collision! %s blocked by currently running %s!'%(userCmd.cmdStr, self.userCmd.cmdStr))
-        # add a callback to cancel device cmd if the userCmd was cancelled...
-        def cancelDev(cbUserCmd):
-            if (cbUserCmd.state == cbUserCmd.Cancelling):
-                self.currDevCmd.setState(self.currDevCmd.Cancelling)
-                self.conn.writeLine(GalCancelCmd)
-
-        if userCmd is None:
-            userCmd = NullUserCmd
-        else:
-            userCmd.addCallback(cancelDev)
-        self.userCmd = userCmd
+        if not self.currDevCmd.isDone:
+            print calledFrom + "KILLING CURR DEV COMMAND %r"%self.currDevCmd
+            # send an ST and set command state to cancelled
+            self.currDevCmd.setState(self.currDevCmd.Cancelled, textMsg="Device Command Cancelled via clearAll() in galilDevice")
+            self.conn.writeLine("ST")
+        self.parsedKeyList = []
+        self.status.iter = numpy.nan
+        self.status.homing = [0]*self.nAct
+        self.status.maxDuration = numpy.nan
+        self.status.duration.reset()
 
     def cmdHome(self, userCmd, axisList):
         """Home the specified actuators
@@ -649,7 +652,6 @@ class GalilDevice(TCPDevice):
         @param[in] userCmd: a twistedActor UserCmd associated with the home command
         @param[in] axisList: a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
          """
-        self.setCurrUserCmd(userCmd)
         if not axisList:
             axisList = self.validAxisList
         else:
@@ -671,12 +673,15 @@ class GalilDevice(TCPDevice):
             valueList = [doHome if doHome else None for doHome in newHoming],
             cmd = "XQ #HOME",
         )
-        self.status.homing = newHoming
-
-        self.writeToUsers(">", "Text = \"Homing Actuators: %s\"" % (", ".join(str(v) for v in axisList)), cmd=self.userCmdOrNone)
-        updateStr = self.status._getKeyValStr(["homing"])
-        self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
-        self.startDevCmd(cmdStr, errFunc=self.failStop)
+        self.runCommand(userCmd, galilCmdStr=cmdStr)
+        if self.currDevCmd.state == self.currDevCmd.Running:
+            self.status.homing = newHoming
+            self.writeToUsers(">", "Text = \"Homing Actuators: %s\"" % (", ".join(str(v) for v in axisList)), cmd=userCmd)
+            updateStr = self.status._getKeyValStr(["homing"])
+            self.writeToUsers("i", updateStr, cmd=userCmd)
+        else:
+            # command failed for some reason, do nothing, should clean itself up
+            pass
 
     def cmdMove(self, userCmd, orient):
         """Accepts an orientation then commands the move.
@@ -687,15 +692,12 @@ class GalilDevice(TCPDevice):
         Subsequent moves are commanded until an acceptable orientation is reached (within errors).
         Cmd not tied to state of devCmd, because of subsequent moves.
         """
-        self.setCurrUserCmd(userCmd)
         # enable iteration for mirrors with encoders
-        if self.mirror.hasEncoders:
-            self.status.iter = 1
         # (user) commanded orient --> mount
         mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient=True)
         adjOrient = numpy.asarray(adjOrient, dtype=float)
         mount = numpy.asarray(mount, dtype=float)
-        self.status.cmdMount = mount[:] # this will not change upon iteration
+
         # determine if automatic offset should be applied (is this a small move?)
         # self.status.desOrient will not be finite (numpy.nans) upon startup
         addOffset = False
@@ -706,18 +708,25 @@ class GalilDevice(TCPDevice):
         if addOffset:
             # be sure that a previous desOrient is defined (not nans)
             mount = mount + numpy.asarray(self.status.mountOffset, dtype=float)
-            self.writeToUsers("i", "Text=\"Automatically applying previous offset to mirror move.\"")
+            self.writeToUsers("i", "Text=\"Automatically applying previous offset to mirror move.\"", cmd=userCmd)
             statusStr = self.status._getKeyValStr(["mountOffset"])
-            self.writeToUsers('i', statusStr, cmd=self.userCmdOrNone)
-        self.status.cmdMountIter = mount[:] # this will change upon iteration
-        self.status.desOrient = adjOrient[:] # initial guess for fitter
+            self.writeToUsers('i', statusStr, cmd=userCmd)
+
         # format Galil command
         cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
-        self.status.desOrientAge.startTimer()
-        statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "cmdMount", "maxIter", "iter"])
-        self.writeToUsers('i', statusStr, cmd=self.userCmdOrNone)
-        self.startDevCmd(cmdMoveStr, callFunc=self._moveIter, errFunc=self.failStop)#timeLim=0.03,
-
+        self.runCommand(userCmd, galilCmdStr=cmdMoveStr, nextDevCmdCall=self._moveIter)
+        if self.currDevCmd.state == self.currDevCmd.Running:
+            self.status.cmdMount = mount[:] # this will not change upon iteration
+            self.status.cmdMountIter = mount[:] # this will change upon iteration
+            self.status.desOrient = adjOrient[:] # initial guess for fitter
+            if self.mirror.hasEncoders:
+                self.status.iter = 1
+            self.status.desOrientAge.startTimer()
+            statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "cmdMount", "maxIter", "iter"])
+            self.writeToUsers('i', statusStr, cmd=userCmd)
+        else:
+            # dev command not running for some reason, must have failed
+            pass
 
     def cmdReset(self, userCmd):
         """Reset the Galil to its power-on state. All axes will have to be re-homed. Stop is gentler!
@@ -726,11 +735,9 @@ class GalilDevice(TCPDevice):
 
         Send 'RS' to the Galil, causing it to reset to power-up state,
         """
-        #self.startUserCmd(userCmd, doCancel=True, timeLim=10)
-        self.setCurrUserCmd(userCmd, forceKill = True)
-        self.startDevCmd("RS", forceKill = True)
-        # self.conn.writeLine('RS')
-        # reactor.callLater(self.RSWaitTime, self.sendStop) # wait 3 seconds then command stop, then status
+        self.runCommand(userCmd, galilCmdStr="RS", forceKill=True)
+        # this command doesn't reply with an OK.  Explicitly set the device command to be done
+        self.currDevCmd.setState(self.currDevCmd.Done)
 
     def cmdStop(self, userCmd):
         """Stop the Galil.
@@ -739,10 +746,7 @@ class GalilDevice(TCPDevice):
 
         Send 'ST;XQ#STATUS' to the Galil, causing it to stop all threads,
         """
-        self.setCurrUserCmd(userCmd, forceKill = True)
-        #self.conn.writeLine('ST')
-        #reactor.callLater(1, self.sendStop) # wait 1 second then command stop, then status
-        self.startDevCmd("ST;XQ#STATUS", forceKill = True) # , callFunc=self.sendStatus)
+        self.runCommand(userCmd, galilCmdStr="ST;XQ#STATUS", forceKill=True)
 
     def cmdCachedStatus(self, userCmd):
         """Return a cached status, don't ask the galil for a fresh one
@@ -773,100 +777,15 @@ class GalilDevice(TCPDevice):
 
         If the Galil is busy then returns cached data.
         """
-        self.setCurrUserCmd(userCmd)
-        self.startDevCmd("XQ#STATUS", callFunc = self._statusCallback)
+        self.runCommand(userCmd, galilCmdStr="XQ#STATUS", nextDevCmdCall=self._statusCallback)
 
     def cmdParams(self, userCmd):
         """Show Galil parameters
 
         @param[in] userCmd: a twistedActor UserCmd
         """
-        #self.startUserCmd(userCmd)
-        self.setCurrUserCmd(userCmd)
-        self.startDevCmd("XQ #SHOWPAR")
+        self.runCommand(userCmd, galilCmdStr="XQ#SHOWPAR")
 
-    # def sendStop(self, callFunc=None):
-    #     """Send XQ#STOP, then execute callFunc
-
-    #     @param[in] callFunc: callable, will be a callback set on a device command
-    #     """
-    #     if callFunc == None:
-    #         callFunc = self.sendStatus
-    #     self.startDevCmd("XQ#STOP", callFunc=callFunc)
-
-    # def sendStatus(self):
-    #     """Send device command XQ#STATUS"""
-    #     self.startDevCmd("XQ#STATUS")
-
-    def failStop(self):
-        """Send device command XQ#STOP, then XQ#STATUS, and afterwards fail the user command"""
-        def failStatus():
-            self.startDevCmd("XQ#STATUS", callFunc = self._failUserCmd)
-        self.startDevCmd("XQ#STOP", callFunc=failStatus)
-
-    def startDevCmd(self, cmdStr, callFunc=None, errFunc=None, forceKill=False):
-        """Start a new device command, replacing self.currDevCmd
-
-        @param[in] cmdStr: command to send to the Galil
-        @param[in] callFunc: function to call when the command finishes; receives no arguments
-            (note: _devCmdCallback is called by the device command and is responsible
-            for calling callFunc, which is stored in _userCmdNextStep)
-        @param[in] errFunc: function to call if device command fails (eg, gailil sends a "?") before
-            setting userCmd to failed. Intended primarily for a status query prior to user
-            command termination.
-        @param[in] forceKill: bool. If true, this is an ST or RS, it should kill anything running
-        """
-        # print "startDevCmd(cmdStr=%s, timeLimt=%s, callFunc=%s)" % (cmdStr, timeLim, callFunc)
-        # print "self.userCmd=%r" % (self.userCmd,)
-        # print "self.devCmd=%r" % (self.currDevCmd,)
-        if not self.currDevCmd.isDone:
-            if forceKill:
-                self.currDevCmd.setState(self.currDevCmd.Cancelled, textMsg="Dev Cmd: %s killed by ST or RS" % self.currDevCmd.cmdStr)
-                self._cleanup()
-            else:
-                # this should never happen, but...just in case
-                # if cmdStr == "XQ#STATUS":
-                #     # this is a known bug that seems to only occur in trial based unit testing
-                #     # the cmd_stop and cmd_reset add a status to the command queue on a timer
-                #     # I don't know why they are breaking through the queue.
-                #     writeToLog("Known Bug?: Adding a status command on a timer to the command queue", log.WARNING)
-                #     self.cmdCachedStatus(self.userCmd)
-                #     return
-                raise RuntimeError("Cannot start new device command: %s , %s is currently running" % (cmdStr, self.currDevCmd))
-
-        self._userCmdNextStep = callFunc
-        self._userCmdCatchFail = errFunc
-        devCmd = self.cmdClass(cmdStr, timeLim = self.DevCmdTimeout, callFunc=self._devCmdCallback)
-        self.currDevCmd = devCmd
-        self.parsedKeyList = []
-        try:
-            writeToLog("DevCmd(%s)" % (devCmd.cmdStr,))
-            self.conn.writeLine(devCmd.cmdStr)
-            devCmd.setState(devCmd.Running)
-        except Exception, e:
-            devCmd.setState(devCmd.Failed, textMsg=strFromException(e))
-            self._cleanup()
-
-    def _failUserCmd(self):
-        """Simply fail the current user command
-        """
-        self._cleanup()
-        self._userCmdNextStep = None
-        if not self.userCmd.isDone:
-            self.userCmd.setState(self.userCmd.Failed,
-                textMsg="Galil command %s failed" % (self.userCmd.cmdStr,))
-
-    def _cancelUserCmd(self):
-        """Simply cancel the current user command
-        """
-        self._cleanup()
-        self._userCmdNextStep = None
-        self._userCmdCatchFail = None
-        self.userCmd.setState(self.userCmd.Cancelled,
-            textMsg="Galil command %s cancelled" % (self.userCmd.cmdStr,))
-
-
-        #print "_devCmdCallback()END; self.userCmd=%r" % (self.userCmd,)
 
     def _moveIter(self):
         """A move device command ended; decide whether further move iterations are required and act accordingly.
@@ -904,25 +823,14 @@ class GalilDevice(TCPDevice):
             # convert from numpy to simple list for command formatting
             mount = [x for x in newCmdActPos]
             cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
-            self.startDevCmd(cmdMoveStr, callFunc=self._moveIter, errFunc=self.failStop)
+            self.startDevCmd(cmdMoveStr, nextDevCmdCall=self._moveIter)
             return
         # done
         # record offset which is total descrepancy between first commanded (naive) mount position
         # and lastly commanded (iterated/converged) mount position
         # offset should be added
         self.status.mountOffset = [cmdLast - cmdFirst for cmdFirst, cmdLast in itertools.izip(self.status.cmdMount[0:self.nAct], self.status.cmdMountIter[0:self.nAct])]
-        self._moveEnd()
-
-    def _moveEnd(self, *args):
-        """The final move device command ended successfully; clean up and set self.userCmd state done.
-
-        Optionally perform any post-move cleanup (such as moving piezos).
-        Finally: set self.userCmd state done (or failed, if cleanup failed).
-
-        note: *args for callbackability...
-        """
-        #if not self.userCmd.isDone:
-        self.userCmd.setState(self.userCmd.Done)
+        self.currCmds.allowToFinish()
 
     def _statusCallback(self):
         """Callback for status command.
@@ -947,18 +855,7 @@ class GalilDevice(TCPDevice):
             "homing",
         ])
         self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
-        self.userCmd.setState(self.userCmd.Done)
-
-    def _cleanup(self):
-        """Clean up between device commands
-        """
-        if not self.currDevCmd.isDone:
-            raise RuntimeError('current dev cmd must be finished before cleanup')
-        self.parsedKeyList = []
-        self.status.iter = numpy.nan
-        self.status.homing = [0]*self.nAct
-        self.status.maxDuration = numpy.nan
-        self.status.duration.reset()
+        self.currCmds.allowToFinish()
 
     def formatGalilCommand(self, valueList, cmd, axisPrefix="", valFmt="%0.f", nAxes=None):
         """Format a Galil command.
@@ -993,14 +890,6 @@ class GalilDevice(TCPDevice):
         argList = ["%s%s=%s" % (axisPrefix, self.validAxisList[ind], formatValue(val)) for ind, val in enumerate(fullValueList)]
 
         return "%s; %s" % ("; ".join(argList), cmd)
-
-    # def conn.writeLine(self, galilCmd):
-    #     """Write a line via TCP Connnection to the galil.
-
-    #     @param[in] galilCmd: string to be written to socket.
-    #     """
-    #     writeToLog("Sent To Galil(%s)"%galilCmd)
-    #     self.conn.writeLine(galilCmd)
 
 
 class GalilDevice25Sec(GalilDevice):

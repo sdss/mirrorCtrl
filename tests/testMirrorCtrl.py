@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """http://twistedmatrix.com/documents/current/core/howto/trial.html
 
-Tests communication and other behavior between the Actor and Device. Commands are dispatched using a 
-dispatcher. 
+Tests communication and other behavior between the Actor and Device. Commands are dispatched using a
+dispatcher.
 """
 
 from twisted.trial.unittest import TestCase
@@ -27,8 +27,9 @@ class CmdCallback(object):
     """
     def __init__(self, deferred):
         self.deferred = deferred
-    
+
     def __call__(self, cmd):
+        print "generic command callback: %r, %s" % (cmd, cmd.lastCode)
         if cmd.isDone:
             deferred, self.deferred = self.deferred, None
             deferred.callback("done")
@@ -42,17 +43,17 @@ class GenericTests(TestCase):
             mirror=mir35mTert,
         )
         return self.dw.readyDeferred
-    
+
     def tearDown(self):
         #self.actor.statusTimer.cancel()
         return self.dw.close()
-    
+
     @property
     def dispatcher(self):
         """Return the actor dispatcher that talks to the mirror controller
         """
         return self.dw.dispatcher
-    
+
     @property
     def fakeGalil(self):
         """Return the fake Galil (instance of FakeGalil)
@@ -72,12 +73,12 @@ class GenericTests(TestCase):
                 actor = self.name,
                 cmdStr = 'galil ' + st,
                 #callFunc = CmdCallback(d),
-            )       
+            )
         cmdVar2 = CmdVar (
                 actor = self.name,
                 cmdStr = 'galil ' + galilCmd,
                 #callFunc = CmdCallback(d),
-            ) 
+            )
         self.dispatcher.executeCmd(cmdVar1)
         reactor.callLater(0.2, self.dispatcher.executeCmd, cmdVar2)
         reactor.callLater(3, d.callback, "go")
@@ -93,7 +94,7 @@ class GenericTests(TestCase):
         self.fakeGalil.isHomed = self.fakeGalil.isHomed*0.
         d = Deferred()
         orientation = [-2000.0, 150.0, 860.0]
-        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
+        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])
         cmdVar = CmdVar (
                 actor = self.name,
                 cmdStr = cmdStr,
@@ -103,7 +104,7 @@ class GenericTests(TestCase):
             """Check results after cmdVar is done
             """
             self.assertTrue(cmdVar.didFail)
-        d.addCallback(checkResults)        
+        d.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdVar)
         return d
 
@@ -113,7 +114,7 @@ class GenericTests(TestCase):
         self.actor.logMsg("testMoveTimeout")
         d = Deferred()
         orientation = [-2000.0, 150.0, 860.0]
-        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
+        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])
         cmdVar = CmdVar (
                 actor = self.name,
                 cmdStr = cmdStr,
@@ -123,9 +124,9 @@ class GenericTests(TestCase):
             """Check results after cmdVar is done
             """
             self.assertTrue(cmdVar.didFail)
-        d.addCallback(checkResults) 
+        d.addCallback(checkResults)
         # set timeout to a very small number
-        self.dw.actor.dev.galil.DevCmdTimeout = 0.01       
+        self.dw.actor.dev.galil.DevCmdTimeout = 0.01
         self.dispatcher.executeCmd(cmdVar)
         return d
 
@@ -139,7 +140,7 @@ class GenericTests(TestCase):
         # force all axes on the fakeGalil to unhomed
         self.fakeGalil.isHomed = self.fakeGalil.isHomed*0.
         d = Deferred()
-        cmdStr = 'home A,B,C'        
+        cmdStr = 'home A,B,C'
         cmdVar = CmdVar (
                 actor = self.name,
                 cmdStr = cmdStr,
@@ -150,11 +151,11 @@ class GenericTests(TestCase):
             """
             self.assertFalse(cmdVar.didFail)
             self.assertFalse( 0 in self.dispatcher.model.axisHomed.valueList[:], msg=str(self.dispatcher.model.axisHomed.valueList[:]))
-            
+
         d.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdVar)
         return d
-        
+
     def testStatus(self):
         """tests the status command.  Set is homed to false first to verify that most recent values
         are being reported.
@@ -166,7 +167,7 @@ class GenericTests(TestCase):
         # force all axes on the fakeGalil to unhomed
         self.fakeGalil.isHomed = self.fakeGalil.isHomed*0.
         d = Deferred()
-        cmdStr = 'status'        
+        cmdStr = 'status'
         cmdVar = CmdVar (
                 actor = self.name,
                 cmdStr = cmdStr,
@@ -177,11 +178,11 @@ class GenericTests(TestCase):
             """
             self.assertFalse(cmdVar.didFail)
             self.assertFalse( 1 in self.dispatcher.model.axisHomed.valueList[:], msg=str(self.dispatcher.model.axisHomed.valueList[:]))
-            
+
         d.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdVar)
         return d
-        
+
     def testReset(self):
         """Send a reset command.
         checks:
@@ -190,7 +191,7 @@ class GenericTests(TestCase):
         """
         self.actor.logMsg("testReset")
         d = Deferred()
-        cmdStr = 'reset'        
+        cmdStr = 'reset'
         cmdVar = CmdVar (
                 actor = self.name,
                 cmdStr = cmdStr,
@@ -201,11 +202,11 @@ class GenericTests(TestCase):
             """
             self.assertFalse(cmdVar.didFail)
             self.assertFalse( 1 in self.dispatcher.model.axisHomed.valueList[:], msg=str(self.dispatcher.model.axisHomed.valueList[:]))
-            
+
         d.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdVar)
         return d
-        
+
     def testStop(self):
         """Send a stop command.
         checks:
@@ -213,7 +214,7 @@ class GenericTests(TestCase):
         """
         self.test="testStop"
         d = Deferred()
-        cmdStr = 'stop'        
+        cmdStr = 'stop'
         cmdVar = CmdVar (
                 actor = self.name,
                 cmdStr = cmdStr,
@@ -223,24 +224,24 @@ class GenericTests(TestCase):
             """Check results after cmdVar is done
             """
             self.assertFalse(cmdVar.didFail)
-            
+
         d.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdVar)
         return d
-        
+
     def testStopInterrupt(self):
         """Test that a stop command will interrupt a move command. Commands a move then a stop
         immediately afterwards.
         Checks:
         1. the move fails
         2. the stop succeeds.
-        """          
+        """
         self.actor.logMsg("testStopInterrupt")
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
         orientation = [-2000.0, 150.0, 860.0]
-        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
+        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])
         cmdMove = CmdVar (
                 actor = self.name,
                 cmdStr = cmdStr,
@@ -255,11 +256,11 @@ class GenericTests(TestCase):
             """Check results after cmdVar is done
             """
             self.assertTrue(cmdMove.didFail)
-            self.assertFalse(cmdStop.didFail)            
-        dBoth.addCallback(checkResults)        
+            self.assertFalse(cmdStop.didFail)
+        dBoth.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdMove)
         self.dispatcher.executeCmd(cmdStop)
-        return dBoth        
+        return dBoth
 
     def testResetInterrupt(self):
         """Test that a reset command will interrupt a move command. Commands a move then a reset
@@ -268,13 +269,13 @@ class GenericTests(TestCase):
         1. the move fails
         2. the reset succeeds.
         3. check that isHomed == False (due to the reset)
-        """          
+        """
         self.actor.logMsg("testResetInterrupt")
         d1 = Deferred()
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
         orientation = [-2000.0, 150.0, 860.0]
-        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
+        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])
         cmdMove = CmdVar (
                 actor = self.name,
                 cmdStr = cmdStr,
@@ -289,15 +290,15 @@ class GenericTests(TestCase):
             """Check results after cmdVar is done
             """
             self.assertTrue(cmdMove.didFail)
-            self.assertFalse(cmdReset.didFail)     
+            self.assertFalse(cmdReset.didFail)
             self.assertFalse(1 in self.dispatcher.model.axisHomed.valueList[:], msg=str(self.dispatcher.model.axisHomed.valueList[:]))
-        dBoth.addCallback(checkResults)        
+        dBoth.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdMove)
         self.dispatcher.executeCmd(cmdReset)
         return dBoth
 
     def testCmdQueueHome(self):
-        """send a status then a home, 
+        """send a status then a home,
         home should finish after status.
         """
         self.actor.logMsg("testCmdQueueHome")
@@ -318,10 +319,10 @@ class GenericTests(TestCase):
             """Check results after cmdVar is done
             """
             self.assertFalse(cmdHome.didFail)
-            self.assertFalse(cmdStatus.didFail)     
-            
-        dBoth.addCallback(checkResults)    
-        self.dispatcher.executeCmd(cmdStatus)    
+            self.assertFalse(cmdStatus.didFail)
+
+        dBoth.addCallback(checkResults)
+        self.dispatcher.executeCmd(cmdStatus)
         self.dispatcher.executeCmd(cmdHome)
         return dBoth
 
@@ -354,10 +355,10 @@ class GenericTests(TestCase):
             """
             self.assertTrue(cmdMove1.didFail)
             self.assertFalse(cmdStatus.didFail)
-            self.assertFalse(cmdMove2.didFail)     
-            
-        dAll.addCallback(checkResults)    
-        self.dispatcher.executeCmd(cmdStatus)    
+            self.assertFalse(cmdMove2.didFail)
+
+        dAll.addCallback(checkResults)
+        self.dispatcher.executeCmd(cmdStatus)
         self.dispatcher.executeCmd(cmdMove1)
         self.dispatcher.executeCmd(cmdMove2)
         return dAll
@@ -391,10 +392,10 @@ class GenericTests(TestCase):
             """
             self.assertFalse(cmdMove.didFail)
             self.assertFalse(cmdStatus.didFail)
-            self.assertTrue(cmdHome.didFail)     
-            
-        dAll.addCallback(checkResults)    
-        self.dispatcher.executeCmd(cmdStatus)    
+            self.assertTrue(cmdHome.didFail)
+
+        dAll.addCallback(checkResults)
+        self.dispatcher.executeCmd(cmdStatus)
         self.dispatcher.executeCmd(cmdMove)
         self.dispatcher.executeCmd(cmdHome)
         return dAll
@@ -428,16 +429,16 @@ class GenericTests(TestCase):
             """
             self.assertFalse(cmdHome.didFail)
             self.assertFalse(cmdStatus.didFail)
-            self.assertTrue(cmdMove.didFail)     
-            
-        dAll.addCallback(checkResults)    
-        self.dispatcher.executeCmd(cmdStatus)    
+            self.assertTrue(cmdMove.didFail)
+
+        dAll.addCallback(checkResults)
+        self.dispatcher.executeCmd(cmdStatus)
         self.dispatcher.executeCmd(cmdHome)
         self.dispatcher.executeCmd(cmdMove)
         return dAll
- 
+
     def testCmdQueueSuperseded(self):
-        """send a status then a home then a stop, 
+        """send a status then a home then a stop,
         stop should succeed rest should fail
         """
         self.actor.logMsg("testCmdQueueSuperseded")
@@ -465,14 +466,14 @@ class GenericTests(TestCase):
             """
             self.assertTrue(cmdHome.didFail)
             self.assertTrue(cmdStatus.didFail)
-            self.assertFalse(cmdStop.didFail)     
-            
-        dAll.addCallback(checkResults)    
-        self.dispatcher.executeCmd(cmdStatus)    
+            self.assertFalse(cmdStop.didFail)
+
+        dAll.addCallback(checkResults)
+        self.dispatcher.executeCmd(cmdStatus)
         self.dispatcher.executeCmd(cmdHome)
         self.dispatcher.executeCmd(cmdStop)
         return dAll
-    
+
     def testCmdQueueMove(self):
         """send a staus then a move.
         move should finish after status
@@ -495,13 +496,13 @@ class GenericTests(TestCase):
             """Check results after cmdVar is done
             """
             self.assertFalse(cmdMove.didFail)
-            self.assertFalse(cmdStatus.didFail)     
-            
-        dBoth.addCallback(checkResults)    
-        self.dispatcher.executeCmd(cmdStatus)    
+            self.assertFalse(cmdStatus.didFail)
+
+        dBoth.addCallback(checkResults)
+        self.dispatcher.executeCmd(cmdStatus)
         self.dispatcher.executeCmd(cmdMove)
         return dBoth
-        
+
     def testStatusCollide(self):
         """Send a status request while a home command is executing.
         Check:
@@ -526,9 +527,9 @@ class GenericTests(TestCase):
             """Check results after cmdVar is done
             """
             self.assertFalse(cmdHome.didFail)
-            self.assertFalse(cmdStatus.didFail)     
-            
-        dBoth.addCallback(checkResults)        
+            self.assertFalse(cmdStatus.didFail)
+
+        dBoth.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdHome)
         self.dispatcher.executeCmd(cmdStatus)
         return dBoth
@@ -542,8 +543,8 @@ class GenericTests(TestCase):
         dBoth = gatherResults([d1,d2])
         orientation1 = [-2000.0, 150.0, 860.0]
         orientation2 = [num-50 for num in orientation1]
-        cmdStr1 = 'move ' + ', '.join([str(x) for x in orientation1])   
-        cmdStr2 = 'move ' + ', '.join([str(x) for x in orientation2])     
+        cmdStr1 = 'move ' + ', '.join([str(x) for x in orientation1])
+        cmdStr2 = 'move ' + ', '.join([str(x) for x in orientation2])
         cmdMove1 = CmdVar (
                 actor = self.name,
                 cmdStr = cmdStr1,
@@ -558,12 +559,12 @@ class GenericTests(TestCase):
             """Check results after cmdVar is done
             """
             self.assertTrue(cmdMove1.didFail)
-            self.assertFalse(cmdMove2.didFail)     
-        dBoth.addCallback(checkResults)        
+            self.assertFalse(cmdMove2.didFail)
+        dBoth.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdMove1)
         self.dispatcher.executeCmd(cmdMove2)
-        return dBoth        
-        
+        return dBoth
+
     def testMoveCollide(self):
         """Send a move command while a home command is executing
         Checks:
@@ -575,7 +576,7 @@ class GenericTests(TestCase):
         d2 = Deferred()
         dBoth = gatherResults([d1,d2])
         orientation = [-2000.0, 150.0, 860.0]
-        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
+        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])
         cmdMove = CmdVar (
                 actor = self.name,
                 cmdStr = cmdStr,
@@ -590,8 +591,8 @@ class GenericTests(TestCase):
             """Check results after cmdVar is done
             """
             self.assertTrue(cmdMove.didFail)
-            self.assertFalse(cmdHome.didFail)     
-        dBoth.addCallback(checkResults)        
+            self.assertFalse(cmdHome.didFail)
+        dBoth.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdHome)
         self.dispatcher.executeCmd(cmdMove)
         return dBoth
@@ -606,7 +607,7 @@ class GenericTests(TestCase):
         self.fakeGalil.encRes = self.fakeGalil.encRes*0.
         d = Deferred()
         orientation = [-2000.0, 150.0, 860.0, 0.0, -2000.0, 48.0]
-        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])        
+        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])
         cmdVar = CmdVar (
                 actor = self.name,
                 cmdStr = cmdStr,
@@ -616,7 +617,7 @@ class GenericTests(TestCase):
             """Check results after cmdVar is done
             """
             self.assertTrue(cmdVar.didFail)
-        d.addCallback(checkResults)        
+        d.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdVar)
         return d
 
@@ -629,7 +630,7 @@ class GenericTests(TestCase):
         # force all axes on the fakeGalil to unhomed
         self.fakeGalil.isHomed = self.fakeGalil.isHomed*0.
         d = Deferred()
-        cmdStr = 'home A,B,C,D'        
+        cmdStr = 'home A,B,C,D'
         cmdVar = CmdVar (
                 actor = self.name,
                 cmdStr = cmdStr,
@@ -639,10 +640,10 @@ class GenericTests(TestCase):
             """Check results after cmdVar is done
             """
             self.assertTrue(cmdVar.didFail)
-            
+
         d.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdVar)
-        return d    
+        return d
 
 class PiezoTests(TestCase):
     """Tests a piezo mirror setup
@@ -655,16 +656,16 @@ class PiezoTests(TestCase):
             galilClass=FakePiezoGalil,
         )
         return self.dw.readyDeferred
-    
+
     def tearDown(self):
         return self.dw.close()
-    
+
     @property
     def dispatcher(self):
         """Return the actor dispatcher that talks to the mirror controller
         """
         return self.dw.dispatcher
-    
+
     @property
     def actor(self):
         return self.dw.actorWrapper.actor
@@ -685,7 +686,7 @@ class PiezoTests(TestCase):
         # force all axes on the fakeGalil to unhomed
         self.fakeGalil.isHomed = self.fakeGalil.isHomed*0.
         d = Deferred()
-        cmdStr = 'home A,B,C,D,E'        
+        cmdStr = 'home A,B,C,D,E'
         cmdVar = CmdVar (
                 actor = self.name,
                 cmdStr = cmdStr,
@@ -696,10 +697,10 @@ class PiezoTests(TestCase):
             """
             self.assertFalse(cmdVar.didFail)
             self.assertFalse( 0 in self.dispatcher.model.axisHomed.valueList[:], msg=str(self.dispatcher.model.axisHomed.valueList[:]))
-            
+
         d.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdVar)
-        return d  
+        return d
 
 if __name__ == '__main__':
     from unittest import main

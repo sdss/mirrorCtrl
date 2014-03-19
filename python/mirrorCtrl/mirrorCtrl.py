@@ -18,6 +18,15 @@ Version = 0.1
 
 DefaultMaxUsers = 5
 
+# if LogDir is specified as an environment variable
+# begin logging to it.
+try:
+    LogDir = os.environ["TWISTED_LOG_DIR"]
+except KeyError:
+    pass # logging will not start
+else:
+    startLogging(LogDir, "mirrorCtrl.log", serverMode=False)
+
 class MirrorCtrl(Actor):
     """Mirror controller actor
     """
@@ -35,15 +44,6 @@ class MirrorCtrl(Actor):
         @param[in] maxUsers  maximum allowed simultaneous users
         @param[in] doConnect: if True then connect devices on construction
         """
-        # if LogDir is specified as an environment variable
-        # begin logging to it.
-        try:
-            LogDir = os.environ["TWISTED_LOG_DIR"]
-        except KeyError:
-            pass # logging will not start
-        else:
-            startLogging(LogDir, "mirrorCtrl.log")
-        # give the device logging capabilities
         # add a slot for a status timer, to be triggered after stop and reset commands
         self.statusTimer = Timer()
         Actor.__init__(self,
