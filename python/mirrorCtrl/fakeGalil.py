@@ -43,7 +43,7 @@ class FakeGalil(TCPServer):
         self.mirror = mirror
         self._cmdBuffer = collections.deque()
         self.replyTimer = Timer()
-        # self.nextCmdTimer = Timer()
+        self.nextCmdTimer = Timer()
         self.nAxes = len(self.mirror.actuatorList)
         self.userSocket = None
 
@@ -75,11 +75,7 @@ class FakeGalil(TCPServer):
     def close(self):
         # overridden to shut down timer upon close
         self.replyTimer.cancel()
-        from twisted.internet import reactor
-        for call in reactor.getDelayedCalls():
-            print 'gotta delayed call!', call
-            call.cancel()
-        # self.nextCmdTimer.cancel()
+        self.nextCmdTimer.cancel()
         return TCPServer.close(self)
 
     def sockStateCallback(self, sock):
@@ -123,8 +119,8 @@ class FakeGalil(TCPServer):
             self.newCmd(cmdStr)
 
             if self._cmdBuffer:
-                Timer(0.000001, self._startNextCmd)
-                # self.nextCmdTimer.start(0.000001, self._startNextCmd)
+                # Timer(0., self._startNextCmd)
+                self.nextCmdTimer.start(0., self._startNextCmd)
 
     def echo(self, line):
         """Send line + "\n:" back, emulating an echo from a galil

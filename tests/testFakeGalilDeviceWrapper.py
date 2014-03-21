@@ -12,11 +12,11 @@ class TestFakeGalilDeviceWrapper(TestCase):
             mirror=mir35mTert,
         )
         return self.dw.readyDeferred
-    
+
     def tearDown(self):
         d = self.dw.close()
         return d
-    
+
     def testSetUpTearDown(self):
         self.assertFalse(self.dw.didFail)
         self.assertFalse(self.dw.isDone)
