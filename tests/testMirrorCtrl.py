@@ -59,8 +59,8 @@ class GenericTests(TestCase):
         # self.fakeGalil.replyTimer.cancel()
         # self.fakeGalil.nextCmdTimer.cancel()
         from twisted.internet import reactor
-        for call in delayedCalls in reactor.getDelayedCalls():
-            # print 'gotta delayed call!', call
+        for call in reactor.getDelayedCalls():
+            print 'gotta delayed call!', call
             call.cancel()
         return self.dw.close()
 
