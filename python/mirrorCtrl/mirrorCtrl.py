@@ -55,6 +55,7 @@ class MirrorCtrl(Actor):
             doConnect = doConnect,
         )
         def killFunc(killThisCmd):
+            # print "killing this command!!! %r"% killThisCmd
             killThisCmd.setState(killThisCmd.Cancelled)
             # the galil device is listening for the cancelled state.
             # A galilDevice adds a callback to the user command to ensure cleanup

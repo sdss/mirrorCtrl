@@ -8,8 +8,10 @@ dispatcher.
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import Deferred, gatherResults
 from twisted.internet import reactor
+
 import RO.Comm.Generic
 RO.Comm.Generic.setFramework("twisted")
+from RO.Comm.TwistedTimer import Timer
 from opscore.actor import CmdVar
 
 from mirrorCtrl.mirrors import mir25mSec, mir35mTert
@@ -45,7 +47,21 @@ class GenericTests(TestCase):
         return self.dw.readyDeferred
 
     def tearDown(self):
-        #self.actor.statusTimer.cancel()
+        # self.actor.statusTimer.cancel()
+        # self.actor.cmdQueue.timer.cancel()
+        # self.actor.dev.galil.timer.cancel()
+        # self.actor.dev.galil.userCmd._removeAllCallbacks()
+        # self.actor.dev.galil.currDevCmd._removeAllCallbacks()
+        # self.dispatcher._checkCmdTimer.cancel()
+        # self.dispatcher._checkRemCmdTimer.cancel()
+        # self.dispatcher._refreshAllTimer.cancel()
+        # self.dispatcher._refreshNextTimer.cancel()
+        # self.fakeGalil.replyTimer.cancel()
+        # self.fakeGalil.nextCmdTimer.cancel()
+        from twisted.internet import reactor
+        for call in delayedCalls in reactor.getDelayedCalls():
+            # print 'gotta delayed call!', call
+            call.cancel()
         return self.dw.close()
 
     @property
@@ -259,7 +275,7 @@ class GenericTests(TestCase):
             self.assertFalse(cmdStop.didFail)
         dBoth.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdMove)
-        self.dispatcher.executeCmd(cmdStop)
+        Timer(0.02, self.dispatcher.executeCmd, cmdStop)
         return dBoth
 
     def testResetInterrupt(self):
@@ -294,7 +310,8 @@ class GenericTests(TestCase):
             self.assertFalse(1 in self.dispatcher.model.axisHomed.valueList[:], msg=str(self.dispatcher.model.axisHomed.valueList[:]))
         dBoth.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdMove)
-        self.dispatcher.executeCmd(cmdReset)
+        Timer(0.02, self.dispatcher.executeCmd, cmdReset)
+        # self.dispatcher.executeCmd(cmdReset)
         return dBoth
 
     def testCmdQueueHome(self):
@@ -323,7 +340,8 @@ class GenericTests(TestCase):
 
         dBoth.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdStatus)
-        self.dispatcher.executeCmd(cmdHome)
+        Timer(0.02, self.dispatcher.executeCmd, cmdHome)
+        # self.dispatcher.executeCmd(cmdHome)
         return dBoth
 
     def testDoubleQueueMoveMove(self):
@@ -359,8 +377,10 @@ class GenericTests(TestCase):
 
         dAll.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdStatus)
-        self.dispatcher.executeCmd(cmdMove1)
-        self.dispatcher.executeCmd(cmdMove2)
+        # self.dispatcher.executeCmd(cmdMove1)
+        Timer(0.02, self.dispatcher.executeCmd, cmdMove1)
+        Timer(0.04, self.dispatcher.executeCmd, cmdMove2)
+        # self.dispatcher.executeCmd(cmdMove2)
         return dAll
 
     def testDoubleQueueMoveHome(self):
@@ -396,8 +416,10 @@ class GenericTests(TestCase):
 
         dAll.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdStatus)
-        self.dispatcher.executeCmd(cmdMove)
-        self.dispatcher.executeCmd(cmdHome)
+        # self.dispatcher.executeCmd(cmdMove)
+        # self.dispatcher.executeCmd(cmdHome)
+        Timer(0.02, self.dispatcher.executeCmd, cmdMove)
+        Timer(0.04, self.dispatcher.executeCmd, cmdHome)
         return dAll
 
     def testDoubleQueueHomeMove(self):
@@ -433,8 +455,10 @@ class GenericTests(TestCase):
 
         dAll.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdStatus)
-        self.dispatcher.executeCmd(cmdHome)
-        self.dispatcher.executeCmd(cmdMove)
+        # self.dispatcher.executeCmd(cmdHome)
+        # self.dispatcher.executeCmd(cmdMove)
+        Timer(0.02, self.dispatcher.executeCmd, cmdHome)
+        Timer(0.04, self.dispatcher.executeCmd, cmdMove)
         return dAll
 
     def testCmdQueueSuperseded(self):
@@ -470,8 +494,10 @@ class GenericTests(TestCase):
 
         dAll.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdStatus)
-        self.dispatcher.executeCmd(cmdHome)
-        self.dispatcher.executeCmd(cmdStop)
+        Timer(0.02, self.dispatcher.executeCmd, cmdHome)
+        Timer(0.04, self.dispatcher.executeCmd, cmdStop)
+        # self.dispatcher.executeCmd(cmdHome)
+        # self.dispatcher.executeCmd(cmdStop)
         return dAll
 
     def testCmdQueueMove(self):
@@ -500,7 +526,8 @@ class GenericTests(TestCase):
 
         dBoth.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdStatus)
-        self.dispatcher.executeCmd(cmdMove)
+        # self.dispatcher.executeCmd(cmdMove)
+        Timer(0.04, self.dispatcher.executeCmd, cmdMove)
         return dBoth
 
     def testStatusCollide(self):
@@ -531,7 +558,8 @@ class GenericTests(TestCase):
 
         dBoth.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdHome)
-        self.dispatcher.executeCmd(cmdStatus)
+        Timer(0.02, self.dispatcher.executeCmd, cmdStatus)
+        # self.dispatcher.executeCmd(cmdStatus)
         return dBoth
 
     def testMoveSupersede(self):
@@ -562,7 +590,8 @@ class GenericTests(TestCase):
             self.assertFalse(cmdMove2.didFail)
         dBoth.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdMove1)
-        self.dispatcher.executeCmd(cmdMove2)
+        Timer(0.02, self.dispatcher.executeCmd, cmdMove2)
+        # self.dispatcher.executeCmd(cmdMove2)
         return dBoth
 
     def testMoveCollide(self):
@@ -594,7 +623,8 @@ class GenericTests(TestCase):
             self.assertFalse(cmdHome.didFail)
         dBoth.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdHome)
-        self.dispatcher.executeCmd(cmdMove)
+        Timer(0.04, self.dispatcher.executeCmd, cmdMove)
+        # self.dispatcher.executeCmd(cmdMove)
         return dBoth
 
     def testBadMove(self):
@@ -658,6 +688,10 @@ class PiezoTests(TestCase):
         return self.dw.readyDeferred
 
     def tearDown(self):
+        from twisted.internet import reactor
+        delayedCalls = reactor.getDelayedCalls()
+        for call in delayedCalls:
+            call.cancel()
         return self.dw.close()
 
     @property

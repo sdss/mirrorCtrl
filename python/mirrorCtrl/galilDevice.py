@@ -198,6 +198,7 @@ class GalilStatus(object):
             "axisHomed": strArrayCast,
         }
 
+
     def _getKeyValStr(self, keywords):
         """Package and return current keyword value info in status cache
 
@@ -277,6 +278,7 @@ class GalilDevice(TCPDevice):
         self.axisIndexDict = dict((axisName, ind) for ind, axisName in enumerate(self.validAxisList))
         ## a galil status object
         self.status = GalilStatus(self)
+        self.timer = Timer()
 
     # def logMsg(self, msg):
     #     """Temporary log routine, incase of logging prior to actor
@@ -561,15 +563,16 @@ class GalilDevice(TCPDevice):
         # print 'in runCommand curr dev cmd? %r' % self.currDevCmd
         if not self.userCmd.isDone:
             if forceKill:
-                # print 'SAW FORCEKILL'
-                self.clearAll()
+                # self.userCmd.setState(self.userCmd.Failed, textMsg="%r command forceKilled by incomming %r command"%(self.userCmd, userCmd))
+                # print 'SAW FORCEKILL: curr %r, next: %r, devCmd: %r'%(self.userCmd, userCmd, self.currDevCmd)
+                self.clearAll() # need dev command to finish before rest of code here is executed
                 # self.userCmd.setState(self.userCmd.Cancelled, textMsg="%s cancelled by RS or ST"%self.userCmd.cmdStr)
             else:
                 raise RuntimeError("User command collision! %s blocked by currently running %s!"%(userCmd.cmdStr, self.userCmd.cmdStr))
         if userCmd is None:
             userCmd = getNullUserCmd(UserCmd.Running)
-        if not userCmd.state == userCmd.Running:
-            userCmd.setState(UserCmd.Running)
+        # if not userCmd.state == userCmd.Running:
+        #     userCmd.setState(UserCmd.Running)
         # self.clearAll()
         self.userCmd = userCmd
         self.userCmd.addCallback(self._userCmdCallback)
@@ -610,8 +613,13 @@ class GalilDevice(TCPDevice):
         @param[in] userCmd: a user command, passed from the mirrorCtrl
         """
         # print 'usercmd callback: %r' % userCmd
-        if userCmd.isDone: # note clear all will run up to two times (if user cmd is set done before the device cmd), but never more
-            self.clearAll()
+        if userCmd.isDone:
+            if not self.currDevCmd.isDone:
+                # print "user command done %r, device command not %r"%(userCmd, self.currDevCmd)
+                # user command was set done outside this device, clean up accordingly
+                # remove callbacks so cancelling the device command won't call this again
+                self.currDevCmd._removeAllCallbacks()
+            self.clearAll() # this will cancel the device command
 
     def _devCmdCallback(self, devCmd):
         """Device command callback
@@ -623,7 +631,7 @@ class GalilDevice(TCPDevice):
         # print 'in dev command callback devCmd %r, userCommand %r'%(devCmd, self.userCmd)
         if devCmd.didFail:
             # set the userCmd to the same failed state
-            self.userCmd.setState(devCmd.state)
+            self.timer.start(0., self.userCmd.setState, devCmd.state)
             return # user command should fail also, no point in continuing
         if not devCmd.isDone:
             return
@@ -633,16 +641,19 @@ class GalilDevice(TCPDevice):
             nextDevCmdCall()
         else:
             # dev command done and no other code to run...set user command to done
-            self.userCmd.setState(self.userCmd.Done)
+            self.timer.start(0., self.userCmd.setState, self.userCmd.Done)
 
     def clearAll(self):
         """If a device command is currently running, kill it. Put galilDevice in a state to receive new commands.
         """
         self.nextDevCmdCall = None #unnecessary?
         if not self.currDevCmd.isDone:
+            # print 'DEV CMD Cancelled via clear all'
             # send an ST and set command state to cancelled
-            self.conn.writeLine("ST")
-            Timer(0., self.currDevCmd.setState, self.currDevCmd.Cancelled, textMsg="Device Command Cancelled via clearAll() in galilDevice")
+            if self.conn.isConnected:
+                self.conn.writeLine("ST") # incase not connected
+            # self.timer.start(0., self.currDevCmd.setState, self.currDevCmd.Cancelled, textMsg="Device Command Cancelled via clearAll() in galilDevice")
+            self.currDevCmd.setState(self.currDevCmd.Cancelled, textMsg="Device Command Cancelled via clearAll() in galilDevice")
 
         self.parsedKeyList = []
         self.status.iter = numpy.nan
@@ -671,7 +682,9 @@ class GalilDevice(TCPDevice):
             else:
                 newHoming[ind] = 1
         if badAxisList:
-            raise CommandError("Invalid axes %s not in %s" % (badAxisList, self.validAxisList))
+            userCmd.setState(userCmd.Failed, textMsg="Invalid axes %s not in %s" % (badAxisList, self.validAxisList))
+            return
+            #raise CommandError("Invalid axes %s not in %s" % (badAxisList, self.validAxisList))
 
         cmdStr = self.formatGalilCommand(
             valueList = [doHome if doHome else None for doHome in newHoming],

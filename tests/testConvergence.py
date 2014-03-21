@@ -65,7 +65,7 @@ def getActRandMove(mirror, seed=10):
         act.basePos += offset
     for act in mirror.actuatorList[3:]:
         # let offset vary by magnitude of true offset in z direction
-        zOff = numpy.random.sample()*2.*lengthScale*0.5 - lengthScale*0.5 
+        zOff = numpy.random.sample()*2.*lengthScale*0.5 - lengthScale*0.5
         offset = numpy.asarray([0., 0., zOff])
         act.mirPos += offset
         act.basePos += offset
@@ -101,9 +101,13 @@ class ConvergenceTestBase(object):
             assert(self.dw.actorWrapper.deviceWrapperList[0].device.mirror is not None)
             self.dw.actorWrapper.deviceWrapperList[0].device.mirror = self.mirror
         self.dw.readyDeferred.addCallback(overwriteMirror)
-        return self.dw.readyDeferred        
+        return self.dw.readyDeferred
 
     def tearDown(self):
+        from twisted.internet import reactor
+        delayedCalls = reactor.getDelayedCalls()
+        for call in delayedCalls:
+            call.cancel()
         d = self.dw.close()
         return d
 
@@ -142,7 +146,7 @@ class ConvergenceTestBase(object):
 
     def setVars(self):
         """overwritten by subclasses
-        
+
         must set the following instance variables (shown by example):
         self.fakeGalilFactory: fake Galil factory, e.g. FakeGalilFactory or FakePiezoGalilFactory
         self.mirror: mirorCtrl Mirror, e.g. mirrorCtrl.mirrors.mir35mTert
@@ -160,7 +164,7 @@ class ConvergenceTestBase(object):
         modelMirState = MirState(self.mirror)
         nIter, finalOffset = self._testConv(modelMirState, trueMirState,  orient)
         d = Deferred()
-        cmdStr = 'move ' + ', '.join([str(x) for x in orient])        
+        cmdStr = 'move ' + ', '.join([str(x) for x in orient])
         cmdVar = CmdVar (
                 actor = self.name,
                 cmdStr = cmdStr,
@@ -174,7 +178,7 @@ class ConvergenceTestBase(object):
             # if new orient is a big difference from the previous, an automatic offset
             # should have been applied, thus taking less iterations to converge
             self.assertTrue(self.dispatcher.model.iter.valueList[0] <= nIter)
-        d.addCallback(checkResults)   
+        d.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdVar)
         return d
 
@@ -201,10 +205,10 @@ class ConvergenceTestActEqEnc(ConvergenceTestBase, TestCase):
         self.trueMirror = mir35mSec
         self.mirror = getActEqEncMir(self.trueMirror)
         # self.mirDev = mirrorCtrl.GalilDevice
-        self.name = "mirror"    
+        self.name = "mirror"
 
     def testOrients(self):
-        return self._testOrients(m2TestOrients)    
+        return self._testOrients(m2TestOrients)
 
     def testSmallMoves(self):
         bigOrient = numpy.asarray([LargePiston/MMPerMicron, LargeTilt/RadPerArcSec, LargeTilt/RadPerArcSec, LargeTranslation/MMPerMicron, LargeTranslation/MMPerMicron], dtype=float)
@@ -223,7 +227,7 @@ class ConvergenceTestActEqEnc(ConvergenceTestBase, TestCase):
         orient1 = numpy.asarray(m2TestOrients[0], dtype=float)
         orient2 = orient1 + 1.5*bigOrient
         orient3 = orient2 + 2.75*bigOrient
-        return self._testOrients([orient1, orient2, orient3])      # no added offset  
+        return self._testOrients([orient1, orient2, orient3])      # no added offset
 
 class ConvergenceTestM3(ConvergenceTestBase, TestCase):
     def setVars(self):
@@ -232,7 +236,7 @@ class ConvergenceTestM3(ConvergenceTestBase, TestCase):
         self.trueMirror = mir35mTert
         self.mirror = getActEqEncMir(self.trueMirror)
         # self.mirDev = mirrorCtrl.GalilDevice
-        self.name = "mirror" 
+        self.name = "mirror"
 
     def testOrients(self):
         return self._testOrients(m3TestOrients)
@@ -244,7 +248,7 @@ class ConvergenceTestSDSSM2(ConvergenceTestBase, TestCase):
         self.trueMirror = mir25mSec
         self.mirror = getActEqEncMir(self.trueMirror)
         # self.mirDev = mirrorCtrl.GalilDevice
-        self.name = "mirror" 
+        self.name = "mirror"
 
     def testOrients(self):
         orientList = [
@@ -260,7 +264,7 @@ class ConvergenceTestRandAct(ConvergenceTestBase, TestCase):
         self.trueMirror = mir35mSec
         self.mirror = getActRandMove(self.trueMirror, seed=45)
         # self.mirDev = mirrorCtrl.GalilDevice
-        self.name = "mirror" 
+        self.name = "mirror"
 
     def testOrients(self):
         return self._testOrients(m2TestOrients)
@@ -274,7 +278,7 @@ class ConvergenceTestPerfect(ConvergenceTestBase, TestCase):
         self.trueMirror = mir35mSec
         self.mirror = copy.deepcopy(mir35mSec)
         # self.mirDev = mirrorCtrl.GalilDevice
-        self.name = "mirror" 
+        self.name = "mirror"
 
     def testOrients(self):
         return self._testOrients(m2TestOrients)
