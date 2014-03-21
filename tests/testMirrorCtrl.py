@@ -48,6 +48,7 @@ class GenericTests(TestCase):
 
     def tearDown(self):
         self.actor.statusTimer.cancel()
+        self.actor.cmdQueue.queueTimer.cancel()
         # self.actor.cmdQueue.timer.cancel()
         # self.actor.dev.galil.timer.cancel()
         # self.actor.dev.galil.userCmd._removeAllCallbacks()
