@@ -570,9 +570,9 @@ class GalilDevice(TCPDevice):
                 raise RuntimeError("User command collision! %s blocked by currently running %s!"%(userCmd.cmdStr, self.userCmd.cmdStr))
         if userCmd is None:
             userCmd = getNullUserCmd(UserCmd.Running)
-        # elif userCmd.state == userCmd.Ready:
-        #     userCmd.setState(userCmd.Running)
-        #     pass
+        elif userCmd.state == userCmd.Ready:
+            userCmd.setState(userCmd.Running)
+            pass
         self.userCmd = userCmd
         self.userCmd.addCallback(self._userCmdCallback)
         self.startDevCmd(galilCmdStr, nextDevCmdCall)
