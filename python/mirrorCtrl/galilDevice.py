@@ -37,7 +37,9 @@ def getNullUserCmd(state):
     return nullUserCmd
 
 ## Stop command for direct galil communication
-GalCancelCmd = 'ST'
+GalCancelCmd = re.compile('^ST$', re.IGNORECASE)
+## Reset command for direct galil communication
+GalResetCmd = re.compile('^RS$', re.IGNORECASE)
 ## RegEx stuff up here to keep these from being needlessly re-compiled...
 StartsWithNumRegEx = re.compile(r'^-?[0-9]')
 ## find numbers not preceeded by a '/' or a letter and not followed by a letter
@@ -524,8 +526,8 @@ class GalilDevice(TCPDevice):
             else:
                 self.currDevCmd.setState(self.currDevCmd.Done)
             return
-        if CmdEchoRegEx.search(replyStr) or AxisEchoRegEx.search(replyStr):
-            # this is just the command echo, ignore it
+        if CmdEchoRegEx.search(replyStr) or AxisEchoRegEx.search(replyStr) or GalCancelCmd.search(replyStr) or GalResetCmd.search(replyStr):
+            # this is just the command echo (including possibly ST or RS) ignore it
             return
         if not StartsWithNumRegEx.match(replyStr):
             # line doesn't begin with a data value, eg 'Finding next full step'
