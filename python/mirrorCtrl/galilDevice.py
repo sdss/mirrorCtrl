@@ -823,6 +823,9 @@ class GalilDevice(TCPDevice):
     def _moveIter(self):
         """A move device command ended; decide whether further move iterations are required and act accordingly.
         """
+        if self.userCmd.isDone or self.userCmd.isFailing:
+            return
+
         # check if we got all expected information from Galil...
         if not ('max sec for move' in self.parsedKeyList):
             self.writeToUsers("w", "Text=\"Move time estimates were not received from move\"", cmd=self.userCmdOrNone)
