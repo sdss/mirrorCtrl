@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """2.5m secondary mirror controller
 """
 import mirrorCtrl

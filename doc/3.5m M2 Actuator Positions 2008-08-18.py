@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 import numpy
 import math
 """3.5m M3 mirror actuator worksheet

@@ -1,4 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+from __future__ import division, absolute_import
+
 from twisted.trial.unittest import TestCase
 
 from mirrorCtrl.mirrors import mir35mTert

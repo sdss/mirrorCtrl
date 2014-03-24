@@ -1,18 +1,18 @@
+from __future__ import division, absolute_import
 """ Actor for mirrors (via Galil devices).
 """
-__all__ = ["MirrorCtrl", "runMirrorCtrl"]
-
-import os
-import traceback
-import sys
 import functools
+import os
+import sys
+import traceback
 
 import numpy
 from twistedActor import Actor, CommandError, writeToLog, startLogging, CommandQueue, UserCmd#,startGlobalLogging UserCmd, BaseCmd,
 from RO.Comm.TwistedTimer import Timer
 
-from const import convOrient2MMRad
+from .const import convOrient2MMRad
 
+__all__ = ["MirrorCtrl", "runMirrorCtrl"]
 
 Version = 0.1
 

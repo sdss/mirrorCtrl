@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """Configuration of secondary mirror for 2.5m SDSS telescope
 
 To Do: 

@@ -1,3 +1,4 @@
+from __future__ import division, absolute_import
 """Mirror
 
 The units for orientation are mm and radians (not user-friendly units, but best for computation).
@@ -10,6 +11,7 @@ import numpy
 import scipy.optimize
 import matplotlib.pyplot
 
+__all__ = ["MirrorBase", "DirectMirror", "TipTransMirror"]
 
 numpy.seterr(all='raise')
 
@@ -160,7 +162,7 @@ class MirrorBase(object):
         matplotlib.pyplot.ylim(xyrange)
         ax.set_xlabel("x")
         ax.set_ylabel("y")
-        ax.set_zlim(xyrange)
+        ax.set_zlim(zrange)
         matplotlib.pyplot.show()
 
     @property
@@ -704,7 +706,3 @@ class TipTransMirror(MirrorBase):
                 physList.append(phys)
 
         return numpy.asarray(physList, dtype=float)
-
-
-
-

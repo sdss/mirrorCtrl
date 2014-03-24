@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+from __future__ import division, absolute_import
 """Fake Galil actor wrapper.
 """
 from twistedActor import DispatcherWrapper

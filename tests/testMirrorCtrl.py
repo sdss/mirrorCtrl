@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+from __future__ import division, absolute_import
 """http://twistedmatrix.com/documents/current/core/howto/trial.html
 
 Tests communication and other behavior between the Actor and Device. Commands are dispatched using a

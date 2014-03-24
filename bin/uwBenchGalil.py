@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """Talk to a bench mirror with only 3 axes: same parameters as 3.5m tertiary
 """
 import mirrorCtrl

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """3.5m tertiary mirror controller
 """
 import mirrorCtrl

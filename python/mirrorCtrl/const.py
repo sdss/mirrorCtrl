@@ -1,7 +1,12 @@
+from __future__ import division, absolute_import
 """Collection of constants and functions used throughout the package
 """
 import math
+
 import numpy
+
+__all__ = ["MMPerMicron", "MMPerInch", "RadPerDeg", "ArcSecPerDeg", "RadPerArcSec",
+    "convOrient2UMArcsec", "convOrient2MMRad"]
 
 ## millimeters per micron
 MMPerMicron = 1 / 1000.0      
@@ -14,8 +19,14 @@ ArcSecPerDeg = 60.0 * 60.0
 ## radians per arcsec 
 RadPerArcSec = RadPerDeg / ArcSecPerDeg 
 
-_ConvertOrient = numpy.array([MMPerMicron, RadPerArcSec, RadPerArcSec,
-                                        MMPerMicron, MMPerMicron, RadPerArcSec], dtype = float)
+_ConvertOrient = numpy.array([
+    MMPerMicron,    # piston
+    RadPerArcSec,   # x tilt
+    RadPerArcSec,   # y tilt
+    MMPerMicron,    # x translation
+    MMPerMicron,    # y translation
+    RadPerArcSec,   # rotation
+], dtype = float)
 
 def convOrient2UMArcsec(orientation):
     """Convert an orientation from mm and radians to um and arcsec

@@ -1,10 +1,9 @@
-#!/usr/bin/env python
-#import sys
+#!/usr/bin/env python2
+from __future__ import division, absolute_import
+
 import unittest
 import numpy
 import numpy.random
-#import math
-import time
 import itertools
 import copy
 import pickle

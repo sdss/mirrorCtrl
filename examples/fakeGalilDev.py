@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 from twisted.internet import reactor
 
 from mirrorCtrl.mirrors import mir35mSec

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """Configuration of secondary mirror for 3.5m APO telescope
 
 notes: 

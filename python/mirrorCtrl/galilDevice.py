@@ -1,3 +1,4 @@
+from __future__ import division, absolute_import
 """Galil Device.
 
 This talks to a Galil motor controller, which commands actuators to move the mirror and
@@ -24,6 +25,7 @@ from RO.StringUtil import quoteStr, strFromException
 from RO.SeqUtil import asSequence
 from RO.Comm.TwistedTimer import Timer
 from twistedActor import TCPDevice, UserCmd, writeToLog
+
 from .const import convOrient2UMArcsec, MMPerMicron, RadPerArcSec
 
 __all__ = ["GalilDevice", "GalilDevice25Sec"]

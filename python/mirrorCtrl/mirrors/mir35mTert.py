@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """Configuration of tertiary (flat) mirror for 3.5m APO telescope
 
 The 3.5m tertiary has an unusual coordinate system convention:

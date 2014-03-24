@@ -1,14 +1,18 @@
-#!/usr/bin/env python
-from data.mirrorBlocks import mirDict35, mirDict25
+#!/usr/bin/env python2
+from __future__ import division, absolute_import
+
 import os.path
-import numpy
 import itertools
 import unittest
-#import time
-import RO.Astro.Tm
+
+import numpy
 import numpy.random
+import RO.Astro.Tm
+
+from data.mirrorBlocks import mirDict35, mirDict25
 from mirrorCtrl.mirrors import mir35mSec, mir35mTert, mir25mSec, mir25mPrim
 from mirrorCtrl.const import convOrient2UMArcsec, convOrient2MMRad, MMPerMicron
+
 numpy.random.seed(0)
 
 dataDir = os.path.join((os.path.dirname(__file__)), "data")

@@ -1,3 +1,4 @@
+from __future__ import division, absolute_import
 """Links
 
 Mirrors are constrained by a set of 6 links: a mix of actuators and fixed-length links.

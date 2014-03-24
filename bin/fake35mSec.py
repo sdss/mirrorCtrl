@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """Fake 3.5m secondary Galil
 """
 from argparse import ArgumentParser

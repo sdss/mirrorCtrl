@@ -1,4 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+from __future__ import division, absolute_import
+
 import itertools
 import copy
 import math
