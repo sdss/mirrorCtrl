@@ -278,6 +278,7 @@ class GalilDevice(TCPDevice):
         self.axisIndexDict = dict((axisName, ind) for ind, axisName in enumerate(self.validAxisList))
         ## a galil status object
         self.status = GalilStatus(self)
+        self._inDevCmdCallback = False
 
     # def logMsg(self, msg):
     #     """Temporary log routine, incase of logging prior to actor
@@ -607,8 +608,9 @@ class GalilDevice(TCPDevice):
         @param[in] galilCmdStr: string, to be sent directly to the galil.
         @param[in] nextDevCmdCall: Callable to execute when the device command is done.
         """
-        self.currDevCmd._removeAllCallbacks()
-        self.currDevCmd.setState(self.currDevCmd.Done)
+        if not self.currDevCmd.isDone:
+            self.currDevCmd._removeAllCallbacks()
+            self.currDevCmd.setState(self.currDevCmd.Done)
         self.startDevCmd(galilCmdStr, nextDevCmdCall)
 
     def _connCallback(self, conn=None):
@@ -625,13 +627,12 @@ class GalilDevice(TCPDevice):
         @param[in] userCmd: a user command, passed from the mirrorCtrl
         """
         # print "%s._userCmdCallback(userCmd=%r)" % (self, userCmd)
-        if userCmd.isDone:
-            if not self.currDevCmd.isDone:
-                # print "user command done %r, device command not %r"%(userCmd, self.currDevCmd)
-                # user command was set done outside this device, clean up accordingly
-                # remove callbacks so cancelling the device command won't call this again
-                self.currDevCmd._removeAllCallbacks()
-            self.clearAll() # this will cancel the device command
+        if not self._inDevCmdCallback:
+            if userCmd.isDone:
+                self.clearAll()
+            elif userCmd.isFailing:
+                # use a timer so cancelling devCmdState sets userCmd state
+                Timer(0, self.clearAll)
 
     def _devCmdCallback(self, devCmd):
         """Device command callback
@@ -641,20 +642,20 @@ class GalilDevice(TCPDevice):
         startDevCmd always assigns this as the callback, which then calls and clears any user-specified callback.
         """
         # print "%s._devCmdCallback(devCmd=%r); self.userCmd=%r" % (self, devCmd, self.userCmd)
-        if not devCmd.isDone:
-            return
-        if devCmd.didFail:
-            # set the userCmd to the same failed state
+        self._inDevCmdCallback = True
+        try:
+            if not devCmd.isDone:
+                return
+
+            if not devCmd.didFail and self.nextDevCmdCall is not None:
+                # succeeded and more code to execute
+                nextDevCmdCall, self.nextDevCmdCall = self.nextDevCmdCall, None
+                Timer(0, nextDevCmdCall)
+
             if not self.userCmd.isDone:
                 self.userCmd.setState(devCmd.state)
-        elif self.nextDevCmdCall is not None:
-            # done and more code to execute
-            nextDevCmdCall, self.nextDevCmdCall = self.nextDevCmdCall, None
-            nextDevCmdCall()
-        else:
-            # dev command done and no other code to run...set user command to done
-            if not self.userCmd.isDone:
-                self.userCmd.setState(devCmd.state)
+        finally:
+            self._inDevCmdCallback = False
 
     def clearAll(self):
         """If a device command is currently running, kill it. Put galilDevice in a state to receive new commands.
@@ -828,7 +829,8 @@ class GalilDevice(TCPDevice):
             self.writeToUsers("w", "Text=\"Target actuator positions not received from move\"", cmd=self.userCmdOrNone)
         if not('final position' in self.parsedKeyList):
             # final actuator positions are needed for subsequent moves...better fail the cmd
-            self.currDevCmd.setState(self.currDevCmd.Failed, textMsg="Final actuator positions not received from move")
+            if not self.currDevCmd.isDone:
+                self.currDevCmd.setState(self.currDevCmd.Failed, textMsg="Final actuator positions not received from move")
             return
 
         actErr = [cmd - act for cmd, act in itertools.izip(self.status.cmdMount[0:self.nAct], self.status.actMount[0:self.nAct])]
