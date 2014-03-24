@@ -356,7 +356,7 @@ class GenericTests(TestCase):
         dAll = gatherResults([d1,d2, d3])
         cmdMove1 = CmdVar (
                 actor = self.name,
-                cmdStr = 'move 10001, 3601, 3601',
+                cmdStr = 'move 1001, 3601, 3601',
                 callFunc = CmdCallback(d1),
             )
         cmdStatus = CmdVar (
