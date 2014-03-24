@@ -182,14 +182,14 @@ class MirrorCtrl(Actor):
         if not self.dev.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.cmdQueue.addCmd(cmd, self.dev.galil.cmdStatus)
+            if self.cmdQueue.currExeCmd.cmd.isDone:
+                # put a status command on the stack
+                self.cmdQueue.addCmd(cmd, self.dev.galil.cmdStatus)
+            else:
+                # currently executing a command, send a cached status
+                self.dev.galil.cmdCachedStatus(cmd)
         except Exception, e:
             raise CommandError(str(e))
-        else:
-            # if status was queued or cancelled (not running), send
-            # a cached status
-            if not cmd.isActive:
-                self.dev.galil.cmdCachedStatus(cmd)
         return True
 
     def cmd_showparams(self, cmd):
