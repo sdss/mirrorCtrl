@@ -769,7 +769,8 @@ class GalilDevice(TCPDevice):
         """
         self.runCommand(userCmd, galilCmdStr="RS", forceKill=True)
         # this command doesn't reply with an OK.  Explicitly set the device command to be done
-        self.currDevCmd.setState(self.currDevCmd.Done)
+        # self.currDevCmd.setState(self.currDevCmd.Done)
+        Timer(0., self.currDevCmd.setState, self.currDevCmd.Done)
 
     def cmdStop(self, userCmd):
         """Stop the Galil.

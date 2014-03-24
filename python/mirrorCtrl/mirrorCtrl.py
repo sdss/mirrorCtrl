@@ -221,10 +221,6 @@ class MirrorCtrl(Actor):
         dummyCmd = UserCmd(cmdStr="%i status"%cmd.userID)
         dummyCmd.cmdVerb = "status"
         dummyCmd.userID = cmd.userID
-        # def queCmdLater():
-        #     self.cmdQueue.addCmd(dummyCmd, self.dev.galil.cmdStatus)
-        # self.statusTimer.start(1., queCmdLater)
-       # self.cmdQueue.addCmd(dummyCmd, self.dev.galil.cmdStatus)
         self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.dev.galil.cmdStatus)
         return True
 
@@ -242,11 +238,7 @@ class MirrorCtrl(Actor):
         dummyCmd = UserCmd(cmdStr="%i status"%cmd.userID)
         dummyCmd.cmdVerb = "status"
         dummyCmd.userID = cmd.userID
-       # self.cmdQueue.addCmd(dummyCmd, self.dev.galil.cmdStatus)
-        # def queCmdLater():
-        #     self.cmdQueue.addCmd(dummyCmd, self.dev.galil.cmdStatus)
-        # self.statusTimer.start(1., queCmdLater)
-        # self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.dev.galil.cmdStatus)
+        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.dev.galil.cmdStatus)
         return True
 
 
