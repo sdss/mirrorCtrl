@@ -54,9 +54,10 @@ class MirrorCtrl(Actor):
             name = name,
             doConnect = doConnect,
         )
+        self.galilDevice = device
         def killFunc(killThisCmd):
             # print "killing this command!!! %r"% killThisCmd
-            killThisCmd.setState(killThisCmd.Cancelled)
+            killThisCmd.setState(killThisCmd.Cancelled, "Killed via killFunc in commandQueue")
             # the galil device is listening for the cancelled state.
             # A galilDevice adds a callback to the user command to ensure cleanup
             # happens if the user command is cancelled.
@@ -72,7 +73,7 @@ class MirrorCtrl(Actor):
             }
         )
         self.cmdQueue.addRule(
-            action = CommandQueue.KillRunning,
+            action = CommandQueue.KillRunning, # note this will also cancel a queued move
             newCmds = ['move'],
             queuedCmds = ['move'],
         )
@@ -143,10 +144,10 @@ class MirrorCtrl(Actor):
             raise CommandError("Must specify 1 to 5 orientation values; got %s" % (len(cmdArgList)))
         # pad extra orientations with zeros, if not specified 5.
         cmdOrient = self.processOrientation(cmdArgList)
-        if not self.dev.galil.conn.isConnected:
+        if not self.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.cmdQueue.addCmd(cmd, functools.partial(self.dev.galil.cmdMove, orient=cmdOrient))
+            self.cmdQueue.addCmd(cmd, functools.partial(self.galilDevice.cmdMove, orient=cmdOrient))
         except Exception, e:
             traceback.print_exc(file=sys.stderr)
             raise CommandError(str(e))
@@ -164,10 +165,10 @@ class MirrorCtrl(Actor):
             if len(arg) != 1:
                 raise CommandError(
                     "Could not parse %s as a comma-separated list of letters" % (cmd.cmdArgs,))
-        if not self.dev.galil.conn.isConnected:
+        if not self.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.cmdQueue.addCmd(cmd, functools.partial(self.dev.galil.cmdHome, axisList = axisList))
+            self.cmdQueue.addCmd(cmd, functools.partial(self.galilDevice.cmdHome, axisList = axisList))
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -179,15 +180,15 @@ class MirrorCtrl(Actor):
         """
         # twistedActor status
         Actor.cmd_status(self, cmd)
-        if not self.dev.galil.conn.isConnected:
+        if not self.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
             if self.cmdQueue.currExeCmd.cmd.isDone:
                 # put a status command on the stack
-                self.cmdQueue.addCmd(cmd, self.dev.galil.cmdStatus)
+                self.cmdQueue.addCmd(cmd, self.galilDevice.cmdStatus)
             else:
                 # currently executing a command, send a cached status
-                self.dev.galil.cmdCachedStatus(cmd)
+                self.galilDevice.cmdCachedStatus(cmd)
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -197,10 +198,10 @@ class MirrorCtrl(Actor):
 
         @param[in] cmd: new local user command (twistedActor.UserCmd)
         """
-        if not self.dev.galil.conn.isConnected:
+        if not self.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.cmdQueue.addCmd(cmd, self.dev.galil.cmdParams)
+            self.cmdQueue.addCmd(cmd, self.galilDevice.cmdParams)
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -211,17 +212,17 @@ class MirrorCtrl(Actor):
         @param[in] cmd: new local user command (twistedActor.UserCmd)
         """
 
-        if not self.dev.galil.conn.isConnected:
+        if not self.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.cmdQueue.addCmd(cmd, self.dev.galil.cmdStop)
+            self.cmdQueue.addCmd(cmd, self.galilDevice.cmdStop)
         except Exception, e:
             raise CommandError(str(e))
         # command a status for 1 second later (roughly 2x stopping time from max speed)
         dummyCmd = UserCmd(cmdStr="%i status"%cmd.userID)
         dummyCmd.cmdVerb = "status"
         dummyCmd.userID = cmd.userID
-        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.dev.galil.cmdStatus)
+        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.galilDevice.cmdStatus)
         return True
 
     def cmd_reset(self, cmd):
@@ -229,16 +230,16 @@ class MirrorCtrl(Actor):
 
         @param[in] cmd: new local user command (twistedActor.UserCmd)
         """
-        if not self.dev.galil.conn.isConnected:
+        if not self.galilDevice.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.cmdQueue.addCmd(cmd, self.dev.galil.cmdReset)
+            self.cmdQueue.addCmd(cmd, self.galilDevice.cmdReset)
         except Exception, e:
             raise CommandError(str(e))
         dummyCmd = UserCmd(cmdStr="%i status"%cmd.userID)
         dummyCmd.cmdVerb = "status"
         dummyCmd.userID = cmd.userID
-        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.dev.galil.cmdStatus)
+        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.galilDevice.cmdStatus)
         return True
 
 

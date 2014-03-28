@@ -12,7 +12,7 @@ import numpy
 
 import mirrorCtrl
 
-Name = 'SDSS Primary'
+Name = 'mir25mPrim'
 
 ## choose the actuator model (adjustable base or adjustable length)
 genLink = mirrorCtrl.AdjLengthLink # old style
@@ -113,5 +113,5 @@ def _makeMirror():
         maxCorrList = maxCorrList,
         name = Name,
     )
-    
+
 mir25mPrim = _makeMirror()

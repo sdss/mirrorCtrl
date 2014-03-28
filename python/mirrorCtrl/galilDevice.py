@@ -261,7 +261,7 @@ class GalilDevice(TCPDevice):
         self.MaxIter = maxIter
         self.mirror = mirror
         TCPDevice.__init__(self,
-            name = 'galil',
+            name = self.mirror.name,
             host = host,
             port = port,
             callFunc = callFunc,
@@ -489,7 +489,7 @@ class GalilDevice(TCPDevice):
         - If a command has finished, call the appropriate command callback
         """
         # print "handleReply(replyStr=%r); currDevCmd=%r" % (replyStr, self.currDevCmd)
-        writeToLog('Galil Reply(%s)' % (replyStr,))
+        writeToLog('%s got Reply(%s)' % (self, replyStr,))
         replyStr = replyStr.replace(":", "").strip(' ;\r\n\x01\x03\x18\x00')
         #print "handleReply(replyStr=%r)" % (replyStr,)
         if self.currDevCmd.isDone:
@@ -596,7 +596,7 @@ class GalilDevice(TCPDevice):
         self.parsedKeyList = []
         # not self.clearAll()?
         try:
-            writeToLog("DevCmd(%s)" % (galilCmdStr,))
+            writeToLog("%s.startDevCmd(%s)" % (self, galilCmdStr,))
             if self.conn.isConnected:
                 self.conn.writeLine(galilCmdStr)
                 self.currDevCmd.setState(self.currDevCmd.Running)

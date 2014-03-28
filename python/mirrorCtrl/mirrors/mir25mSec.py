@@ -1,20 +1,20 @@
 #!/usr/bin/env python2
 """Configuration of secondary mirror for 2.5m SDSS telescope
 
-To Do: 
+To Do:
 1. need to incorporate actual encoder positions
 2. get actual address info
 3. French's model places the anti-rotation arm Z height = 1 inch below the glass. I don't know
     what the z offset from the vertex of the mirror is for this dimension. So I adoped the Z
     position of the A,B,C actuators instead.  Also the X and Y axes were not labeled, so
-    I am making an educated assumption about which is which. The drawings are currently in 
+    I am making an educated assumption about which is which. The drawings are currently in
     the docs directory.
-    
+
 notes:
     8/12    - was able to get rough measurment of encoder offset relative to
             axial actuators.  It is not radial.  They are at the same radius as
             actuators but about 2 inches away (a greater theta)
-            Could not measure transverse encoder offset, will assume the 
+            Could not measure transverse encoder offset, will assume the
             same offset as 3.5m secondary for now
 """
 __all__ = ["mir25mSec"]
@@ -25,7 +25,7 @@ import mirrorCtrl
 from mirrorCtrl.const import MMPerInch
 
 ## Mirror Name
-Name = 'SDSS Secondary'
+Name = 'mir25mSec'
 
 def _makeMirror():
     """Construct a 2.5m Secondary mirror
@@ -84,7 +84,7 @@ def _makeMirror():
         mirAct = numpy.array([ActMirX[i], ActMirY[i], ActMirZ[i]])
         actuatorList.append(
             mirrorCtrl.AdjBaseActuator(
-                baseAct, mirAct, ActMinMount[i], 
+                baseAct, mirAct, ActMinMount[i],
                 ActMaxMount[i], ActMountScale[i], ActMountOffset[i]
             )
         )
@@ -103,7 +103,7 @@ def _makeMirror():
                 mirrorCtrl.AdjLengthLink(
                     numpy.array([xPos, yPos, baseAct[2]]),
                     numpy.array([xPos, yPos, mirAct[2]]),
-                    ActMinMount[i], ActMaxMount[i], 
+                    ActMinMount[i], ActMaxMount[i],
                     ActMountScale[i], ActMountOffset[i]
                 )
             )
@@ -113,7 +113,7 @@ def _makeMirror():
                 mirrorCtrl.AdjLengthLink(
                     numpy.array([baseAct[0], baseAct[1], baseAct[2] + zEncOffsetTrans]),
                     numpy.array([mirAct[0], mirAct[1], mirAct[2] + zEncOffsetTrans]),
-                    ActMinMount[i], ActMaxMount[i], 
+                    ActMinMount[i], ActMaxMount[i],
                     ActMountScale[i], ActMountOffset[i]
                 )
             )
@@ -123,7 +123,7 @@ def _makeMirror():
     # note: x and y poitions were not labeled, so may be transposed
 
     # note: French's model has Z = 1 inch below glass, but I'm adopting Z = actuators' mir pos.
-    fixedLinkList = [] 
+    fixedLinkList = []
     fixMirPos = numpy.array([0., -17.296 * MMPerInch, -193.0])
     fixBasePos = numpy.array([13.125 * MMPerInch, -17.296 * MMPerInch, -193.0])
     fixedLinkList.append(mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos))

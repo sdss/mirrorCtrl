@@ -50,25 +50,14 @@ class GenericTests(TestCase):
     def tearDown(self):
         self.actor.statusTimer.cancel()
         self.actor.cmdQueue.queueTimer.cancel()
-        # self.actor.cmdQueue.timer.cancel()
-        # self.actor.dev.galil.timer.cancel()
-        # self.actor.dev.galil.userCmd._removeAllCallbacks()
-        # self.actor.dev.galil.currDevCmd._removeAllCallbacks()
-        # self.dispatcher._checkCmdTimer.cancel()
-        # self.dispatcher._checkRemCmdTimer.cancel()
-        # self.dispatcher._refreshAllTimer.cancel()
-        # self.dispatcher._refreshNextTimer.cancel()
         self.fakeGalil.replyTimer.cancel()
         self.fakeGalil.nextCmdTimer.cancel()
-        # from twisted.internet import reactor
-        # for call in reactor.getDelayedCalls():
-        #     print 'gotta delayed call!', call
-        #     call.cancel()
+
         return self.dw.close()
 
     @property
     def galilDevice(self):
-        return self.actor.dev.galil
+        return self.actor.galilDevice
 
     @property
     def dispatcher(self):
@@ -148,7 +137,7 @@ class GenericTests(TestCase):
             self.assertTrue(cmdVar.didFail)
         d.addCallback(checkResults)
         # set timeout to a very small number
-        self.dw.actor.dev.galil.DevCmdTimeout = 0.01
+        self.galilDevice.DevCmdTimeout = 0.01
         self.dispatcher.executeCmd(cmdVar)
         return d
 
