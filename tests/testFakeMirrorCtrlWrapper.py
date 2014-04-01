@@ -2,6 +2,9 @@
 from __future__ import division, absolute_import
 
 from twisted.trial.unittest import TestCase
+from twistedActor import testUtils
+
+testUtils.init(__file__)
 
 from mirrorCtrl.mirrors import mir35mTert
 from mirrorCtrl import FakeMirrorCtrlWrapper

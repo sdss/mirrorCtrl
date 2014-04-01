@@ -489,9 +489,8 @@ class GalilDevice(TCPDevice):
         - If a command has finished, call the appropriate command callback
         """
         # print "handleReply(replyStr=%r); currDevCmd=%r" % (replyStr, self.currDevCmd)
-        writeToLog('Galil Reply(%s)' % (replyStr,))
+        writeToLog("%s.handleReply(%r)" % (self, replyStr))
         replyStr = replyStr.replace(":", "").strip(' ;\r\n\x01\x03\x18\x00')
-        #print "handleReply(replyStr=%r)" % (replyStr,)
         if self.currDevCmd.isDone:
             # ignore unsolicited input
             return
@@ -588,6 +587,7 @@ class GalilDevice(TCPDevice):
         @param[in] nextDevCmdCall: Callable to execute when the device command is done.
         """
         # print "%s.startDevCmd(galilCmdStr=%r, nextDevCmdCall=%r)" % (self, galilCmdStr, nextDevCmdCall)
+        writeToLog("%s.startDevCmd(%r, nextDevCmdCall=%s)" % (self, galilCmdStr, nextDevCmdCall))
         if not self.currDevCmd.isDone:
             raise RuntimeError("Device command collision: userCmd=%r, currDevCmd=%r, desired galilCmdStr=%r" % \
                 (self.userCmd, self.currDevCmd, galilCmdStr))
@@ -596,7 +596,6 @@ class GalilDevice(TCPDevice):
         self.parsedKeyList = []
         # not self.clearAll()?
         try:
-            writeToLog("DevCmd(%s)" % (galilCmdStr,))
             if self.conn.isConnected:
                 self.conn.writeLine(galilCmdStr)
                 self.currDevCmd.setState(self.currDevCmd.Running)

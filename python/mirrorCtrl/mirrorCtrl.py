@@ -250,7 +250,7 @@ def runMirrorCtrl(device, userPort):
     """
     from twisted.internet import reactor
 
-    Actor = MirrorCtrl(
+    MirrorCtrl(
         device = device,
         userPort = userPort,
     )

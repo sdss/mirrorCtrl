@@ -9,6 +9,9 @@ dispatcher.
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import Deferred, gatherResults
 from twisted.internet import reactor
+from twistedActor import testUtils
+
+testUtils.init(__file__)
 
 import RO.Comm.Generic
 RO.Comm.Generic.setFramework("twisted")

@@ -15,6 +15,9 @@ RO.Comm.Generic.setFramework("twisted")
 from opscore.actor import CmdVar
 from twisted.internet.defer import Deferred
 from twisted.trial.unittest import TestCase
+from twistedActor import testUtils
+
+testUtils.init(__file__)
 
 from mirrorCtrl.const import convOrient2MMRad, MMPerMicron, RadPerArcSec
 from mirrorCtrl.mirrors import mir35mSec, mir35mTert, mir25mSec
