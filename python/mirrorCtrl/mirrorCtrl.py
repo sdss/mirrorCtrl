@@ -218,7 +218,7 @@ class MirrorCtrl(Actor):
         except Exception, e:
             raise CommandError(str(e))
         # command a status for 1 second later (roughly 2x stopping time from max speed)
-        dummyCmd = UserCmd(cmdStr="%i status"%cmd.userID)
+        dummyCmd = UserCmd(cmdStr="%i status" % cmd.userID)
         dummyCmd.cmdVerb = "status"
         dummyCmd.userID = cmd.userID
         self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.dev.galil.cmdStatus)

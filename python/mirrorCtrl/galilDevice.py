@@ -309,8 +309,13 @@ class GalilDevice(TCPDevice):
         outStr = keyword + '=' + valStr
         return outStr
 
-    def init(self, userCmd=None, timeLim=None):
+    def init(self, userCmd=None, timeLim=None, getStatus=False):
         """Initialize Galil
+
+        @param[in] userCmd: user command that tracks this command, if any
+        @param[in] timeLim: IGNORED maximum time before command expires, in sec; None for no limit
+        @param[in] getStatus: IGNORED (status is not output)
+        @return devCmd: the device command that was started (and may already have failed)
 
         Called on disconnection
         """
@@ -780,9 +785,9 @@ class GalilDevice(TCPDevice):
 
         @param[in] userCmd: a twistedActor UserCmd
 
-        Send 'ST;XQ#STATUS' to the Galil, causing it to stop all threads,
+        Send 'ST;XQ#STOP' to the Galil, causing it to stop all threads,
         """
-        self.runCommand(userCmd, galilCmdStr="ST;XQ#STATUS", forceKill=True)
+        self.runCommand(userCmd, galilCmdStr="ST;XQ#STOP", forceKill=True)
 
     def cmdCachedStatus(self, userCmd):
         """Return a cached status, don't ask the galil for a fresh one
