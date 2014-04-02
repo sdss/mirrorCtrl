@@ -44,10 +44,10 @@ class FakeGalilDeviceWrapper(DeviceWrapper):
         """
         self._mirror = mirror
         controller = galilClass(
-            mirror=mirror,
-            port=port,
-            verbose=verbose,
-            wakeUpHomed=wakeUpHomed,
+            mirror = mirror,
+            port = port,
+            verbose = verbose,
+            wakeUpHomed = wakeUpHomed,
         )
         DeviceWrapper.__init__(self, name=mirror.name, stateCallback=stateCallback, controller=controller, debug=debug)
     
