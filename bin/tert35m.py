@@ -6,7 +6,7 @@ import os.path
 import mirrorCtrl
 from mirrorCtrl.mirrors import mir35mTert
 
-UserPort = 3532
+UserPort = 3533
 
 GalilHost = "tccserv35m-p"
 GalilPort = 3500 # port 15
