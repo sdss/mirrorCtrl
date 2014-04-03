@@ -54,9 +54,9 @@ class GenericTests(TestCase):
         self.actor.statusTimer.cancel()
         self.actor.cmdQueue.queueTimer.cancel()
         # self.actor.cmdQueue.timer.cancel()
-        # self.actor.dev.galil.timer.cancel()
-        # self.actor.dev.galil.userCmd._removeAllCallbacks()
-        # self.actor.dev.galil.currDevCmd._removeAllCallbacks()
+        # self.actor.galil.timer.cancel()
+        # self.actor.galil.userCmd._removeAllCallbacks()
+        # self.actor.galil.currDevCmd._removeAllCallbacks()
         # self.dispatcher._checkCmdTimer.cancel()
         # self.dispatcher._checkRemCmdTimer.cancel()
         # self.dispatcher._refreshAllTimer.cancel()
@@ -68,10 +68,6 @@ class GenericTests(TestCase):
         #     print 'gotta delayed call!', call
         #     call.cancel()
         return self.dw.close()
-
-    @property
-    def galilDevice(self):
-        return self.actor.dev.galil
 
     @property
     def dispatcher(self):
@@ -151,7 +147,7 @@ class GenericTests(TestCase):
             self.assertTrue(cmdVar.didFail)
         d.addCallback(checkResults)
         # set timeout to a very small number
-        self.dw.actor.dev.galil.DevCmdTimeout = 0.01
+        self.dw.actor.galil.DevCmdTimeout = 0.01
         self.dispatcher.executeCmd(cmdVar)
         return d
 
