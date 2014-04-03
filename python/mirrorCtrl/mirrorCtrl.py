@@ -14,18 +14,9 @@ from .const import convOrient2MMRad
 
 __all__ = ["MirrorCtrl", "runMirrorCtrl"]
 
-Version = 0.1
+Version = 0.5
 
 DefaultMaxUsers = 5
-
-# if LogDir is specified as an environment variable
-# begin logging to it.
-try:
-    LogDir = os.environ["TWISTED_LOG_DIR"]
-except KeyError:
-    pass # logging will not start
-else:
-    startLogging(LogDir, "mirrorCtrl.log", serverMode=False)
 
 class MirrorCtrl(Actor):
     """Mirror controller actor
@@ -242,13 +233,22 @@ class MirrorCtrl(Actor):
         return True
 
 
-def runMirrorCtrl(device, userPort):
+def runMirrorCtrl(name, device, userPort):
     """Start up a Galil actor
 
+    @param[in] name: name of controller, e.g. "sec35m"; used for the log file and log entries
     @param[in] device: a twistedActor-based Galil Device (see mirrorCtrl/galilDevice.py)
     @param[in] userPort: port on which actor accepts user commands
     """
     from twisted.internet import reactor
+
+    # if LogDir is specified as an environment variable, begin logging to it.
+    try:
+        LogDir = os.environ["TWISTED_LOG_DIR"]
+    except KeyError:
+        pass # logging will not start
+    else:
+        startLogging(LogDir, name + ".log", serverMode = False)
 
     MirrorCtrl(
         device = device,

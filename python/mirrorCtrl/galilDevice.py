@@ -246,7 +246,7 @@ class GalilDevice(TCPDevice):
     LargeTilt = 10. * RadPerArcSec
     ## scale the determined move offset correction by this much, eg go only 90%
     CorrectionStrength = 0.9
-    def __init__(self, mirror, host, port, maxIter = 5, callFunc = None):
+    def __init__(self, mirror, host, port, maxIter=5, callFunc=None, name=None):
         """Construct a GalilDevice
 
         @param[in] mirror: an instance of mirrorCtrl.MirrorBase
@@ -257,11 +257,12 @@ class GalilDevice(TCPDevice):
             it receives one argument: this device.
             Note that callFunc is NOT called when the connection state changes;
             register a callback with "conn" for that.
+        @param[in] name: name of device; if None then use mirror.name
         """
         self.MaxIter = maxIter
         self.mirror = mirror
         TCPDevice.__init__(self,
-            name = 'galil',
+            name = name if name else mirror.name,
             host = host,
             port = port,
             callFunc = callFunc,
@@ -952,7 +953,8 @@ class GalilDevice25Sec(GalilDevice):
         mirror,
         host,
         port,
-        callFunc = None,
+        callFunc=None,
+        name=None,
     ):
         """Construct a GalilDevice25Sec
 
@@ -963,8 +965,10 @@ class GalilDevice25Sec(GalilDevice):
             it receives one argument: this device.
             Note that callFunc is NOT called when the connection state changes;
             register a callback with "conn" for that.
+        @param[in] name: name of device; if None then use mirror.name
         """
         GalilDevice.__init__(self,
+            name = name if name else mirror.name,
             mirror = mirror,
             host = host,
             port = port,
