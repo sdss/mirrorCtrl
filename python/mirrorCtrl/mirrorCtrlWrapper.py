@@ -56,7 +56,7 @@ class MirrorCtrlWrapper(ActorWrapper):
         ActorWrapper.__init__(self, deviceWrapperList=[deviceWrapper], stateCallback=stateCallback, debug=debug)
 
     def _makeActor(self):
-        #print "_makeActor()"
+        # print "_makeActor()"
         self.actor = MirrorCtrl(
             name = self._mirror.name,
             device = self.deviceWrapperList[0].device,

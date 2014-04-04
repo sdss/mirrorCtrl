@@ -625,10 +625,10 @@ class GalilDevice(TCPDevice):
     def _connCallback(self, conn=None):
         """If the connection closes, fail any current command
         """
-        # print "%s._connCallback(conn=%s); self.conn.state=%s" % (self, conn, self.conn.state)
         TCPDevice._connCallback(self, conn)
-        if not self.conn.isConnected and not self.currDevCmd.isDone:
-            self.currDevCmd.setState(self.currDevCmd.Failed, "Connection closed")
+        if not self._ignoreConnCallback:
+            if not self.conn.isConnected and not self.currDevCmd.isDone:
+                self.currDevCmd.setState(self.currDevCmd.Failed, "Connection closed")
 
     def _userCmdCallback(self, userCmd):
         """Callback to be added to every user command
