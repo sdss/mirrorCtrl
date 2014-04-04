@@ -320,8 +320,8 @@ class GalilDevice(TCPDevice):
 
         Called on disconnection
         """
-        # writeToLog('init called')
-        self.cmdStop(userCmd=userCmd)
+        writeToLog("%s.init(userCmd=%s, timeLim=%s, getStatus=%s)" % (self, userCmd, timeLim, getStatus))
+        self.cmdStop(userCmd=userCmd, getStatus=getStatus)
 
     def parseReply(self, replyStr):
         """Parse a reply from the Galil and seperate into key=value format.
@@ -781,14 +781,17 @@ class GalilDevice(TCPDevice):
         # self.currDevCmd.setState(self.currDevCmd.Done)
         Timer(0., self.currDevCmd.setState, self.currDevCmd.Done)
 
-    def cmdStop(self, userCmd):
+    def cmdStop(self, userCmd, getStatus=False):
         """Stop the Galil.
 
         @param[in] userCmd: a twistedActor UserCmd
 
         Send 'ST;XQ#STOP' to the Galil, causing it to stop all threads,
         """
-        self.runCommand(userCmd, galilCmdStr="ST;XQ#STOP", forceKill=True)
+        if getStatus:
+            self.runCommand(userCmd, galilCmdStr="ST;XQ#STATUS", forceKill=True)
+        else:
+            self.runCommand(userCmd, galilCmdStr="ST;XQ#STOP", forceKill=True)
 
     def cmdCachedStatus(self, userCmd):
         """Return a cached status, don't ask the galil for a fresh one
