@@ -56,11 +56,10 @@ class MirrorCtrlWrapper(ActorWrapper):
         ActorWrapper.__init__(self, deviceWrapperList=[deviceWrapper], stateCallback=stateCallback, debug=debug)
 
     def _makeActor(self):
-        # print "_makeActor()"
+        # print "%s._makeActor()" % (self,)
         self.actor = MirrorCtrl(
             name = self._mirror.name,
             device = self.deviceWrapperList[0].device,
             userPort = self._userPort,
         )
-        self.actor.server.addStateCallback(self._stateChanged)
 
