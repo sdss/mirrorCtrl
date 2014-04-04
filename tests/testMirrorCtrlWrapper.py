@@ -7,13 +7,13 @@ from twistedActor import testUtils
 testUtils.init(__file__)
 
 from mirrorCtrl.mirrors import mir35mTert
-from mirrorCtrl import FakeMirrorCtrlWrapper
+from mirrorCtrl import MirrorCtrlWrapper
 
-class TestFakeMirrorCtrlWrapper(TestCase):
-    """Test basics of FakeMirrorCtrlWrapper
+class TestMirrorCtrlWrapper(TestCase):
+    """Test basics of MirrorCtrlWrapper
     """
     def setUp(self):
-        self.dw = FakeMirrorCtrlWrapper(
+        self.dw = MirrorCtrlWrapper(
             mirror=mir35mTert,
         )
         return self.dw.readyDeferred

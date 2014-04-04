@@ -5,7 +5,7 @@ from argparse import ArgumentParser
 from twisted.internet import reactor
 
 from mirrorCtrl.mirrors import mir35mSec
-from mirrorCtrl import FakeMirrorCtrlWrapper
+from mirrorCtrl import MirrorCtrlWrapper
 
 DefaultPort = 3520
 
@@ -24,7 +24,7 @@ def stateCallback(wrapper):
     elif wrapper.isDone:
         print "Fake 35mSec controller shut down"
 
-FakeMirrorCtrlWrapper(
+MirrorCtrlWrapper(
     mirror=mir35mSec,
     userPort=args.port,
     verbose=args.verbose,

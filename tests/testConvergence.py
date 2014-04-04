@@ -22,7 +22,7 @@ testUtils.init(__file__)
 from mirrorCtrl.const import convOrient2MMRad, MMPerMicron, RadPerArcSec
 from mirrorCtrl.mirrors import mir35mSec, mir35mTert, mir25mSec
 from testMirrorCtrl import  CmdCallback #getOpenPort #, UserPort, MirrorCtrlTestBase,
-from mirrorCtrl import FakeDispatcherWrapper, GalilDevice
+from mirrorCtrl import MirrorDispatcherWrapper, GalilDevice
 import mirrorCtrl.fakeGalil
 
 pwd = os.path.dirname(__file__)
@@ -99,7 +99,7 @@ class MirState(object):
 class ConvergenceTestBase(object):
     def setUp(self):
         self.setVars()
-        self.dw = FakeDispatcherWrapper(
+        self.dw = MirrorDispatcherWrapper(
             mirror=self.trueMirror,
         )
         def overwriteMirror(foo=None):

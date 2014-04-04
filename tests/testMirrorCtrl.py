@@ -19,7 +19,7 @@ from RO.Comm.TwistedTimer import Timer
 from opscore.actor import CmdVar
 
 from mirrorCtrl.mirrors import mir25mSec, mir35mTert
-from mirrorCtrl import FakePiezoGalil, FakeDispatcherWrapper
+from mirrorCtrl import FakePiezoGalil, MirrorDispatcherWrapper
 
 ## speed up fake galil responses
 import mirrorCtrl.fakeGalil
@@ -45,7 +45,7 @@ class GenericTests(TestCase):
     """
     def setUp(self):
         self.name = "mirror"
-        self.dw = FakeDispatcherWrapper(
+        self.dw = MirrorDispatcherWrapper(
             mirror=mir35mTert,
         )
         return self.dw.readyDeferred
@@ -691,7 +691,7 @@ class PiezoTests(TestCase):
     """
     def setUp(self):
         self.name = "piezomirror"
-        self.dw = FakeDispatcherWrapper(
+        self.dw = MirrorDispatcherWrapper(
             mirror=mir25mSec,
             dictName=self.name,
             galilClass=FakePiezoGalil,

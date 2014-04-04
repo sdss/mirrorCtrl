@@ -7,13 +7,13 @@ from twistedActor import testUtils
 testUtils.init(__file__)
 
 from mirrorCtrl.mirrors import mir35mTert
-from mirrorCtrl import FakeGalilDeviceWrapper
+from mirrorCtrl import GalilDeviceWrapper
 
-class TestFakeGalilDeviceWrapper(TestCase):
-    """Test basics of FakeGalilDeviceWrapper
+class TestGalilDeviceWrapper(TestCase):
+    """Test basics of GalilDeviceWrapper
     """
     def setUp(self):
-        self.dw = FakeGalilDeviceWrapper(
+        self.dw = GalilDeviceWrapper(
             mirror=mir35mTert,
         )
         return self.dw.readyDeferred
