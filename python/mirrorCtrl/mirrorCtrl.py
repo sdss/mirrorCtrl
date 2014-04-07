@@ -14,18 +14,9 @@ from .const import convOrient2MMRad
 
 __all__ = ["MirrorCtrl", "runMirrorCtrl"]
 
-Version = 0.1
+Version = 0.5
 
 DefaultMaxUsers = 5
-
-# if LogDir is specified as an environment variable
-# begin logging to it.
-try:
-    LogDir = os.environ["TWISTED_LOG_DIR"]
-except KeyError:
-    pass # logging will not start
-else:
-    startLogging(LogDir, "mirrorCtrl.log", serverMode=False)
 
 class MirrorCtrl(Actor):
     """Mirror controller actor
@@ -54,7 +45,7 @@ class MirrorCtrl(Actor):
             name = name,
             doConnect = doConnect,
         )
-        self.galilDevice = device
+        self.galil = device # easier access
         def killFunc(killThisCmd):
             # print "killing this command!!! %r"% killThisCmd
             killThisCmd.setState(killThisCmd.Cancelled, "Killed via killFunc in commandQueue")
@@ -144,10 +135,10 @@ class MirrorCtrl(Actor):
             raise CommandError("Must specify 1 to 5 orientation values; got %s" % (len(cmdArgList)))
         # pad extra orientations with zeros, if not specified 5.
         cmdOrient = self.processOrientation(cmdArgList)
-        if not self.galilDevice.conn.isConnected:
+        if not self.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.cmdQueue.addCmd(cmd, functools.partial(self.galilDevice.cmdMove, orient=cmdOrient))
+            self.cmdQueue.addCmd(cmd, functools.partial(self.galil.cmdMove, orient=cmdOrient))
         except Exception, e:
             traceback.print_exc(file=sys.stderr)
             raise CommandError(str(e))
@@ -165,10 +156,10 @@ class MirrorCtrl(Actor):
             if len(arg) != 1:
                 raise CommandError(
                     "Could not parse %s as a comma-separated list of letters" % (cmd.cmdArgs,))
-        if not self.galilDevice.conn.isConnected:
+        if not self.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.cmdQueue.addCmd(cmd, functools.partial(self.galilDevice.cmdHome, axisList = axisList))
+            self.cmdQueue.addCmd(cmd, functools.partial(self.galil.cmdHome, axisList = axisList))
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -180,15 +171,15 @@ class MirrorCtrl(Actor):
         """
         # twistedActor status
         Actor.cmd_status(self, cmd)
-        if not self.galilDevice.conn.isConnected:
+        if not self.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
             if self.cmdQueue.currExeCmd.cmd.isDone:
                 # put a status command on the stack
-                self.cmdQueue.addCmd(cmd, self.galilDevice.cmdStatus)
+                self.cmdQueue.addCmd(cmd, self.galil.cmdStatus)
             else:
                 # currently executing a command, send a cached status
-                self.galilDevice.cmdCachedStatus(cmd)
+                self.galil.cmdCachedStatus(cmd)
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -198,10 +189,10 @@ class MirrorCtrl(Actor):
 
         @param[in] cmd: new local user command (twistedActor.UserCmd)
         """
-        if not self.galilDevice.conn.isConnected:
+        if not self.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.cmdQueue.addCmd(cmd, self.galilDevice.cmdParams)
+            self.cmdQueue.addCmd(cmd, self.galil.cmdParams)
         except Exception, e:
             raise CommandError(str(e))
         return True
@@ -212,17 +203,17 @@ class MirrorCtrl(Actor):
         @param[in] cmd: new local user command (twistedActor.UserCmd)
         """
 
-        if not self.galilDevice.conn.isConnected:
+        if not self.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.cmdQueue.addCmd(cmd, self.galilDevice.cmdStop)
+            self.cmdQueue.addCmd(cmd, self.galil.cmdStop)
         except Exception, e:
             raise CommandError(str(e))
         # command a status for 1 second later (roughly 2x stopping time from max speed)
-        dummyCmd = UserCmd(cmdStr="%i status"%cmd.userID)
+        dummyCmd = UserCmd(cmdStr="%i status" % cmd.userID)
         dummyCmd.cmdVerb = "status"
         dummyCmd.userID = cmd.userID
-        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.galilDevice.cmdStatus)
+        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.galil.cmdStatus)
         return True
 
     def cmd_reset(self, cmd):
@@ -230,28 +221,37 @@ class MirrorCtrl(Actor):
 
         @param[in] cmd: new local user command (twistedActor.UserCmd)
         """
-        if not self.galilDevice.conn.isConnected:
+        if not self.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            self.cmdQueue.addCmd(cmd, self.galilDevice.cmdReset)
+            self.cmdQueue.addCmd(cmd, self.galil.cmdReset)
         except Exception, e:
             raise CommandError(str(e))
         dummyCmd = UserCmd(cmdStr="%i status"%cmd.userID)
         dummyCmd.cmdVerb = "status"
         dummyCmd.userID = cmd.userID
-        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.galilDevice.cmdStatus)
+        self.statusTimer.start(1., self.cmdQueue.addCmd, dummyCmd, self.galil.cmdStatus)
         return True
 
 
-def runMirrorCtrl(device, userPort):
+def runMirrorCtrl(name, device, userPort):
     """Start up a Galil actor
 
+    @param[in] name: name of controller, e.g. "sec35m"; used for the log file and log entries
     @param[in] device: a twistedActor-based Galil Device (see mirrorCtrl/galilDevice.py)
     @param[in] userPort: port on which actor accepts user commands
     """
     from twisted.internet import reactor
 
-    Actor = MirrorCtrl(
+    # if LogDir is specified as an environment variable, begin logging to it.
+    try:
+        LogDir = os.environ["TWISTED_LOG_DIR"]
+    except KeyError:
+        pass # logging will not start
+    else:
+        startLogging(LogDir, name + ".log", serverMode = False)
+
+    MirrorCtrl(
         device = device,
         userPort = userPort,
     )

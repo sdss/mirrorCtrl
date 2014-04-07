@@ -4,15 +4,15 @@ from __future__ import division, absolute_import
 from twistedActor import DispatcherWrapper
 
 from .fakeGalil import FakeGalil
-from .fakeMirrorCtrlWrapper import FakeMirrorCtrlWrapper
+from .mirrorCtrlWrapper import MirrorCtrlWrapper
 
-__all__ = ["FakeDispatcherWrapper"]
+__all__ = ["MirrorDispatcherWrapper"]
 
-class FakeDispatcherWrapper(DispatcherWrapper):
+class MirrorDispatcherWrapper(DispatcherWrapper):
     """A wrapper for an ActorDispatcher talking to a mirror controller talking to a fake Galil
     
     This wrapper is responsible for starting and stopping everything:
-    - It builds a FakeMirrorCtrlWrapper on construction
+    - It builds a MirrorCtrlWrapper on construction
     - It builds an ActorDispatcher when fake mirror controller is ready
     - It stops both on close()
     
@@ -33,7 +33,7 @@ class FakeDispatcherWrapper(DispatcherWrapper):
         stateCallback = None,
         debug = False,
     ):
-        """Construct a FakeDispatcherWrapper that manages everything
+        """Construct a MirrorDispatcherWrapper that manages everything
 
         @param[in] userPort: port for mirror controller connections; 0 to auto-select
         @param[in] dictName: name of actor key dictionary
@@ -46,7 +46,7 @@ class FakeDispatcherWrapper(DispatcherWrapper):
             receives one argument: this actor wrapper
         @param[in] debug: print debug messages to stdout?
         """
-        actorWrapper = FakeMirrorCtrlWrapper(
+        actorWrapper = MirrorCtrlWrapper(
             mirror=mirror,
             galilClass=galilClass,
             userPort=userPort,

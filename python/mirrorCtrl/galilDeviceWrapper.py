@@ -6,9 +6,9 @@ from twistedActor import DeviceWrapper
 from .fakeGalil import FakeGalil
 from .galilDevice import GalilDevice
 
-__all__ = ["FakeGalilDeviceWrapper"]
+__all__ = ["GalilDeviceWrapper"]
 
-class FakeGalilDeviceWrapper(DeviceWrapper):
+class GalilDeviceWrapper(DeviceWrapper):
     """A wrapper for a GalilDevice and a fake Galil
     
     This wrapper is responsible for starting and stopping a fake Galil and a GalilDevice:
@@ -31,7 +31,7 @@ class FakeGalilDeviceWrapper(DeviceWrapper):
         port = 0,
         debug = False,
     ):
-        """Construct a FakeGalilDeviceWrapper that manages its fake Galil
+        """Construct a GalilDeviceWrapper that manages its fake Galil
 
         @param[in] mirror: the Mirror object used by the fake Galil
         @param[in] galilClass: class of fake Galil
@@ -44,10 +44,10 @@ class FakeGalilDeviceWrapper(DeviceWrapper):
         """
         self._mirror = mirror
         controller = galilClass(
-            mirror=mirror,
-            port=port,
-            verbose=verbose,
-            wakeUpHomed=wakeUpHomed,
+            mirror = mirror,
+            port = port,
+            verbose = verbose,
+            wakeUpHomed = wakeUpHomed,
         )
         DeviceWrapper.__init__(self, name=mirror.name, stateCallback=stateCallback, controller=controller, debug=debug)
     

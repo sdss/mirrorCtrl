@@ -4,6 +4,6 @@ from .galilDevice import *
 from .mirrorCtrl import *
 from .const import *
 from .fakeGalil import *
-from .fakeDispatcherWrapper import *
-from .fakeGalilDeviceWrapper import *
-from .fakeMirrorCtrlWrapper import *
+from .galilDeviceWrapper import *
+from .mirrorCtrlWrapper import *
+from .mirrorDispatcherWrapper import *

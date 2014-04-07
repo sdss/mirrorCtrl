@@ -246,7 +246,7 @@ class GalilDevice(TCPDevice):
     LargeTilt = 10. * RadPerArcSec
     ## scale the determined move offset correction by this much, eg go only 90%
     CorrectionStrength = 0.9
-    def __init__(self, mirror, host, port, maxIter = 5, callFunc = None):
+    def __init__(self, mirror, host, port, maxIter=5, callFunc=None, name=None):
         """Construct a GalilDevice
 
         @param[in] mirror: an instance of mirrorCtrl.MirrorBase
@@ -257,11 +257,12 @@ class GalilDevice(TCPDevice):
             it receives one argument: this device.
             Note that callFunc is NOT called when the connection state changes;
             register a callback with "conn" for that.
+        @param[in] name: name of device; if None then use mirror.name
         """
         self.MaxIter = maxIter
         self.mirror = mirror
         TCPDevice.__init__(self,
-            name = self.mirror.name,
+            name = name if name else mirror.name,
             host = host,
             port = port,
             callFunc = callFunc,
@@ -309,13 +310,18 @@ class GalilDevice(TCPDevice):
         outStr = keyword + '=' + valStr
         return outStr
 
-    def init(self, userCmd=None, timeLim=None):
+    def init(self, userCmd=None, timeLim=None, getStatus=False):
         """Initialize Galil
+
+        @param[in] userCmd: user command that tracks this command, if any
+        @param[in] timeLim: IGNORED maximum time before command expires, in sec; None for no limit
+        @param[in] getStatus: IGNORED (status is not output)
+        @return devCmd: the device command that was started (and may already have failed)
 
         Called on disconnection
         """
-        # writeToLog('init called')
-        self.cmdStop(userCmd=userCmd)
+        writeToLog("%s.init(userCmd=%s, timeLim=%s, getStatus=%s)" % (self, userCmd, timeLim, getStatus))
+        self.cmdStop(userCmd=userCmd, getStatus=getStatus)
 
     def parseReply(self, replyStr):
         """Parse a reply from the Galil and seperate into key=value format.
@@ -489,9 +495,8 @@ class GalilDevice(TCPDevice):
         - If a command has finished, call the appropriate command callback
         """
         # print "handleReply(replyStr=%r); currDevCmd=%r" % (replyStr, self.currDevCmd)
-        writeToLog('%s got Reply(%s)' % (self, replyStr,))
+        writeToLog("%s.handleReply(%r)" % (self, replyStr))
         replyStr = replyStr.replace(":", "").strip(' ;\r\n\x01\x03\x18\x00')
-        #print "handleReply(replyStr=%r)" % (replyStr,)
         if self.currDevCmd.isDone:
             # ignore unsolicited input
             return
@@ -588,15 +593,15 @@ class GalilDevice(TCPDevice):
         @param[in] nextDevCmdCall: Callable to execute when the device command is done.
         """
         # print "%s.startDevCmd(galilCmdStr=%r, nextDevCmdCall=%r)" % (self, galilCmdStr, nextDevCmdCall)
+        writeToLog("%s.startDevCmd(%r, nextDevCmdCall=%s)" % (self, galilCmdStr, nextDevCmdCall))
         if not self.currDevCmd.isDone:
             raise RuntimeError("Device command collision: userCmd=%r, currDevCmd=%r, desired galilCmdStr=%r" % \
                 (self.userCmd, self.currDevCmd, galilCmdStr))
-        self.currDevCmd = self.cmdClass(galilCmdStr, timeLim = self.DevCmdTimeout, callFunc=self._devCmdCallback)
+        self.currDevCmd = self.cmdClass(galilCmdStr, timeLim = self.DevCmdTimeout, callFunc=self._devCmdCallback, dev=self)
         self.nextDevCmdCall = nextDevCmdCall
         self.parsedKeyList = []
         # not self.clearAll()?
         try:
-            writeToLog("%s.startDevCmd(%s)" % (self, galilCmdStr,))
             if self.conn.isConnected:
                 self.conn.writeLine(galilCmdStr)
                 self.currDevCmd.setState(self.currDevCmd.Running)
@@ -620,10 +625,10 @@ class GalilDevice(TCPDevice):
     def _connCallback(self, conn=None):
         """If the connection closes, fail any current command
         """
-        # print "%s._connCallback(conn=%s); self.conn.state=%s" % (self, conn, self.conn.state)
-        if not self.conn.isConnected and not self.currDevCmd.isDone:
-            self.currDevCmd.setState(self.currDevCmd.Failed, "Connection closed")
         TCPDevice._connCallback(self, conn)
+        if not self._ignoreConnCallback:
+            if not self.conn.isConnected and not self.currDevCmd.isDone:
+                self.currDevCmd.setState(self.currDevCmd.Failed, "Connection closed")
 
     def _userCmdCallback(self, userCmd):
         """Callback to be added to every user command
@@ -776,14 +781,17 @@ class GalilDevice(TCPDevice):
         # self.currDevCmd.setState(self.currDevCmd.Done)
         Timer(0., self.currDevCmd.setState, self.currDevCmd.Done)
 
-    def cmdStop(self, userCmd):
+    def cmdStop(self, userCmd, getStatus=False):
         """Stop the Galil.
 
         @param[in] userCmd: a twistedActor UserCmd
 
-        Send 'ST;XQ#STATUS' to the Galil, causing it to stop all threads,
+        Send 'ST;XQ#STOP' to the Galil, causing it to stop all threads,
         """
-        self.runCommand(userCmd, galilCmdStr="ST;XQ#STATUS", forceKill=True)
+        if getStatus:
+            self.runCommand(userCmd, galilCmdStr="ST;XQ#STATUS", forceKill=True)
+        else:
+            self.runCommand(userCmd, galilCmdStr="ST;XQ#STOP", forceKill=True)
 
     def cmdCachedStatus(self, userCmd):
         """Return a cached status, don't ask the galil for a fresh one
@@ -948,7 +956,8 @@ class GalilDevice25Sec(GalilDevice):
         mirror,
         host,
         port,
-        callFunc = None,
+        callFunc=None,
+        name=None,
     ):
         """Construct a GalilDevice25Sec
 
@@ -959,8 +968,10 @@ class GalilDevice25Sec(GalilDevice):
             it receives one argument: this device.
             Note that callFunc is NOT called when the connection state changes;
             register a callback with "conn" for that.
+        @param[in] name: name of device; if None then use mirror.name
         """
         GalilDevice.__init__(self,
+            name = name if name else mirror.name,
             mirror = mirror,
             host = host,
             port = port,

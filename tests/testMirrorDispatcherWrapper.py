@@ -2,15 +2,18 @@
 from __future__ import division, absolute_import
 
 from twisted.trial.unittest import TestCase
+from twistedActor import testUtils
+
+testUtils.init(__file__)
 
 from mirrorCtrl.mirrors import mir35mTert
-from mirrorCtrl import FakeDispatcherWrapper
+from mirrorCtrl import MirrorDispatcherWrapper
 
-class TestFakeDispatcherWrapper(TestCase):
-    """Test basics of FakeDispatcherWrapper
+class TestMirrorDispatcherWrapper(TestCase):
+    """Test basics of MirrorDispatcherWrapper
     """
     def setUp(self):
-        self.dw = FakeDispatcherWrapper(
+        self.dw = MirrorDispatcherWrapper(
             mirror=mir35mTert,
         )
         return self.dw.readyDeferred

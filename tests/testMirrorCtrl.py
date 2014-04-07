@@ -9,6 +9,9 @@ dispatcher.
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import Deferred, gatherResults
 from twisted.internet import reactor
+from twistedActor import testUtils
+
+testUtils.init(__file__)
 
 import RO.Comm.Generic
 RO.Comm.Generic.setFramework("twisted")
@@ -16,7 +19,7 @@ from RO.Comm.TwistedTimer import Timer
 from opscore.actor import CmdVar
 
 from mirrorCtrl.mirrors import mir25mSec, mir35mTert
-from mirrorCtrl import FakePiezoGalil, FakeDispatcherWrapper
+from mirrorCtrl import FakePiezoGalil, MirrorDispatcherWrapper
 
 ## speed up fake galil responses
 import mirrorCtrl.fakeGalil
@@ -42,7 +45,7 @@ class GenericTests(TestCase):
     """
     def setUp(self):
         self.name = "mirror"
-        self.dw = FakeDispatcherWrapper(
+        self.dw = MirrorDispatcherWrapper(
             mirror=mir35mTert,
         )
         return self.dw.readyDeferred
@@ -54,10 +57,6 @@ class GenericTests(TestCase):
         self.fakeGalil.nextCmdTimer.cancel()
 
         return self.dw.close()
-
-    @property
-    def galilDevice(self):
-        return self.actor.galilDevice
 
     @property
     def dispatcher(self):
@@ -137,7 +136,7 @@ class GenericTests(TestCase):
             self.assertTrue(cmdVar.didFail)
         d.addCallback(checkResults)
         # set timeout to a very small number
-        self.galilDevice.DevCmdTimeout = 0.01
+        self.dw.actor.galil.DevCmdTimeout = 0.01
         self.dispatcher.executeCmd(cmdVar)
         return d
 
@@ -681,7 +680,7 @@ class PiezoTests(TestCase):
     """
     def setUp(self):
         self.name = "piezomirror"
-        self.dw = FakeDispatcherWrapper(
+        self.dw = MirrorDispatcherWrapper(
             mirror=mir25mSec,
             dictName=self.name,
             galilClass=FakePiezoGalil,

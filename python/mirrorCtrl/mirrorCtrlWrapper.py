@@ -4,16 +4,16 @@ from __future__ import division, absolute_import
 from twistedActor import ActorWrapper
 
 from .fakeGalil import FakeGalil
-from .fakeGalilDeviceWrapper import FakeGalilDeviceWrapper
+from .galilDeviceWrapper import GalilDeviceWrapper
 from .mirrorCtrl import MirrorCtrl
 
-__all__ = ["FakeMirrorCtrlWrapper"]
+__all__ = ["MirrorCtrlWrapper"]
 
-class FakeMirrorCtrlWrapper(ActorWrapper):
+class MirrorCtrlWrapper(ActorWrapper):
     """A wrapper for a MirrorCtrl talking to a fake Galil
 
     This wrapper is responsible for starting and stopping a fake Galil and a MirrorCtrl:
-    - It builds a FakeGalilDeviceWrapper on construction, using an auto-selected port
+    - It builds a GalilDeviceWrapper on construction, using an auto-selected port
     - It builds a MirrorCtrl when the fake Galil is ready
     - It stops both on close()
 
@@ -32,7 +32,7 @@ class FakeMirrorCtrlWrapper(ActorWrapper):
         stateCallback = None,
         debug = False,
     ):
-        """Construct a FakeMirrorCtrlWrapper that manages its fake Galil
+        """Construct a MirrorCtrlWrapper that manages its fake Galil
 
         @param[in] userPort: port for mirror controller connections; 0 to auto-select
         @param[in] mirror: the Mirror object used by the fake Galil
@@ -46,7 +46,7 @@ class FakeMirrorCtrlWrapper(ActorWrapper):
         self._mirror = mirror
         self._userPort = userPort
         self.actor = None # the MirrorCtrl, once it's built
-        deviceWrapper = FakeGalilDeviceWrapper(
+        deviceWrapper = GalilDeviceWrapper(
             mirror=mirror,
             galilClass=galilClass,
             verbose=verbose,
@@ -56,10 +56,10 @@ class FakeMirrorCtrlWrapper(ActorWrapper):
         ActorWrapper.__init__(self, deviceWrapperList=[deviceWrapper], stateCallback=stateCallback, debug=debug)
 
     def _makeActor(self):
-        #print "_makeActor()"
+        # print "%s._makeActor()" % (self,)
         self.actor = MirrorCtrl(
-            device=self.deviceWrapperList[0].device,
-            userPort=self._userPort,
+            name = self._mirror.name,
+            device = self.deviceWrapperList[0].device,
+            userPort = self._userPort,
         )
-        self.actor.server.addStateCallback(self._stateChanged)
 
