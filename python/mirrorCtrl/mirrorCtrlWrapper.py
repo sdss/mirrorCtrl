@@ -45,23 +45,28 @@ class MirrorCtrlWrapper(ActorWrapper):
         @param[in] debug: print debug messages to stdout?
         @param[in] name: name of mirror controller; defaults to mirror.name
         """
+        self.name = name
         self._mirror = mirror
-        self._userPort = userPort
-        self._name = name
         self.actor = None # the MirrorCtrl, once it's built
         deviceWrapper = GalilDeviceWrapper(
-            mirror=mirror,
-            galilClass=galilClass,
-            verbose=verbose,
-            wakeUpHomed=wakeUpHomed,
-            debug=debug,
+            mirror = mirror,
+            galilClass = galilClass,
+            verbose = verbose,
+            wakeUpHomed = wakeUpHomed,
+            debug = debug,
         )
-        ActorWrapper.__init__(self, deviceWrapperList=[deviceWrapper], stateCallback=stateCallback, debug=debug)
+        ActorWrapper.__init__(self,
+            deviceWrapperList = [deviceWrapper],
+            name = name,
+            userPort = userPort,
+            stateCallback = stateCallback,
+            debug = debug,
+        )
 
     def _makeActor(self):
-        # print "%s._makeActor()" % (self,)
+        print "%s._makeActor(); self.name=%s, self._userPort=%s" % (self, self.name, self._userPort)
         self.actor = MirrorCtrl(
-            name = self._name or self._mirror.name,
+            name = self.name or self._mirror.name,
             device = self.deviceWrapperList[0].device,
             userPort = self._userPort,
         )

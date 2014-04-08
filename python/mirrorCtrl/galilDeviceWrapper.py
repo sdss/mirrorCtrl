@@ -25,6 +25,7 @@ class GalilDeviceWrapper(DeviceWrapper):
     def __init__(self,
         mirror,
         galilClass = FakeGalil,
+        name = "",
         verbose = False,
         wakeUpHomed = True,
         stateCallback = None,
@@ -35,6 +36,7 @@ class GalilDeviceWrapper(DeviceWrapper):
 
         @param[in] mirror: the Mirror object used by the fake Galil
         @param[in] galilClass: class of fake Galil
+        @param[in] name: name of device
         @param[in] verbose: should the fake Gail run in verbose mode?
         @param[in] wakeUpHomed: should actuators be homed upon construction, or not?
         @param[in] stateCallback: function to call when connection state of hardware controller or device changes;
@@ -49,7 +51,12 @@ class GalilDeviceWrapper(DeviceWrapper):
             verbose = verbose,
             wakeUpHomed = wakeUpHomed,
         )
-        DeviceWrapper.__init__(self, name=mirror.name, stateCallback=stateCallback, controller=controller, debug=debug)
+        DeviceWrapper.__init__(self,
+            name = name,
+            stateCallback = stateCallback,
+            controller = controller,
+            debug = debug,
+        )
     
     def _makeDevice(self):
         port = self.port
