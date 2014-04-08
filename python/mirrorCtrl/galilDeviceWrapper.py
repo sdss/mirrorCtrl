@@ -10,12 +10,12 @@ __all__ = ["GalilDeviceWrapper"]
 
 class GalilDeviceWrapper(DeviceWrapper):
     """A wrapper for a GalilDevice and a fake Galil
-    
+
     This wrapper is responsible for starting and stopping a fake Galil and a GalilDevice:
     - It builds a fake Galil on construction
     - It builds a GalilDevice when the fake Galil is ready
     - It stops both on close()
-    
+
     Public attributes include:
     - controller: the fake Galil
     - device: the GalilDevice (None until ready)
@@ -28,6 +28,7 @@ class GalilDeviceWrapper(DeviceWrapper):
         verbose = False,
         wakeUpHomed = True,
         stateCallback = None,
+        fastTimeout = False,
         port = 0,
         debug = False,
     ):
@@ -50,7 +51,7 @@ class GalilDeviceWrapper(DeviceWrapper):
             wakeUpHomed = wakeUpHomed,
         )
         DeviceWrapper.__init__(self, name=mirror.name, stateCallback=stateCallback, controller=controller, debug=debug)
-    
+
     def _makeDevice(self):
         port = self.port
         if port is None:

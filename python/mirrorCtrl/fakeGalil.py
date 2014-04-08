@@ -29,7 +29,13 @@ MAXINT = 2147483647
 MaxCmdTime = 2.0 # maximum time any command can take; sec
 
 class FakeGalil(TCPServer):
-    def __init__(self, mirror, port=0, verbose=False, wakeUpHomed=True, stateCallback=None):
+    def __init__(self,
+            mirror,
+            port=0,
+            verbose=False,
+            wakeUpHomed=True,
+            stateCallback=None,
+        ):
         """Fake Galil TCP server
 
         @param[in] mirror: a mirrorCtrl.mirror.Mirror object, the mirror this fake galil should emulate
@@ -40,6 +46,7 @@ class FakeGalil(TCPServer):
         """
         self.verbose = bool(verbose)
         self.wakeUpHomed = bool(wakeUpHomed)
+        self.fastTimeout = bool(False) # this is toggled independently by a specific unit test in the tcc testMirDevTO.py
         self.mirror = mirror
         self._cmdBuffer = collections.deque()
         self.replyTimer = Timer()
@@ -230,7 +237,8 @@ class FakeGalil(TCPServer):
         deltaPos = numpy.where(self.userNums == MAXINT, 0.0, -self.range)
         deltaTimeArr = numpy.abs(deltaPos / numpy.array(self.speed, dtype=float))
         moveTime = min(deltaTimeArr.max(), MaxCmdTime)
-
+        if self.fastTimeout:
+            deltaTimeArr = [0.1 for x in deltaTimeArr]
         self.sendLine(self.formatArr("%6.1f", deltaTimeArr, "max sec to find reverse limit switch"))
 
         self.replyTimer.start(moveTime, self.homeFoundHome)
@@ -241,7 +249,8 @@ class FakeGalil(TCPServer):
         deltaPos = numpy.where(self.userNums == MAXINT, 0.0, self.marg)
         deltaTimeArr = deltaPos / numpy.array(self.homeSpeed, dtype=float)
         moveTime = min(deltaTimeArr.max(), MaxCmdTime)
-
+        if self.fastTimeout:
+            deltaTimeArr = [0.1 for x in deltaTimeArr]#deltaTimeArr / 10. # force a quicker timeout
         self.sendLine(self.formatArr("%6.1f", deltaTimeArr, "max sec to move away from home switch"))
 
         self.replyTimer.start(moveTime, self.homeMovedAway)
@@ -353,7 +362,8 @@ class FakeGalil(TCPServer):
 #         #measMount = numpy.hstack((self.mirror.encoderMountFromOrient(measOrient), noisyPos[3:])) #append last 3 'unused' axes
 #         measMount = self.mirror.encoderMountFromOrient(measOrient)
 #         self.measPos = measMount
-
+        if self.fastTimeout:
+            deltaTimeArr = [0.1 for x in deltaTimeArr]#deltaTimeArr/10. # report shorter time for move
         self.sendLine(self.formatArr("%4.1f", deltaTimeArr, "max sec for move"))
         self.sendLine(self.formatArr("%09d", self.cmdPos, "target position"))
         self.replyTimer.start(moveTime, self.moveDone)
