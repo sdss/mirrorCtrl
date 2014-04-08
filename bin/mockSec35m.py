@@ -16,18 +16,10 @@ parser.add_argument("-v", "--verbose", action = "store_true", help = "print inpu
 
 args = parser.parse_args()
 
-def stateCallback(wrapper):
-    if wrapper.isReady:
-        print "Fake 35mSec controller running on port", wrapper.userPort
-    elif wrapper.didFail:
-        print "Fake 35mSec controller error"
-    elif wrapper.isDone:
-        print "Fake 35mSec controller shut down"
-
 MirrorCtrlWrapper(
-    mirror=mir35mSec,
-    userPort=args.port,
-    verbose=args.verbose,
-    stateCallback=stateCallback,
+    name = "mockSec35m",
+    mirror = mir35mSec,
+    userPort = args.port,
+    verbose = args.verbose,
 )
 reactor.run()

@@ -31,6 +31,7 @@ class MirrorCtrlWrapper(ActorWrapper):
         wakeUpHomed = True,
         stateCallback = None,
         debug = False,
+        name = None,
     ):
         """Construct a MirrorCtrlWrapper that manages its fake Galil
 
@@ -42,9 +43,11 @@ class MirrorCtrlWrapper(ActorWrapper):
         @param[in] stateCallback: function to call when connection state of hardware controller or actor changes;
             receives one argument: this actor wrapper
         @param[in] debug: print debug messages to stdout?
+        @param[in] name: name of mirror controller; defaults to mirror.name
         """
         self._mirror = mirror
         self._userPort = userPort
+        self._name = name
         self.actor = None # the MirrorCtrl, once it's built
         deviceWrapper = GalilDeviceWrapper(
             mirror=mirror,
@@ -58,7 +61,7 @@ class MirrorCtrlWrapper(ActorWrapper):
     def _makeActor(self):
         # print "%s._makeActor()" % (self,)
         self.actor = MirrorCtrl(
-            name = self._mirror.name,
+            name = self._name or self._mirror.name,
             device = self.deviceWrapperList[0].device,
             userPort = self._userPort,
         )

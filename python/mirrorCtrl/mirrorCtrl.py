@@ -7,7 +7,7 @@ import sys
 import traceback
 
 import numpy
-from twistedActor import Actor, CommandError, writeToLog, startLogging, CommandQueue, UserCmd#,startGlobalLogging UserCmd, BaseCmd,
+from twistedActor import Actor, CommandError, writeToLog, CommandQueue, UserCmd
 from RO.Comm.TwistedTimer import Timer
 
 from .const import convOrient2MMRad
@@ -242,6 +242,7 @@ def runMirrorCtrl(name, device, userPort):
     @param[in] userPort: port on which actor accepts user commands
     """
     from twisted.internet import reactor
+    from twistedActor import startLogging
 
     # if LogDir is specified as an environment variable, begin logging to it.
     try:
@@ -252,9 +253,8 @@ def runMirrorCtrl(name, device, userPort):
         startLogging(LogDir, name + ".log", serverMode = False)
 
     MirrorCtrl(
+        name = name,
         device = device,
         userPort = userPort,
     )
-
-    print "%s mirror controller starting on port %s" % (device.mirror.name, userPort,)
     reactor.run()
