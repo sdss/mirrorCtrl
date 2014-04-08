@@ -253,9 +253,8 @@ def runMirrorCtrl(name, device, userPort):
         startLogging(LogDir, name + ".log", serverMode = False)
 
     MirrorCtrl(
+        name = name,
         device = device,
         userPort = userPort,
     )
-
-    print "%s mirror controller starting on port %s" % (device.mirror.name, userPort,)
     reactor.run()
