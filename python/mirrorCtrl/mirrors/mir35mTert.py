@@ -7,8 +7,8 @@ The 3.5m tertiary has an unusual coordinate system convention:
 +X defined by right hand rule
 
 The actuator placements are defined (below) in the plane of the mirror, so a
-coord transform is necessary.  The coords and transform method are almost identical 
-to the file: 3.5m M3 Actuator Positions 2008-04-18.py (in docs directory).  
+coord transform is necessary.  The coords and transform method are almost identical
+to the file: 3.5m M3 Actuator Positions 2008-04-18.py (in docs directory).
 Differences are:
 1. Fake encoder positions are also computed here.
 2. Fixed link geometry is from Nick Macdonald, the old version used 3
@@ -17,15 +17,15 @@ Differences are:
    the X translation link wasn't in the solid model, so I guessed that it extends along
    +X, rather than -X).
    The old positions are included below for reference but commented out.
-   
+
 3.5m M3 Actuator Positions 2008-04-18.py has a worksheet showing old TCC 3.5m M3 model
-   
+
 Notes:
 
 2012-07 - Measured encoder / actuator positions during shutdown.
             actuator radius = 8.96"
             encoder radius = 10.69"
-        - Fixed length links: 2 extend towards A (-y?), 1 extends towards B (+x?). 
+        - Fixed length links: 2 extend towards A (-y?), 1 extends towards B (+x?).
             I think this is correct convention.
         - Did not adjust Z positions.
 """
@@ -36,7 +36,7 @@ import mirrorCtrl
 from mirrorCtrl.const import MMPerInch, RadPerDeg
 
 ## Mirror name
-Name = '3.5m Tertiary'
+Name = 'mir35mTert'
 
 def _makeMirror():
     """Create a 3.5m Tertiary Mirror
@@ -80,7 +80,7 @@ def _makeMirror():
         ))
         baseEnc[actInd, 0:2] = mirEnc[actInd, 0:2]
         baseEnc[actInd, 2] = zBase
-        
+
     # now add fixed link constraints:
     # 0,1 are transverse
     # 2 is anti-rotation
@@ -130,30 +130,30 @@ def _makeMirror():
     encoderList = []
     fixedLinkList = []
     # generate list of actuators, encoders, and fixed links
-    for i in range(3):    
+    for i in range(3):
         actuatorList.append(
             mirrorCtrl.AdjLengthLink(
             #mirrorCtrl.AdjBaseActuator(
-                basePosAct[i, :], mirPosAct[i, :], ActMinMount[i], 
+                basePosAct[i, :], mirPosAct[i, :], ActMinMount[i],
                 ActMaxMount[i], ActMountScale[i], ActMountOffset[i]
             )
-        )    
+        )
         encoderList.append(
             mirrorCtrl.AdjLengthLink(
-                basePosEnc[i, :], mirPosEnc[i, :], ActMinMount[i], 
-                ActMaxMount[i], ActMountScale[i], ActMountOffset[i]        
+                basePosEnc[i, :], mirPosEnc[i, :], ActMinMount[i],
+                ActMaxMount[i], ActMountScale[i], ActMountOffset[i]
             )
-        )    
+        )
         fixedLinkList.append(
             mirrorCtrl.FixedLengthLink( basePosFix[i, :], mirPosFix[i, :] )
         )
 
     # minCorrList = [4.0e-5]*3 # min correction (mm); 50 actuator microsteps
     # maxCorrList = [0.79]*3   # max correction (mm); 1000000 actuator microsteps
-        
+
     minCorrList = [50]*3 # min correction actuator microsteps
     maxCorrList = [1000000]*3   # max correction actuator microsteps
-        
+
     return mirrorCtrl.DirectMirror(
         actuatorList = actuatorList,
         fixedLinkList = fixedLinkList,

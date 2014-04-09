@@ -53,20 +53,9 @@ class GenericTests(TestCase):
     def tearDown(self):
         self.actor.statusTimer.cancel()
         self.actor.cmdQueue.queueTimer.cancel()
-        # self.actor.cmdQueue.timer.cancel()
-        # self.actor.galil.timer.cancel()
-        # self.actor.galil.userCmd._removeAllCallbacks()
-        # self.actor.galil.currDevCmd._removeAllCallbacks()
-        # self.dispatcher._checkCmdTimer.cancel()
-        # self.dispatcher._checkRemCmdTimer.cancel()
-        # self.dispatcher._refreshAllTimer.cancel()
-        # self.dispatcher._refreshNextTimer.cancel()
         self.fakeGalil.replyTimer.cancel()
         self.fakeGalil.nextCmdTimer.cancel()
-        # from twisted.internet import reactor
-        # for call in reactor.getDelayedCalls():
-        #     print 'gotta delayed call!', call
-        #     call.cancel()
+
         return self.dw.close()
 
     @property

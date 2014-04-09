@@ -1,11 +1,11 @@
 #!/usr/bin/env python2
 """Configuration of secondary mirror for 3.5m APO telescope
 
-notes: 
+notes:
 2012-08 - Measured encoder and fixed link positions during 2012 shutdown.
             actuator radius = 9.08 inches
             encoder radius = 10.25 inches
-            
+
         - do the transverse encoders lie between the actuator and glass?  I can't remember but I think this is correct
 """
 __all__ = ["mir35mSec"]
@@ -16,11 +16,11 @@ import mirrorCtrl
 from mirrorCtrl.const import MMPerInch, RadPerDeg
 
 ## Mirror name
-Name = '3.5m Secondary'
+Name = 'mir35mSec'
 ## Radial position of ABC actuators relative to mirror vertex
-actRad =   9.08 * MMPerInch 
+actRad =   9.08 * MMPerInch
 ## Radial position of ABC encoders relative to mirror vertex
-encRad = 10.25 * MMPerInch 
+encRad = 10.25 * MMPerInch
 
 def _makeMirror():
     """Create a 3.5m Secondary Mirror
@@ -49,8 +49,8 @@ def _makeMirror():
     xyBaseTrans = 284.010 # for Transverse
     zEncOffsetTrans = 0.90 * MMPerInch # Transverse encoders are between actuator and glass.
 
-    
-    angDegList = numpy.array([-90.0+180., 30.+180., 150.+180.]) 
+
+    angDegList = numpy.array([-90.0+180., 30.+180., 150.+180.])
     angRadList = angDegList * RadPerDeg
 
     # Actuators are: Axial A, B, C, Transverse D, E
@@ -105,7 +105,7 @@ def _makeMirror():
             xyBaseTrans,
             zBaseTrans
         ])
-        
+
         mirEnc[actInd, :] = numpy.array([
             xyMirTrans * mult,
             xyMirTrans,
@@ -132,20 +132,20 @@ def _makeMirror():
         basePosAct = baseAct[i, :]
         mirPosAct = mirAct[i, :]
         basePosEnc = baseEnc[i, :]
-        mirPosEnc = mirEnc[i, :]   
+        mirPosEnc = mirEnc[i, :]
         ###########################################
 
 
         actuatorList.append(
             mirrorCtrl.AdjBaseActuator(
-                basePosAct, mirPosAct, 
+                basePosAct, mirPosAct,
                 ActMinMount[i], ActMaxMount[i], ActMountScale[i], ActMountOffset[i]
             )
         )
         encoderList.append(
             mirrorCtrl.AdjLengthLink(
-                basePosEnc, mirPosEnc, 
-                ActMinMount[i], ActMaxMount[i], ActMountScale[i], ActMountOffset[i]        
+                basePosEnc, mirPosEnc,
+                ActMinMount[i], ActMaxMount[i], ActMountScale[i], ActMountOffset[i]
             )
         )
 

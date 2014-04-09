@@ -48,7 +48,7 @@ class MirrorCtrl(Actor):
         self.galil = device # easier access
         def killFunc(killThisCmd):
             # print "killing this command!!! %r"% killThisCmd
-            killThisCmd.setState(killThisCmd.Cancelled)
+            killThisCmd.setState(killThisCmd.Cancelled, "Killed via killFunc in commandQueue")
             # the galil device is listening for the cancelled state.
             # A galilDevice adds a callback to the user command to ensure cleanup
             # happens if the user command is cancelled.
@@ -64,7 +64,7 @@ class MirrorCtrl(Actor):
             }
         )
         self.cmdQueue.addRule(
-            action = CommandQueue.KillRunning,
+            action = CommandQueue.KillRunning, # note this will also cancel a queued move
             newCmds = ['move'],
             queuedCmds = ['move'],
         )
