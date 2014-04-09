@@ -250,7 +250,7 @@ def runMirrorCtrl(name, device, userPort):
     except KeyError:
         pass # logging will not start
     else:
-        startLogging(LogDir, name + ".log", serverMode = False)
+        startLogging(LogDir, name + ".log")
 
     MirrorCtrl(
         name = name,
