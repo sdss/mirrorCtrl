@@ -92,6 +92,7 @@ class MirrorCtrl(Actor):
     def _cancelTimers(self):
         """Cancel all timers
         """
+        self.cmdQueue.queueTimer.cancel()
         self.statusTimer.cancel()
 
     def logMsg(self, msgStr):

@@ -64,7 +64,6 @@ class MirrorCtrlWrapper(ActorWrapper):
         )
 
     def _makeActor(self):
-        print "%s._makeActor(); self.name=%s, self._userPort=%s" % (self, self.name, self._userPort)
         self.actor = MirrorCtrl(
             name = self.name or self._mirror.name,
             device = self.deviceWrapperList[0].device,

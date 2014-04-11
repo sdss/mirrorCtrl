@@ -17,11 +17,13 @@ To do:
 - Figure out how to set status more realistically.
 """
 import collections
+import logging
 import re
 
 import numpy
 from RO.Comm.TwistedTimer import Timer
 from RO.Comm.TwistedSocket import TCPServer
+from twistedActor import writeToLog
 
 __all__ = ["FakeGalil", "FakePiezoGalil"]
 
@@ -233,7 +235,6 @@ class FakeGalil(TCPServer):
         """Start homing
         """
         self.isHomed[:] = numpy.logical_and(self.isHomed, self.userNums == MAXINT)
-        cmdPos = numpy.where(self.userNums == MAXINT, self.cmdPos, self.cmdPos - self.range)
         deltaPos = numpy.where(self.userNums == MAXINT, 0.0, -self.range)
         deltaTimeArr = numpy.abs(deltaPos / numpy.array(self.speed, dtype=float))
         moveTime = min(deltaTimeArr.max(), MaxCmdTime)
@@ -392,7 +393,7 @@ class FakeGalil(TCPServer):
         if self.userSock:
             self.userSock.writeLine(line)
         else:
-            print "Warning: no socket to send this to:", line
+            writeToLog("%s.sendLine(%r) failed: no socket" % (line,), logging.WARNING)
 
 
 class FakePiezoGalil(FakeGalil):

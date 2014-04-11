@@ -51,11 +51,6 @@ class GenericTests(TestCase):
         return self.dw.readyDeferred
 
     def tearDown(self):
-        self.actor.statusTimer.cancel()
-        self.actor.cmdQueue.queueTimer.cancel()
-        self.fakeGalil.replyTimer.cancel()
-        self.fakeGalil.nextCmdTimer.cancel()
-
         return self.dw.close()
 
     @property

@@ -495,7 +495,7 @@ class GalilDevice(TCPDevice):
         - If a command has finished, call the appropriate command callback
         """
         # print "handleReply(replyStr=%r); currDevCmd=%r" % (replyStr, self.currDevCmd)
-        writeToLog("%s.handleReply(%r)" % (self, replyStr))
+        writeToLog("%s read %r" % (self, replyStr))
         replyStr = replyStr.replace(":", "").strip(' ;\r\n\x01\x03\x18\x00')
         if self.currDevCmd.isDone:
             # ignore unsolicited input
@@ -603,6 +603,7 @@ class GalilDevice(TCPDevice):
         # not self.clearAll()?
         try:
             if self.conn.isConnected:
+                writeToLog("%s writing %r" % (self, galilCmdStr))
                 self.conn.writeLine(galilCmdStr)
                 self.currDevCmd.setState(self.currDevCmd.Running)
             else:
@@ -675,7 +676,9 @@ class GalilDevice(TCPDevice):
             # print 'DEV CMD Cancelled via clear all'
             # send an ST and set command state to cancelled
             if self.conn.isConnected:
-                self.conn.writeLine("ST; XQ#STOP")
+                cmdStr = "ST; XQ#STOP"
+                writeToLog("%s writing %r for clearAll" % (self, cmdStr))
+                self.conn.writeLine(cmdStr)
             # self.timer.start(0, self.currDevCmd.setState, self.currDevCmd.Cancelled, textMsg="Device Command Cancelled via clearAll() in galilDevice")
             self.currDevCmd.setState(self.currDevCmd.Cancelled, textMsg="Device Command Cancelled via clearAll() in galilDevice")
 
