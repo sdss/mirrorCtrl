@@ -357,10 +357,6 @@ class FakeGalil(TCPServer):
         # add noise to encoder measurement
         noisyEnc = trueEnc + noise
         self.measPos = noisyEnc
-        # hack to try and reproduce error of iteration
-        # being set on galils
-        self.measPos = self.cmdPos
-
 
  #       print "fake Galil Meas Pos", self.measPos
 #         noisyPos = newCmdPos + noise
