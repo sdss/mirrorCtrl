@@ -557,6 +557,26 @@ class GenericTests(TestCase):
         # self.dispatcher.executeCmd(cmdStatus)
         return dBoth
 
+    def testSimpleMove(self):
+        """Simply test a move and see if it works
+        """
+        self.actor.logMsg("testSimpleMove")
+        d1 = Deferred()
+        orientation1 = [-2000.0, 150.0, 860.0]
+        cmdStr1 = 'move ' + ', '.join([str(x) for x in orientation1])
+        cmdMove1 = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr1,
+                callFunc = CmdCallback(d1),
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertFalse(cmdMove1.didFail)
+        d1.addCallback(checkResults)
+        self.dispatcher.executeCmd(cmdMove1)
+        return d1
+
     def testMoveSupersede(self):
         """Send two move commands, the second should supersede the first
         """

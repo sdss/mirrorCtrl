@@ -495,10 +495,10 @@ class GalilDevice(TCPDevice):
         - If a command has finished, call the appropriate command callback
         """
         # print "handleReply(replyStr=%r); currDevCmd=%r" % (replyStr, self.currDevCmd)
-        writeToLog("%s read %r" % (self, replyStr))
+        writeToLog("%s read %r, currDevCmd: %r" % (self, replyStr, self.currDevCmd))
         replyStr = replyStr.replace(":", "").strip(' ;\r\n\x01\x03\x18\x00')
         if self.currDevCmd.isDone:
-            # ignore unsolicited input
+            writeToLog("Ignoring unsolicited output from Galil: %s " % replyStr)
             return
         if self.currDevCmd.state == self.currDevCmd.Cancelling:
             raise RuntimeError("Should not be set to Cancelling")
@@ -641,6 +641,7 @@ class GalilDevice(TCPDevice):
                 self.clearAll()
             elif userCmd.isFailing:
                 # use a timer so cancelling devCmdState sets userCmd state
+                # self.clearAll()
                 Timer(0, self.clearAll)
 
     def _devCmdCallback(self, devCmd):
@@ -674,10 +675,12 @@ class GalilDevice(TCPDevice):
         if not self.currDevCmd.isDone:
             # print 'DEV CMD Cancelled via clear all'
             # send an ST and set command state to cancelled
-            if self.conn.isConnected:
-                cmdStr = "ST; XQ#STOP"
-                writeToLog("%s writing %r for clearAll" % (self, cmdStr))
-                self.conn.writeLine(cmdStr)
+            # raise RuntimeError("clearAll called in galilDevice, but currDevCmd not done: %r"%self.currDevCmd)
+            # if self.conn.isConnected:
+            #     cmdStr = "ST; XQ#STOP"
+            #     # cmdStr = "ST;"
+            #     writeToLog("%s writing %r in clearAll before cancelling currently executing device command %s" % (self, cmdStr, self.currDevCmd.cmdStr))
+            #     self.conn.writeLine(cmdStr)
             # self.timer.start(0, self.currDevCmd.setState, self.currDevCmd.Cancelled, textMsg="Device Command Cancelled via clearAll() in galilDevice")
             self.currDevCmd.setState(self.currDevCmd.Cancelled, textMsg="Device Command Cancelled via clearAll() in galilDevice")
 
