@@ -155,9 +155,9 @@ class GalilStatus(object):
         ## encoder mount reported from the galil
         self.encMount = numpy.asarray([numpy.nan]*self.nAct)
         ## the user commanded mount position
-        self.cmdMount = numpy.asarray([numpy.nan]*self.nAct)
+        self.modelMount = numpy.asarray([numpy.nan]*self.nAct)
         ## subsequent commanded mount positions determined during iterations
-        self.cmdMountIter = numpy.asarray([numpy.nan]*self.nAct)
+        self.cmdMount = numpy.asarray([numpy.nan]*self.nAct)
         ## offset applied to a previously commanded mount, a new mountErr is determined each iteration
         self.mountErr = numpy.asarray([0.]*self.nAct)
         ## last computed total offset between the first commanded mount position and the last commanded mount position after iteration
@@ -187,8 +187,8 @@ class GalilStatus(object):
             "Duration": self.duration.getTime,
             "ActMount": mountCast,
             "EncMount": mountCast,
+            "ModelMount": mountCast,
             "CmdMount": mountCast,
-            "CmdMountIter": mountCast,
             "MountErr": mountCast,
             "MountOffset": mountCast,
             "Orient": orientCast,
@@ -426,7 +426,7 @@ class GalilDevice(TCPDevice):
                 self.userCmd.setTimeLimit(maxTime + 5)
 
         elif ('commanded position' == key) or ('target position' == key):
-            # cmdMount must not be updated for actuator error determination
+            # modelMount must not be updated for actuator error determination
             # and subsequent move commands
             pass
 
@@ -743,13 +743,13 @@ class GalilDevice(TCPDevice):
         cmdMoveStr = self.formatGalilCommand(valueList=mount+ numpy.asarray(self.status.mountOffset, dtype=float), cmd="XQ #MOVE")
         self.runCommand(userCmd, galilCmdStr=cmdMoveStr, nextDevCmdCall=self._moveIter)
         if self.currDevCmd.state == self.currDevCmd.Running:
-            self.status.cmdMount = mount[:] # this will not change upon iteration
-            self.status.cmdMountIter = mount[:] + numpy.asarray(self.status.mountOffset, dtype=float) # this will change upon iteration
+            self.status.modelMount = mount[:] # this will not change upon iteration
+            self.status.cmdMount = mount[:] + numpy.asarray(self.status.mountOffset, dtype=float) # this will change upon iteration
             self.status.desOrient = adjOrient[:] # initial guess for fitter
             if self.mirror.hasEncoders:
                 self.status.iter = 1
             self.status.desOrientAge.startTimer()
-            statusStr = self.status._getKeyValStr(["DesOrient", "DesOrientAge", "CmdMount", "MaxIter", "Iter"])
+            statusStr = self.status._getKeyValStr(["DesOrient", "DesOrientAge", "ModelMount", "MaxIter", "Iter"])
             self.writeToUsers('i', statusStr, cmd=userCmd)
         else:
             # dev command not running for some reason, must have failed
@@ -789,7 +789,7 @@ class GalilDevice(TCPDevice):
             "MaxDuration",
             "Duration",
             "ActMount",
-            "CmdMount",
+            "ModelMount",
             "Orient",
             "DesOrient",
             "DesOrientAge",
@@ -835,9 +835,9 @@ class GalilDevice(TCPDevice):
                 self.currDevCmd.setState(self.currDevCmd.Failed, textMsg="Final actuator positions not received from move")
             return
 
-        actErr = [cmd - act for cmd, act in itertools.izip(self.status.cmdMount[0:self.nAct], self.status.actMount[0:self.nAct])]
+        actErr = [cmd - act for cmd, act in itertools.izip(self.status.modelMount[0:self.nAct], self.status.actMount[0:self.nAct])]
         self.status.mountErr = actErr[:]
-        statusStr = self.status._getKeyValStr(["CmdMount", "Iter", "MountErr"])
+        statusStr = self.status._getKeyValStr(["ModelMount", "Iter", "MountErr"])
         self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
 
         # error too large to correct?
@@ -847,15 +847,15 @@ class GalilDevice(TCPDevice):
 
         # perform another iteration?
         if numpy.any(numpy.abs(actErr) > self.mirror.minCorrList) and (self.status.iter < self.status.maxIter):
-            newCmdActPos = [err*self.CorrectionStrength + prevMount for err, prevMount in itertools.izip(actErr, self.status.cmdMountIter)]
-            self.status.cmdMountIter = newCmdActPos
+            newCmdActPos = [err*self.CorrectionStrength + prevMount for err, prevMount in itertools.izip(actErr, self.status.cmdMount)]
+            self.status.cmdMount = newCmdActPos
             self.status.mountOrient = numpy.asarray(self.mirror.orientFromActuatorMount(newCmdActPos))
             # clear or update the relevant slots before beginning a new device cmd
             self.parsedKeyList = []
             self.status.iter += 1
             self.status.duration.reset() # new timer for new move
             self.userCmd.setTimeLimit(5)
-            statusStr = self.status._getKeyValStr(["CmdMount", "CmdMountIter", "Iter", "MountOrient"])
+            statusStr = self.status._getKeyValStr(["ModelMount", "CmdMount", "Iter", "MountOrient"])
             self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
             # convert from numpy to simple list for command formatting
             mount = [x for x in newCmdActPos]
@@ -866,7 +866,7 @@ class GalilDevice(TCPDevice):
         # record offset which is total descrepancy between first commanded (naive) mount position
         # and lastly commanded (iterated/converged) mount position
         # offset should be added
-        self.status.mountOffset = [cmdLast - cmdFirst for cmdFirst, cmdLast in itertools.izip(self.status.cmdMount[0:self.nAct], self.status.cmdMountIter[0:self.nAct])]
+        self.status.mountOffset = [cmdLast - cmdFirst for cmdFirst, cmdLast in itertools.izip(self.status.modelMount[0:self.nAct], self.status.cmdMount[0:self.nAct])]
         self._moveEnd()
 
     def _moveEnd(self, *args):
@@ -1030,7 +1030,7 @@ class GalilDevice25Sec(GalilDevice):
 
         Only axes A-C have piezo actuators.
         """
-        actErr = self.status.cmdMount[:3] - self.status.actMount[:3] # round?
+        actErr = self.status.modelMount[:3] - self.status.actMount[:3] # round?
         prefix = 'LDESPOS'
         axes = ['A', 'B', 'C']
         argList = ["%s%s=%s" % (prefix, axes[ind], int(round(val))) for ind, val in enumerate(actErr)]
