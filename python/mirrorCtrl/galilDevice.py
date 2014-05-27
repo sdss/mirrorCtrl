@@ -230,20 +230,10 @@ class GalilDevice(TCPDevice):
     but doing so when the command begins is probably sufficient,
     or when the state is Running.
     """
-    ## one second to wait after sending an st
-    STWaitTime = 1.
-    ## wait two seconds after sending an rs
-    RSWaitTime = 2.
     ## initial timeout to use for every device command
     ## the following are thresholds (large moves) beyond which automatic (previously computed)
     ## move offsets should not be used
     DevCmdTimeout = 2.
-    ## A big piston , indicating a local saved offset should not be applied
-    LargePiston = 500. * MMPerMicron
-    ## A big translation, indicating a local saved offset should not be applied
-    LargeTranslation = 100. * MMPerMicron
-    ## A big tilt, indicating a local saved offset should not be applied
-    LargeTilt = 10. * RadPerArcSec
     ## scale the determined move offset correction by this much, eg go only 90%
     CorrectionStrength = 0.9
     def __init__(self, mirror, host, port, maxIter=5, callFunc=None, name=None):
@@ -744,19 +734,10 @@ class GalilDevice(TCPDevice):
         adjOrient = numpy.asarray(adjOrient, dtype=float)
         mount = numpy.asarray(mount, dtype=float)
 
-        # determine if automatic offset should be applied (is this a small move?)
-        # self.status.desOrient will not be finite (numpy.nans) upon startup
-        addOffset = False
-        if numpy.isfinite(numpy.sum(self.status.desOrient)):
-            orientDiff = numpy.abs(adjOrient-self.status.desOrient)[1:5] #don't care about z-rot, nor pistion
-            bigOrient = numpy.asarray([self.LargeTilt, self.LargeTilt, self.LargeTranslation, self.LargeTranslation], dtype=float)
-            addOffset = numpy.all(numpy.all(orientDiff/bigOrient < 1)) # small move, add offset
-        if addOffset:
-            # be sure that a previous desOrient is defined (not nans)
-            #mount = mount + numpy.asarray(self.status.mountOffset, dtype=float)
-            self.writeToUsers("i", "Text=\"Automatically applying previous offset to mirror move.\"", cmd=userCmd)
-            statusStr = self.status._getKeyValStr(["MountOffset"])
-            self.writeToUsers('i', statusStr, cmd=userCmd)
+        # apply the offset from
+        self.writeToUsers("i", "Text=\"Automatically applying previous offset to mirror move.\"", cmd=userCmd)
+        statusStr = self.status._getKeyValStr(["MountOffset"])
+        self.writeToUsers('i', statusStr, cmd=userCmd)
 
         # format Galil command
         cmdMoveStr = self.formatGalilCommand(valueList=mount+ numpy.asarray(self.status.mountOffset, dtype=float), cmd="XQ #MOVE")
