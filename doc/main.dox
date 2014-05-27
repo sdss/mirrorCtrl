@@ -6,7 +6,7 @@
 This package provides high-level mirror control as described in the <a href="mirrorControllerActor.html">Mirror Controller Actor</a> manual. This implementation interfaces to the APO <a href="http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html">Galil mirror controllers</a>.
 
 This package adds the following capabilities to the Galil mirror controllers:
-* Command mirror orientation (piston, tilt and translation) to the extent supported by the actuators. (The Galil only supports commanding individual actuators.)
+* Command mirror orientation (piston, tilt and translation) to the extent supported by the actuators. (The Galil supports commanding actuator mount, not orientation.)
 * Supports systems where the actuators and encoders attached at different points. (Unlike the old TCC interface to the Galils, which assumed that the actuators and encoders were attached to identical points). Thus this code provides more efficient mirror positioning: mirrors should go where commanded with fewer iterations.
 
 \section mirrorCtrl_requirements Requirements
@@ -24,4 +24,22 @@ The simplest way to build this package is:
 * Use "eups declare -r ." to declare this package
 * Use "scons" to build it
 * Use "eups declare -r . mirrorCtrl git --current" to declare it or "scons install" to install it (either is fine).
+
+\section mirrorCtrl_howitworks How It Works
+
+Each mirror controller controls a single mirror. The mirror's position is controlled by 3-6 linear actuators, with fixed links to provide the missing constraints. Each actuator may have an associated encoder (though the encoder need not be in exactly the same location as the actuator). The controller has a model of where the actuators, encoders and fixed links are attached to the mirror (at one end) and to the stationary frame (at the other end). The code assumes the model for the the encoders (or actuators, if no associated encoder, or fixed link if neither) is perfect: we define the orientation of the mirror based on that assumption. For actuators with encoders, we treat the actuator position as imperfect and use iteration to move the mirror to the desired orientation.
+
+The iteration works as follows:
+* compute "model mount" from desired orientation: the predicted mount length of each actuator, assuming our model of where the actuators are located is correct (though we know it is not).
+* commanded mount = model mount + net mount offset, where net mount offset is the last known mount correction, as computed below; it is initialized to 0 when the mirror controller starts up.
+* iterate until mount error is sufficiently small or we run out of iterations:
+    * move the actuators to the commanded mount
+    * measure the encoders and use this to compute actual orientation
+    * use actual orientation to compute "actuator mount": the length of each actuator based on the current mirror orientation and our assumptions about where the actuators are located
+    * mount error = model mount * actuator mount
+    * new commanded mount = commanded mount + damping factor * mount error
+* mount offset = model mount * commanded mount
+
+Note that no attempt is made to refine our model of where the actuators are, although we presumably have all the information we need to do this after moving the mirrors around for awhile. This refinement could easily be done using external code by mining the logs.
+
 */
