@@ -495,10 +495,10 @@ class GalilDevice(TCPDevice):
         - If a command has finished, call the appropriate command callback
         """
         # print "handleReply(replyStr=%r); currDevCmd=%r" % (replyStr, self.currDevCmd)
-        writeToLog("%s read %r" % (self, replyStr))
+        writeToLog("%s read %r, currDevCmd: %r" % (self, replyStr, self.currDevCmd))
         replyStr = replyStr.replace(":", "").strip(' ;\r\n\x01\x03\x18\x00')
         if self.currDevCmd.isDone:
-            # ignore unsolicited input
+            writeToLog("Ignoring unsolicited output from Galil: %s " % replyStr)
             return
         if self.currDevCmd.state == self.currDevCmd.Cancelling:
             raise RuntimeError("Should not be set to Cancelling")
@@ -582,7 +582,6 @@ class GalilDevice(TCPDevice):
             userCmd = getNullUserCmd(UserCmd.Running)
         elif userCmd.state == userCmd.Ready:
             userCmd.setState(userCmd.Running)
-            pass
         self.userCmd = userCmd
         self.userCmd.addCallback(self._userCmdCallback)
         self.startDevCmd(galilCmdStr, nextDevCmdCall)
@@ -642,6 +641,7 @@ class GalilDevice(TCPDevice):
                 self.clearAll()
             elif userCmd.isFailing:
                 # use a timer so cancelling devCmdState sets userCmd state
+                # self.clearAll()
                 Timer(0, self.clearAll)
 
     def _devCmdCallback(self, devCmd):
@@ -662,7 +662,7 @@ class GalilDevice(TCPDevice):
                 nextDevCmdCall, self.nextDevCmdCall = self.nextDevCmdCall, None
                 Timer(0, nextDevCmdCall)
 
-            if not self.userCmd.isDone:
+            elif not self.userCmd.isDone:
                 self.userCmd.setState(devCmd.state)
         finally:
             self._inDevCmdCallback = False
@@ -675,10 +675,12 @@ class GalilDevice(TCPDevice):
         if not self.currDevCmd.isDone:
             # print 'DEV CMD Cancelled via clear all'
             # send an ST and set command state to cancelled
-            if self.conn.isConnected:
-                cmdStr = "ST; XQ#STOP"
-                writeToLog("%s writing %r for clearAll" % (self, cmdStr))
-                self.conn.writeLine(cmdStr)
+            # raise RuntimeError("clearAll called in galilDevice, but currDevCmd not done: %r"%self.currDevCmd)
+            # if self.conn.isConnected:
+            #     cmdStr = "ST; XQ#STOP"
+            #     # cmdStr = "ST;"
+            #     writeToLog("%s writing %r in clearAll before cancelling currently executing device command %s" % (self, cmdStr, self.currDevCmd.cmdStr))
+            #     self.conn.writeLine(cmdStr)
             # self.timer.start(0, self.currDevCmd.setState, self.currDevCmd.Cancelled, textMsg="Device Command Cancelled via clearAll() in galilDevice")
             self.currDevCmd.setState(self.currDevCmd.Cancelled, textMsg="Device Command Cancelled via clearAll() in galilDevice")
 
@@ -839,8 +841,8 @@ class GalilDevice(TCPDevice):
         """A move device command ended; decide whether further move iterations are required and act accordingly.
         """
         if self.userCmd.isDone or self.userCmd.isFailing:
+            writeToLog("_moveIter early return because self.userCmd.isDone!")
             return
-
         # check if we got all expected information from Galil...
         if not ('max sec for move' in self.parsedKeyList):
             self.writeToUsers("w", "Text=\"Move time estimates were not received from move\"", cmd=self.userCmdOrNone)
@@ -854,6 +856,8 @@ class GalilDevice(TCPDevice):
 
         actErr = [cmd - act for cmd, act in itertools.izip(self.status.cmdMount[0:self.nAct], self.status.actMount[0:self.nAct])]
         self.status.mountErr = actErr[:]
+        statusStr = self.status._getKeyValStr(["cmdMount", "iter", "mountErr"])
+        self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
 
         # error too large to correct?
         if numpy.any(numpy.abs(actErr) > self.mirror.maxCorrList):
@@ -870,7 +874,7 @@ class GalilDevice(TCPDevice):
             self.status.iter += 1
             self.status.duration.reset() # new timer for new move
             self.userCmd.setTimeLimit(5)
-            statusStr = self.status._getKeyValStr(["cmdMount", "cmdMountIter" ,"iter", "mountErr", "mountOrient"])
+            statusStr = self.status._getKeyValStr(["cmdMount", "cmdMountIter", "iter", "mountOrient"])
             self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
             # convert from numpy to simple list for command formatting
             mount = [x for x in newCmdActPos]

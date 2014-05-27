@@ -203,6 +203,38 @@ class ConvergenceTestBase(object):
         doNext()
         return outerD
 
+class TestIteration(ConvergenceTestBase, TestCase):
+    def setVars(self):
+        # self.userPort = getOpenPort()
+        # self.fakeGalilFactory = FakeGalil
+        self.trueMirror = mir35mSec
+        self.mirror = getActEqEncMir(self.trueMirror)
+        # self.mirDev = mirrorCtrl.GalilDevice
+        self.name = "mirror"
+
+    def testIteration(self):
+        # print 'previous orient ', prevOrient
+        # print 'testing orient', orient
+        orient = RussellsOrient[:]
+        # trueMirState = MirState(self.trueMirror)
+        # modelMirState = MirState(self.mirror)
+        # nIter, finalOffset = self._testConv(modelMirState, trueMirState,  orient)
+        d = Deferred()
+        cmdStr = 'move ' + ', '.join([str(x) for x in orient])
+        cmdVar = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr,
+                callFunc = CmdCallback(d),
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertFalse(cmdVar.didFail)
+            self.assertTrue(self.dispatcher.model.iter.valueList[0] > 1)
+        d.addCallback(checkResults)
+        self.dispatcher.executeCmd(cmdVar)
+        return d
+
 class ConvergenceTestActEqEnc(ConvergenceTestBase, TestCase):
     def setVars(self):
         # self.userPort = getOpenPort()
