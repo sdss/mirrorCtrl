@@ -182,24 +182,24 @@ class GalilStatus(object):
         self.axisHomed = numpy.asarray(["?"]*self.nAct)
         ## dictionary containing casting strageties to output current gailil status/state info
         self.castDict = {
-            "nAct": int,
-            "maxDuration": floatCast,
-            "duration": self.duration.getTime,
-            "actMount": mountCast,
-            "encMount": mountCast,
-            "cmdMount": mountCast,
-            "cmdMountIter": mountCast,
-            "mountErr": mountCast,
-            "mountOffset": mountCast,
-            "orient": orientCast,
-            "desOrient": orientCast,
-            "mountOrient": orientCast,
-            "desOrientAge": self.desOrientAge.getTime,
-            "iter": intOrNan,
-            "maxIter": intOrNan,
-            "status": statusCast,
-            "homing": strArrayCast,
-            "axisHomed": strArrayCast,
+            "NAct": int,
+            "MaxDuration": floatCast,
+            "Duration": self.duration.getTime,
+            "ActMount": mountCast,
+            "EncMount": mountCast,
+            "CmdMount": mountCast,
+            "CmdMountIter": mountCast,
+            "MountErr": mountCast,
+            "MountOffset": mountCast,
+            "Orient": orientCast,
+            "DesOrient": orientCast,
+            "MountOrient": orientCast,
+            "DesOrientAge": self.desOrientAge.getTime,
+            "Iter": intOrNan,
+            "MaxIter": intOrNan,
+            "Status": statusCast,
+            "Homing": strArrayCast,
+            "AxisHomed": strArrayCast,
         }
 
 
@@ -212,7 +212,7 @@ class GalilStatus(object):
         """
         strList = []
         for keyword in keywords:
-            if keyword in ['duration', 'desOrientAge']:
+            if keyword in ['Duration', 'DesOrientAge']:
                 strVal = self.castDict[keyword]()
             else:
                 val = getattr(self, keyword)
@@ -425,7 +425,7 @@ class GalilDevice(TCPDevice):
             dataList = numpy.asarray(dataList, dtype=float)
             maxTime = numpy.max(dataList) # get time for longest move
             self.status.maxDuration = maxTime
-            updateStr = self.status._getKeyValStr(["maxDuration"])
+            updateStr = self.status._getKeyValStr(["MaxDuration"])
             # append text describing time for what
             updateStr += '; Text=%s' % (quoteStr(key),)
             self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
@@ -444,7 +444,7 @@ class GalilDevice(TCPDevice):
             # measured position (adjusted)
             # account for encoder --> actuator spatial difference
             self.status.encMount = [int(x) if int(x) != 999999999 else numpy.nan for x in dataList]
-            updateStr = self.status._getKeyValStr(["encMount"])
+            updateStr = self.status._getKeyValStr(["EncMount"])
             self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
             # DesOrient may be nans
             if not numpy.isfinite(sum(self.status.encMount[0:self.nAct])):
@@ -461,19 +461,19 @@ class GalilDevice(TCPDevice):
                 # add these new values to status
                 self.status.orient = numpy.asarray(orient[:], dtype=float)
                 self.status.actMount = actMount[:]
-            updateStr = self.status._getKeyValStr(["orient", "actMount"])
+            updateStr = self.status._getKeyValStr(["Orient", "ActMount"])
             self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
 
         elif key == 'axis homed':
             dataList = [int(num) for num in dataList]
             self.status.axisHomed = dataList
-            updateStr = self.status._getKeyValStr(["axisHomed"])
+            updateStr = self.status._getKeyValStr(["AxisHomed"])
             self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
 
         elif key == 'status word':
             dataList = [int(num) for num in dataList]
             self.status.status = dataList
-            updateStr = self.status._getKeyValStr(["status"])
+            updateStr = self.status._getKeyValStr(["Status"])
             self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
 
         else:
@@ -723,7 +723,7 @@ class GalilDevice(TCPDevice):
         if self.currDevCmd.state == self.currDevCmd.Running:
             self.status.homing = newHoming
             self.writeToUsers(">", "Text = \"Homing Actuators: %s\"" % (", ".join(str(v) for v in axisList)), cmd=userCmd)
-            updateStr = self.status._getKeyValStr(["homing"])
+            updateStr = self.status._getKeyValStr(["Homing"])
             self.writeToUsers("i", updateStr, cmd=userCmd)
         else:
             # command failed for some reason, do nothing, should clean itself up
@@ -755,7 +755,7 @@ class GalilDevice(TCPDevice):
             # be sure that a previous desOrient is defined (not nans)
             #mount = mount + numpy.asarray(self.status.mountOffset, dtype=float)
             self.writeToUsers("i", "Text=\"Automatically applying previous offset to mirror move.\"", cmd=userCmd)
-            statusStr = self.status._getKeyValStr(["mountOffset"])
+            statusStr = self.status._getKeyValStr(["MountOffset"])
             self.writeToUsers('i', statusStr, cmd=userCmd)
 
         # format Galil command
@@ -765,12 +765,10 @@ class GalilDevice(TCPDevice):
             self.status.cmdMount = mount[:] # this will not change upon iteration
             self.status.cmdMountIter = mount[:] + numpy.asarray(self.status.mountOffset, dtype=float) # this will change upon iteration
             self.status.desOrient = adjOrient[:] # initial guess for fitter
-            if self.mirror.name == 'mir35mSec':
-                print 'desOrient: ', self.status._getKeyValStr(["desOrient"])
             if self.mirror.hasEncoders:
                 self.status.iter = 1
             self.status.desOrientAge.startTimer()
-            statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "cmdMount", "maxIter", "iter"])
+            statusStr = self.status._getKeyValStr(["DesOrient", "DesOrientAge", "CmdMount", "MaxIter", "Iter"])
             self.writeToUsers('i', statusStr, cmd=userCmd)
         else:
             # dev command not running for some reason, must have failed
@@ -807,17 +805,17 @@ class GalilDevice(TCPDevice):
         """
         self.writeToUsers("w", "Text=\"Galil is busy executing: %s, showing cached status\"" % self.currDevCmd.cmdStr, cmd = userCmd)
         statusStr = self.status._getKeyValStr([
-            "maxDuration",
-            "duration",
-            "actMount",
-            "cmdMount",
-            "orient",
-            "desOrient",
-            "desOrientAge",
-            "iter",
-            "maxIter",
-            "homing",
-            "axisHomed",
+            "MaxDuration",
+            "Duration",
+            "ActMount",
+            "CmdMount",
+            "Orient",
+            "DesOrient",
+            "DesOrientAge",
+            "Iter",
+            "MaxIter",
+            "Homing",
+            "AxisHomed",
         ])
         self.writeToUsers("i", statusStr, cmd=userCmd)
         userCmd.setState(userCmd.Done)
@@ -858,17 +856,13 @@ class GalilDevice(TCPDevice):
 
         actErr = [cmd - act for cmd, act in itertools.izip(self.status.cmdMount[0:self.nAct], self.status.actMount[0:self.nAct])]
         self.status.mountErr = actErr[:]
-        statusStr = self.status._getKeyValStr(["cmdMount", "iter", "mountErr"])
+        statusStr = self.status._getKeyValStr(["CmdMount", "Iter", "MountErr"])
         self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
 
         # error too large to correct?
         if numpy.any(numpy.abs(actErr) > self.mirror.maxCorrList):
             self.currDevCmd.setState(self.currDevCmd.Failed, "Error too large to correct")
             return
-
-        if self.mirror.name == 'mir35mSec':
-            print self.status._getKeyValStr(["iter", "orient", "mountErr"])
-            print
 
         # perform another iteration?
         if numpy.any(numpy.abs(actErr) > self.mirror.minCorrList) and (self.status.iter < self.status.maxIter):
@@ -880,7 +874,7 @@ class GalilDevice(TCPDevice):
             self.status.iter += 1
             self.status.duration.reset() # new timer for new move
             self.userCmd.setTimeLimit(5)
-            statusStr = self.status._getKeyValStr(["cmdMount", "cmdMountIter", "iter", "mountOrient"])
+            statusStr = self.status._getKeyValStr(["CmdMount", "CmdMountIter", "Iter", "MountOrient"])
             self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
             # convert from numpy to simple list for command formatting
             mount = [x for x in newCmdActPos]
@@ -913,13 +907,13 @@ class GalilDevice(TCPDevice):
 
         # grab cached info that wasn't already sent to the user
         statusStr = self.status._getKeyValStr([
-            "maxDuration",
-            "duration",
-            "iter",
-            "maxIter",
-            "desOrient",
-            "desOrientAge",
-            "homing",
+            "MaxDuration",
+            "Duration",
+            "Iter",
+            "MaxIter",
+            "DesOrient",
+            "DesOrientAge",
+            "Homing",
         ])
         self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
         self._devCmdCallback(self.currDevCmd)
@@ -1036,14 +1030,14 @@ class GalilDevice25Sec(GalilDevice):
         elif key == 'piezo corrections (microsteps)':
             self.status.piezoCorr = [float(num) for num in dataList]
             outStr = "; ".join((
-                self.status._getKeyValStr(["piezoCorr"]),
+                self.status._getKeyValStr(["PiezoCorr"]),
                 self.formatAsKeyValStr("piezoStatusWord", dataList),
             ))
             self.writeToUsers("i", outStr, cmd=self.userCmdOrNone)
             return
         elif key == 'piezo status word':
             self.status.piezoStatus = int(dataList[0])
-            updateStr = self.status._getKeyValStr(["piezoStatus"])
+            updateStr = self.status._getKeyValStr(["PiezoStatus"])
             self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
             return
         else:
