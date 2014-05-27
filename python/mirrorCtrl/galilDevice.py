@@ -460,7 +460,7 @@ class GalilDevice(TCPDevice):
                 actMount = numpy.asarray(actMount, dtype=float)
                 # add these new values to status
                 self.status.orient = numpy.asarray(orient[:], dtype=float)
-                self.status.actMount = actMount
+                self.status.actMount = actMount[:]
             updateStr = self.status._getKeyValStr(["orient", "actMount"])
             self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
 
@@ -748,23 +748,25 @@ class GalilDevice(TCPDevice):
         # self.status.desOrient will not be finite (numpy.nans) upon startup
         addOffset = False
         if numpy.isfinite(numpy.sum(self.status.desOrient)):
-            orientDiff = numpy.abs(adjOrient-self.status.desOrient)[:5] #don't care about z-rot
-            bigOrient = numpy.asarray([self.LargePiston, self.LargeTilt, self.LargeTilt, self.LargeTranslation, self.LargeTranslation], dtype=float)
+            orientDiff = numpy.abs(adjOrient-self.status.desOrient)[1:5] #don't care about z-rot, nor pistion
+            bigOrient = numpy.asarray([self.LargeTilt, self.LargeTilt, self.LargeTranslation, self.LargeTranslation], dtype=float)
             addOffset = numpy.all(numpy.all(orientDiff/bigOrient < 1)) # small move, add offset
         if addOffset:
             # be sure that a previous desOrient is defined (not nans)
-            mount = mount + numpy.asarray(self.status.mountOffset, dtype=float)
+            #mount = mount + numpy.asarray(self.status.mountOffset, dtype=float)
             self.writeToUsers("i", "Text=\"Automatically applying previous offset to mirror move.\"", cmd=userCmd)
             statusStr = self.status._getKeyValStr(["mountOffset"])
             self.writeToUsers('i', statusStr, cmd=userCmd)
 
         # format Galil command
-        cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
+        cmdMoveStr = self.formatGalilCommand(valueList=mount+ numpy.asarray(self.status.mountOffset, dtype=float), cmd="XQ #MOVE")
         self.runCommand(userCmd, galilCmdStr=cmdMoveStr, nextDevCmdCall=self._moveIter)
         if self.currDevCmd.state == self.currDevCmd.Running:
             self.status.cmdMount = mount[:] # this will not change upon iteration
-            self.status.cmdMountIter = mount[:] # this will change upon iteration
+            self.status.cmdMountIter = mount[:] + numpy.asarray(self.status.mountOffset, dtype=float) # this will change upon iteration
             self.status.desOrient = adjOrient[:] # initial guess for fitter
+            if self.mirror.name == 'mir35mSec':
+                print 'desOrient: ', self.status._getKeyValStr(["desOrient"])
             if self.mirror.hasEncoders:
                 self.status.iter = 1
             self.status.desOrientAge.startTimer()
@@ -863,6 +865,10 @@ class GalilDevice(TCPDevice):
         if numpy.any(numpy.abs(actErr) > self.mirror.maxCorrList):
             self.currDevCmd.setState(self.currDevCmd.Failed, "Error too large to correct")
             return
+
+        if self.mirror.name == 'mir35mSec':
+            print self.status._getKeyValStr(["iter", "orient", "mountErr"])
+            print
 
         # perform another iteration?
         if numpy.any(numpy.abs(actErr) > self.mirror.minCorrList) and (self.status.iter < self.status.maxIter):

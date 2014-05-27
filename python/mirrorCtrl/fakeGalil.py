@@ -25,6 +25,8 @@ from RO.Comm.TwistedTimer import Timer
 from RO.Comm.TwistedSocket import TCPServer
 from twistedActor import writeToLog
 
+from mirrorCtrl.perturbActuators import getActEqEncMir
+
 __all__ = ["FakeGalil", "FakePiezoGalil"]
 
 MAXINT = 2147483647
@@ -49,7 +51,7 @@ class FakeGalil(TCPServer):
         self.verbose = bool(verbose)
         self.wakeUpHomed = bool(wakeUpHomed)
         self.fastTimeout = bool(False) # this is toggled independently by a specific unit test in the tcc testMirDevTO.py
-        self.mirror = mirror
+        self.mirror = getActEqEncMir(mirror)
         self._cmdBuffer = collections.deque()
         self.replyTimer = Timer()
         self.nextCmdTimer = Timer()

@@ -7,3 +7,4 @@ from .fakeGalil import *
 from .galilDeviceWrapper import *
 from .mirrorCtrlWrapper import *
 from .mirrorDispatcherWrapper import *
+from .perturbActuators import *
