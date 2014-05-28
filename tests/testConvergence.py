@@ -208,7 +208,8 @@ class TestIteration(ConvergenceTestBase, TestCase):
         # self.userPort = getOpenPort()
         # self.fakeGalilFactory = FakeGalil
         self.trueMirror = mir35mSec
-        self.mirror = getActEqEncMir(self.trueMirror)
+        self.mirror = mir35mSec # set equal because the fake galil autimatically sets act=enc
+        #self.mirror = getActEqEncMir(self.trueMirror)
         # self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror"
 
@@ -230,6 +231,8 @@ class TestIteration(ConvergenceTestBase, TestCase):
             """Check results after cmdVar is done
             """
             self.assertFalse(cmdVar.didFail)
+            print 'iterlist', self.dispatcher.model.iter.valueList[0]
+            print 'netMountOffset', self.dispatcher.model.netMountOffset.valueList[0]
             self.assertTrue(self.dispatcher.model.iter.valueList[0] > 1)
         d.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdVar)
@@ -313,7 +316,7 @@ class ConvergenceTestPerfect(ConvergenceTestBase, TestCase):
         # self.userPort = getOpenPort()
         # self.fakeGalilFactory = FakeGalil
         self.trueMirror = mir35mSec
-        self.mirror = copy.deepcopy(mir35mSec)
+        self.mirror = getActEqEncMir(mir35mSec) # fake galil uses a non-perfect model
         # self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror"
 

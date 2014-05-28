@@ -648,7 +648,6 @@ class GenericTests(TestCase):
         1. command fails
         """
         self.actor.logMsg("testBadMove")
-        # turn off noise added by fakeGalil.  This move should not iterate.
         self.fakeGalil.encRes = self.fakeGalil.encRes*0.
         d = Deferred()
         orientation = [-2000.0, 150.0, 860.0, 0.0, -2000.0, 48.0]
