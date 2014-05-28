@@ -39,8 +39,7 @@ m2TestOrients = [numpy.asarray(d["desOrient"]) for d in [secMoveList[ind] for in
 m2TestOrients.append(RussellsOrient)
 m3TestOrients = [numpy.asarray(d["desOrient"]) for d in [tertMoveList[ind] for ind in randInds]]
 
-LargePiston, LargeTilt, LargeTranslation = GalilDevice.LargePiston, GalilDevice.LargeTilt, GalilDevice.LargeTranslation
-
+LargePiston, LargeTilt, LargeTranslation = 500. * MMPerMicron, 10. * RadPerArcSec, 100. * MMPerMicron
 # def getActEqEncMir(mirror):
 #     """ Returns the same mirror as input, except actuators are moved to be exactly aligned with actuators
 #     @param[in] mirror: a MirrorBase instance
@@ -253,7 +252,7 @@ class ConvergenceTestActEqEnc(ConvergenceTestBase, TestCase):
         orient1 = numpy.asarray(m2TestOrients[0], dtype=float)
         orient2 = orient1 + 0.5*bigOrient
         orient3 = orient2 + 0.75*bigOrient
-        return self._testOrients([orient1, orient2, orient3]) # should automatically add offsets
+        return self._testOrients([orient1, orient2, orient3])
 
     def testSameMoves(self):
         # offset should be pre-determined and automatic for moves 2 and 3
@@ -265,7 +264,7 @@ class ConvergenceTestActEqEnc(ConvergenceTestBase, TestCase):
         orient1 = numpy.asarray(m2TestOrients[0], dtype=float)
         orient2 = orient1 + 1.5*bigOrient
         orient3 = orient2 + 2.75*bigOrient
-        return self._testOrients([orient1, orient2, orient3])      # no added offset
+        return self._testOrients([orient1, orient2, orient3])
 
 class ConvergenceTestM3(ConvergenceTestBase, TestCase):
     def setVars(self):

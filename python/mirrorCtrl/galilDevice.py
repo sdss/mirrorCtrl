@@ -161,7 +161,7 @@ class GalilStatus(object):
         ## offset applied to a previously commanded mount, a new mountErr is determined each iteration
         self.mountErr = numpy.asarray([0.]*self.nAct)
         ## last computed total offset between the first commanded mount position and the last commanded mount position after iteration
-        self.mountOffset = numpy.asarray([0.]*self.nAct)
+        self.netMountOffset = numpy.asarray([0.]*self.nAct)
         ## measured orientation (based on encoder lengths)
         self.orient = numpy.asarray([numpy.nan]*6) # get rid of?
         ## orientation based on commanded actuator positions
@@ -182,24 +182,24 @@ class GalilStatus(object):
         self.axisHomed = numpy.asarray(["?"]*self.nAct)
         ## dictionary containing casting strageties to output current gailil status/state info
         self.castDict = {
-            "NAct": int,
-            "MaxDuration": floatCast,
-            "Duration": self.duration.getTime,
-            "ActMount": mountCast,
-            "EncMount": mountCast,
-            "ModelMount": mountCast,
-            "CmdMount": mountCast,
-            "MountErr": mountCast,
-            "MountOffset": mountCast,
-            "Orient": orientCast,
-            "DesOrient": orientCast,
-            "MountOrient": orientCast,
-            "DesOrientAge": self.desOrientAge.getTime,
-            "Iter": intOrNan,
-            "MaxIter": intOrNan,
-            "Status": statusCast,
-            "Homing": strArrayCast,
-            "AxisHomed": strArrayCast,
+            "nAct": int,
+            "maxDuration": floatCast,
+            "duration": self.duration.getTime,
+            "actMount": mountCast,
+            "encMount": mountCast,
+            "modelMount": mountCast,
+            "cmdMount": mountCast,
+            "mountErr": mountCast,
+            "netMountOffset": mountCast,
+            "orient": orientCast,
+            "desOrient": orientCast,
+            "mountOrient": orientCast,
+            "desOrientAge": self.desOrientAge.getTime,
+            "iter": intOrNan,
+            "maxIter": intOrNan,
+            "status": statusCast,
+            "homing": strArrayCast,
+            "axisHomed": strArrayCast,
         }
 
 
@@ -212,7 +212,7 @@ class GalilStatus(object):
         """
         strList = []
         for keyword in keywords:
-            if keyword in ['Duration', 'DesOrientAge']:
+            if keyword in ['duration', 'desOrientAge']:
                 strVal = self.castDict[keyword]()
             else:
                 val = getattr(self, keyword)
@@ -415,7 +415,7 @@ class GalilDevice(TCPDevice):
             dataList = numpy.asarray(dataList, dtype=float)
             maxTime = numpy.max(dataList) # get time for longest move
             self.status.maxDuration = maxTime
-            updateStr = self.status._getKeyValStr(["MaxDuration"])
+            updateStr = self.status._getKeyValStr(["maxDuration"])
             # append text describing time for what
             updateStr += '; Text=%s' % (quoteStr(key),)
             self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
@@ -434,7 +434,7 @@ class GalilDevice(TCPDevice):
             # measured position (adjusted)
             # account for encoder --> actuator spatial difference
             self.status.encMount = [int(x) if int(x) != 999999999 else numpy.nan for x in dataList]
-            updateStr = self.status._getKeyValStr(["EncMount"])
+            updateStr = self.status._getKeyValStr(["encMount"])
             self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
             # DesOrient may be nans
             if not numpy.isfinite(sum(self.status.encMount[0:self.nAct])):
@@ -451,19 +451,19 @@ class GalilDevice(TCPDevice):
                 # add these new values to status
                 self.status.orient = numpy.asarray(orient[:], dtype=float)
                 self.status.actMount = actMount[:]
-            updateStr = self.status._getKeyValStr(["Orient", "ActMount"])
+            updateStr = self.status._getKeyValStr(["orient", "actMount"])
             self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
 
         elif key == 'axis homed':
             dataList = [int(num) for num in dataList]
             self.status.axisHomed = dataList
-            updateStr = self.status._getKeyValStr(["AxisHomed"])
+            updateStr = self.status._getKeyValStr(["axisHomed"])
             self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
 
         elif key == 'status word':
             dataList = [int(num) for num in dataList]
             self.status.status = dataList
-            updateStr = self.status._getKeyValStr(["Status"])
+            updateStr = self.status._getKeyValStr(["status"])
             self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
 
         else:
@@ -713,7 +713,7 @@ class GalilDevice(TCPDevice):
         if self.currDevCmd.state == self.currDevCmd.Running:
             self.status.homing = newHoming
             self.writeToUsers(">", "Text = \"Homing Actuators: %s\"" % (", ".join(str(v) for v in axisList)), cmd=userCmd)
-            updateStr = self.status._getKeyValStr(["Homing"])
+            updateStr = self.status._getKeyValStr(["homing"])
             self.writeToUsers("i", updateStr, cmd=userCmd)
         else:
             # command failed for some reason, do nothing, should clean itself up
@@ -736,20 +736,20 @@ class GalilDevice(TCPDevice):
 
         # apply the offset from
         self.writeToUsers("i", "Text=\"Automatically applying previous offset to mirror move.\"", cmd=userCmd)
-        statusStr = self.status._getKeyValStr(["MountOffset"])
+        statusStr = self.status._getKeyValStr(["netMountOffset"])
         self.writeToUsers('i', statusStr, cmd=userCmd)
 
         # format Galil command
-        cmdMoveStr = self.formatGalilCommand(valueList=mount+ numpy.asarray(self.status.mountOffset, dtype=float), cmd="XQ #MOVE")
+        cmdMoveStr = self.formatGalilCommand(valueList=mount+ numpy.asarray(self.status.netMountOffset, dtype=float), cmd="XQ #MOVE")
         self.runCommand(userCmd, galilCmdStr=cmdMoveStr, nextDevCmdCall=self._moveIter)
         if self.currDevCmd.state == self.currDevCmd.Running:
             self.status.modelMount = mount[:] # this will not change upon iteration
-            self.status.cmdMount = mount[:] + numpy.asarray(self.status.mountOffset, dtype=float) # this will change upon iteration
+            self.status.cmdMount = mount[:] + numpy.asarray(self.status.netMountOffset, dtype=float) # this will change upon iteration
             self.status.desOrient = adjOrient[:] # initial guess for fitter
             if self.mirror.hasEncoders:
                 self.status.iter = 1
             self.status.desOrientAge.startTimer()
-            statusStr = self.status._getKeyValStr(["DesOrient", "DesOrientAge", "ModelMount", "MaxIter", "Iter"])
+            statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "modelMount", "maxIter", "iter"])
             self.writeToUsers('i', statusStr, cmd=userCmd)
         else:
             # dev command not running for some reason, must have failed
@@ -786,17 +786,17 @@ class GalilDevice(TCPDevice):
         """
         self.writeToUsers("w", "Text=\"Galil is busy executing: %s, showing cached status\"" % self.currDevCmd.cmdStr, cmd = userCmd)
         statusStr = self.status._getKeyValStr([
-            "MaxDuration",
-            "Duration",
-            "ActMount",
-            "ModelMount",
-            "Orient",
-            "DesOrient",
-            "DesOrientAge",
-            "Iter",
-            "MaxIter",
-            "Homing",
-            "AxisHomed",
+            "maxDuration",
+            "duration",
+            "actMount",
+            "modelMount",
+            "orient",
+            "desOrient",
+            "desOrientAge",
+            "iter",
+            "maxIter",
+            "homing",
+            "axisHomed",
         ])
         self.writeToUsers("i", statusStr, cmd=userCmd)
         userCmd.setState(userCmd.Done)
@@ -837,7 +837,7 @@ class GalilDevice(TCPDevice):
 
         actErr = [cmd - act for cmd, act in itertools.izip(self.status.modelMount[0:self.nAct], self.status.actMount[0:self.nAct])]
         self.status.mountErr = actErr[:]
-        statusStr = self.status._getKeyValStr(["ModelMount", "Iter", "MountErr"])
+        statusStr = self.status._getKeyValStr(["modelMount", "iter", "mountErr"])
         self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
 
         # error too large to correct?
@@ -855,7 +855,7 @@ class GalilDevice(TCPDevice):
             self.status.iter += 1
             self.status.duration.reset() # new timer for new move
             self.userCmd.setTimeLimit(5)
-            statusStr = self.status._getKeyValStr(["ModelMount", "CmdMount", "Iter", "MountOrient"])
+            statusStr = self.status._getKeyValStr(["modelMount", "cmdMount", "iter", "mountOrient"])
             self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
             # convert from numpy to simple list for command formatting
             mount = [x for x in newCmdActPos]
@@ -866,7 +866,7 @@ class GalilDevice(TCPDevice):
         # record offset which is total descrepancy between first commanded (naive) mount position
         # and lastly commanded (iterated/converged) mount position
         # offset should be added
-        self.status.mountOffset = [cmdLast - cmdFirst for cmdFirst, cmdLast in itertools.izip(self.status.modelMount[0:self.nAct], self.status.cmdMount[0:self.nAct])]
+        self.status.netMountOffset = [cmdLast - cmdFirst for cmdFirst, cmdLast in itertools.izip(self.status.modelMount[0:self.nAct], self.status.cmdMount[0:self.nAct])]
         self._moveEnd()
 
     def _moveEnd(self, *args):
@@ -888,13 +888,13 @@ class GalilDevice(TCPDevice):
 
         # grab cached info that wasn't already sent to the user
         statusStr = self.status._getKeyValStr([
-            "MaxDuration",
-            "Duration",
-            "Iter",
-            "MaxIter",
-            "DesOrient",
-            "DesOrientAge",
-            "Homing",
+            "maxDuration",
+            "duration",
+            "iter",
+            "maxIter",
+            "desOrient",
+            "desOrientAge",
+            "homing",
         ])
         self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
         self._devCmdCallback(self.currDevCmd)
@@ -1011,14 +1011,14 @@ class GalilDevice25Sec(GalilDevice):
         elif key == 'piezo corrections (microsteps)':
             self.status.piezoCorr = [float(num) for num in dataList]
             outStr = "; ".join((
-                self.status._getKeyValStr(["PiezoCorr"]),
+                self.status._getKeyValStr(["piezoCorr"]),
                 self.formatAsKeyValStr("piezoStatusWord", dataList),
             ))
             self.writeToUsers("i", outStr, cmd=self.userCmdOrNone)
             return
         elif key == 'piezo status word':
             self.status.piezoStatus = int(dataList[0])
-            updateStr = self.status._getKeyValStr(["PiezoStatus"])
+            updateStr = self.status._getKeyValStr(["piezoStatus"])
             self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
             return
         else:
