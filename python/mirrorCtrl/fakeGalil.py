@@ -149,6 +149,11 @@ class FakeGalil(TCPServer):
         if self.verbose:
             print "received: %r" % (cmdStr,)
         cmdStr = cmdStr.strip()
+        if cmdStr.startswith("MG"):
+            # print everything after the ok (should be quoted)
+            printThis = cmdStr.split("MG")[1].strip(' "')
+            self.sendLine(printThis)
+            return
         self.echo(cmdStr)
         if cmdStr in ("ST", "RS"):
             self.replyTimer.cancel()
