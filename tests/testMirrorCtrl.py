@@ -72,22 +72,23 @@ class GenericTests(TestCase):
     def testActorBypass(self):
         self.actor.logMsg("testActorBypass")
         d = Deferred()
+        d2 = Deferred()
+        devName = self.actor.dev.nameDict.keys()[0] #just one device
         st = "ST"
         galilCmd = "A=1134426; B=1732577; C=867754; XQ #MOVE"
         cmdVar1 = CmdVar (
                 actor = self.name,
-                cmdStr = 'galil ' + st,
-                #callFunc = CmdCallback(d),
+                cmdStr =  devName + ' ' + st,
+                callFunc = CmdCallback(d2),
             )
         cmdVar2 = CmdVar (
                 actor = self.name,
-                cmdStr = 'galil ' + galilCmd,
-                #callFunc = CmdCallback(d),
+                cmdStr = devName + ' ' + galilCmd,
+                callFunc = CmdCallback(d),
             )
         self.dispatcher.executeCmd(cmdVar1)
         reactor.callLater(0.2, self.dispatcher.executeCmd, cmdVar2)
-        reactor.callLater(3, d.callback, "go")
-        return d
+        return gatherResults([d, d2])
 
     def testUnHomedMove(self):
         """Set isHomed on the fakeGalil to all False. Try to move.
