@@ -126,8 +126,26 @@ class MirrorCtrl(Actor):
         """
         if not cmd or not cmd.cmdArgs:
             raise CommandError("No command specified")
+        # if this command does not contain MG "OK" or and XQ# add an MG "OK" to force
+        # command completion after sending
+        cmdStr = cmd.cmdArgs
+        split = cmdStr.split(";")
+        # split will return empty string in last list item if cmdStr ends with ";"
+        lastBit = split[-1] if split[-1] else split[-2]
+        forceOK = True
+        if "XQ#" in lastBit.replace(" ", "") :
+            forceOK = False # XQ command will force the return ok
+        elif "MG" in lastBit:
+            # figure out if MG "OK" was sent, if so do not force an ok
+            anOK = lastBit.split("MG")[-1].strip() == '"OK"'
+            if anOK:
+                forceOK = False
+        if forceOK:
+            if not cmdStr[-1] == ";":
+                cmdStr = cmdStr + ";"
+            cmdStr = cmdStr + 'MG "OK"'
         try:
-            self.cmdQueue.addCmd(cmd, functools.partial(self.galil.runCommand, galilCmdStr=cmd.cmdArgs))
+            self.cmdQueue.addCmd(cmd, functools.partial(self.galil.runCommand, galilCmdStr=cmdStr))
         except Exception, e:
             traceback.print_exc(file=sys.stderr)
             raise CommandError(str(e))
