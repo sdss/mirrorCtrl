@@ -37,6 +37,9 @@ class MirrorCtrl(Actor):
         """
         # add a slot for a status timer, to be triggered after stop and reset commands
         self.statusTimer = Timer()
+        # set a method cmd_<devCmdName> such that any direct commands
+        # are intercepted and put on the queue for tracking
+        setattr(self, "cmd_%s"%device.name, self.captureDirectDevCmds)
         Actor.__init__(self,
             userPort = userPort,
             devs = [device],
@@ -104,7 +107,6 @@ class MirrorCtrl(Actor):
         """
         writeToLog(msgStr)
 
-
     def processOrientation(self, orientation):
         """Convert a user specified orientation in um and arcseconds with possibly < 5
         fields specified into an orientation of 5 values in units of radians and mm.
@@ -115,6 +117,22 @@ class MirrorCtrl(Actor):
         orientation = numpy.hstack((orientation, numpy.zeros(5-len(orientation))))
         return convOrient2MMRad(orientation)
 
+    def captureDirectDevCmds(self, cmd):
+        """This is called from the attribute set during initialization ... cmd_<devName>
+        cmdArgs are sent directly to the device, and cmd is tracked on the queue in the normal
+        way
+
+        @param[in] cmd: new local user command (twistedActor.UserCmd)
+        """
+        if not cmd or not cmd.cmdArgs:
+            raise CommandError("No command specified")
+        try:
+            self.cmdQueue.addCmd(cmd, functools.partial(self.galil.runCommand, galilCmdStr=cmd.cmdArgs))
+        except Exception, e:
+            traceback.print_exc(file=sys.stderr)
+            raise CommandError(str(e))
+        return True
+        cmd.setState(cmd.Done)
 
     def cmd_move(self, cmd):
         """Move mirror to a commanded orientation, if device isn't busy.

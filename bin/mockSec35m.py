@@ -1,11 +1,21 @@
 #!/usr/bin/env python2
 """Fake 3.5m secondary Galil
 """
+import os
 from argparse import ArgumentParser
 from twisted.internet import reactor
 
 from mirrorCtrl.mirrors import mir35mSec
 from mirrorCtrl import MirrorCtrlWrapper
+
+from twistedActor import startLogging
+
+try:
+    LogDir = os.environ["TWISTED_LOG_DIR"]
+except KeyError:
+    LogDir = None
+else:
+    startLogging(LogDir, "emulate35m.log", deleteOldLog=True)
 
 DefaultPort = 3520
 
