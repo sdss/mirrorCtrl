@@ -11,7 +11,7 @@ import argparse
 
 from twistedActor import makeStartupScript
 
-# dict of telescope name (lowercase): makeStartupScript argument dict
+# dict of mirror name (lowercase): makeStartupScript argument dict
 _DataDict = {
     "sec35m": dict(
         actorName = "sec",
@@ -31,19 +31,19 @@ _DataDict = {
     ),
 }
 
-_TelescopeList = sorted(_DataDict.iterkeys())
+_MirrorList = sorted(_DataDict.iterkeys())
 
 if __name__ == '__main__':
     argParser = argparse.ArgumentParser()
     argParser.add_argument(
-        "telescope",
-        help = "Name of telescope: one of %s" % (_TelescopeList,),
+        "mirror",
+        help = "Name of mirror: one of %s" % (_MirrorList,),
     )
     
     namespace = argParser.parse_args()
-    argDict = _DataDict.get(namespace.telescope.lower())
+    argDict = _DataDict.get(namespace.mirror.lower())
     if argDict is None:
-        argParser.error("Unrecognized telescope %r; must be one of %s" % (namespace.telescope, _TelescopeList))
+        argParser.error("Unrecognized mirror %r; must be one of %s" % (namespace.mirror, _MirrorList))
 
     startupScript = makeStartupScript(pkgName="mirrorCtrl", **argDict)
     print startupScript
