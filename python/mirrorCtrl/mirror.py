@@ -24,6 +24,8 @@ Orientation = collections.namedtuple("Orientation", ["piston", "tiltX", "tiltY",
 ## A zero orientation
 ZeroOrientation = Orientation(0, 0, 0, 0, 0, 0)
 
+RadPerDeg = math.pi / 180.0
+
 
 class MirrorBase(object):
     """Base class for mirrors
@@ -121,9 +123,9 @@ class MirrorBase(object):
             if len(self.fixedLinkList)==3: # mm
                 mirRad = 300
                 # 3.5m M3 mirror is rotated about x by -45 deg
-                phi = 90. * math.pi / 180.0
-                cosP = math.cos(phi)
-                sinP = math.sin(phi)
+                phiRad = 90.0 * RadPerDeg
+                cosP = math.cos(phiRad)
+                sinP = math.sin(phiRad)
                 stack = numpy.vstack((x,y,z))
                 stack = stack.T
                 rotMat = numpy.array([ [1., 0., 0.],
@@ -394,7 +396,6 @@ class MirrorBase(object):
         linkListFull = linkList + self.fixedLinkList
         # now add a phys of zero for fixed links.
         givPhys.extend(numpy.zeros(len(self.fixedLinkList)))
-        numLinks = len(linkListFull)
         # Compute physical errors
         physMult = self._physMult(linkListFull)
 

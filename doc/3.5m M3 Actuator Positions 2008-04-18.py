@@ -102,11 +102,11 @@ print
 # y points towards the instrument port
 # x is unchanged
 # in other words, rotate 45 degrees about x
-rotAng = -45.0 * math.pi / 180.0
+rotAngRad = -45.0 * RadPerDeg
 rotMat = numpy.zeros([3,3])
 rotMat[0,0] = 1
-rotMat[1,1] = math.cos(rotAng)
-rotMat[1,2] = math.sin(rotAng)
+rotMat[1,1] = math.cos(rotAngRad)
+rotMat[1,2] = math.sin(rotAngRad)
 rotMat[2,2] = rotMat[1,1]
 rotMat[2,1] = -rotMat[1,2]
 

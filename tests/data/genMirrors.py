@@ -6,9 +6,10 @@ import itertools
 
 import numpy
 import matplotlib.pyplot
-import mpl_toolkits.mplot3d
 
 import mirrorCtrl
+
+RadPerDeg = math.pi / 180.0
     
 class ConstMirrorBase(object):
     """This object is used to construct APO mirrors to be used in unit testing
@@ -27,9 +28,9 @@ class ConstMirrorBase(object):
             y = r * numpy.cos(theta)
             if self.mirRad < 300: # mm
                 # 3.5m M3 mirror is rotated about x by -45 deg
-                phi = 90. * math.pi / 180.0
-                cosP = math.cos(phi)
-                sinP = math.sin(phi)
+                phiRad = 90.0 * RadPerDeg
+                cosP = math.cos(phiRad)
+                sinP = math.sin(phiRad)
                 stack = numpy.vstack((x,y,z))
                 stack = stack.T
                 rotMat = numpy.array([ [1., 0., 0.],
@@ -62,11 +63,11 @@ class ConstMirrorBase(object):
             z = numpy.array([act.mirPos[2], act.basePos[2]])   
             ax.plot(x, y, z, 'ro-')
         
-        xyrange=(-1.5 * self.mirRad, 1.5 * self.mirRad)
-        zrange = (-3 * self.mirRad, 2 * self.mirRad)
-        matplotlib.pyplot.xlim(xyrange)
-        matplotlib.pyplot.ylim(xyrange)
-        ax.set_zlim(xyrange)        
+        xyRange=(-1.5 * self.mirRad, 1.5 * self.mirRad)
+        # zRange = (-3 * self.mirRad, 2 * self.mirRad)
+        matplotlib.pyplot.xlim(xyRange)
+        matplotlib.pyplot.ylim(xyRange)
+        ax.set_zlim(xyRange)        
         matplotlib.pyplot.show()
         
     def genActuators(self, minMnt, maxMnt, mntOffset, mntScale, mirPos, basePos, actType):
