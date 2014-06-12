@@ -26,7 +26,7 @@ from RO.SeqUtil import asSequence
 from RO.Comm.TwistedTimer import Timer
 from twistedActor import TCPDevice, UserCmd, writeToLog
 
-from .const import convOrient2UMArcsec, MMPerMicron, RadPerArcSec
+from .const import convOrient2UMArcsec
 
 __all__ = ["GalilDevice", "GalilDevice25Sec"]
 
@@ -734,8 +734,9 @@ class GalilDevice(TCPDevice):
         adjOrient = numpy.asarray(adjOrient, dtype=float)
         mount = numpy.asarray(mount, dtype=float)
 
-        # apply the offset from
-        self.writeToUsers("i", "Text=\"Automatically applying previous offset to mirror move.\"", cmd=userCmd)
+        # apply the current offset (doing this for small moves avoids unwanted mirror motion
+        # for tiny corrections; doing it for large moves doesn't seem to hurt and simplifies the code).
+        #self.writeToUsers("i", "Text=\"Automatically applying previous offset to mirror move.\"", cmd=userCmd)
         statusStr = self.status._getKeyValStr(["netMountOffset"])
         self.writeToUsers('i', statusStr, cmd=userCmd)
 
