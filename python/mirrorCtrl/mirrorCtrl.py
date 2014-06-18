@@ -47,7 +47,7 @@ class MirrorCtrl(Actor):
             version = Version,
             name = name,
             doConnect = doConnect,
-            doDevCmd = False,
+            doDevNameCmds = False,
         )
         self.galil = device # easier access
         def killFunc(killThisCmd, killedByCmd):
