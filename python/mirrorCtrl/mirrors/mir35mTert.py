@@ -2,11 +2,11 @@
 """Configuration of tertiary (flat) mirror for 3.5m APO telescope
 
 The 3.5m tertiary has an unusual coordinate system convention:
-With the telescope at the horizon, and when you are standing at the instrument
-port looking in at the tertiary mirror:
+With the telescope at the zenith, and when you are standing at the instrument port
+looking in at the tertiary mirror:
 
-x is to the right (towards the primary)
-y is up (along the primary)
+x is to the right (along the primary)?
+y is up (towards the secondary)?
 z is from the tertiary mirror to the instrument port (i.e. toward you)
 
 The actuator placements are defined (below) in the plane of the mirror, so a

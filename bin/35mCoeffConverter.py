@@ -188,7 +188,7 @@ def batchConvert(fromDir, toDir):
         FileConverter(inPath, outPath)
 
 if __name__ == "__main__":
-    instDir = os.path.join(os.environ["TCC_DATA_DIR"], "inst")
+    instDir = os.path.join(os.environ["TCC_DATA_DIR"], "instWithOldMirCoeffs")
     batchConvert(fromDir = instDir, toDir="convertedInstFiles")
 
 
