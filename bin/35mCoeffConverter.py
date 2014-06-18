@@ -1,38 +1,60 @@
 #!/usr/bin/env python2
-import numpy
 import itertools
 import glob
 import os
+import time
+import re
+import shutil
+
+import numpy
 import numpy.linalg
+
 from mirrorCtrl.mirrors import mir35mTertInfLink, mir35mTert, mir35mSecOldModel, mir35mSec
 from mirrorCtrl.const import convOrient2UMArcsec, convOrient2MMRad
 
-
 class FileConverter(object):
-    def __init__(self, inFilename, outFilename):
+    def __init__(self, inPath, outPath):
         """Searches through inFileName makes orientation coefficient conversions, saves output to outfileName
-        @param[in] inFilename: string, path to file to read in
-        @param[in] outFilename: string, path to output file
+        @param[in] inPath: string, path to file to read in
+        @param[in] outPath: string, path to output file
         """
-        with open(inFilename, "r") as fin:
-            with open(outFilename, "w") as fout:
+        fileName = os.path.split(inPath)[1]
+        convertedRE = re.compile(r"coeffs converted.+ coeffconverter")
+
+        hasMirCoeffs = False
+        with open(inPath, "r") as fin:
+            for line in fin:
+                lowLine = line.strip().lower()
+                if not lowLine:
+                    continue
+                if convertedRE.search(lowLine):
+                    print "%s has already been converted; copying file unchanged" % (fileName,)
+                    shutil.copyfile(inPath, outPath)
+                    return
+                if lowLine.startswith("secpistcoef") or lowLine.startswith("tertpistcoef"):
+                    hasMirCoeffs = True
+        if not hasMirCoeffs:
+            print "%s has no mirror coeffs; copying file unchanged" % (fileName,)
+            shutil.copyfile(inPath, outPath)
+            return
+
+        with open(inPath, "r") as fin:
+            with open(outPath, "w") as fout:
+                print "%s conversion begins" % (fileName,)
+                # use this clumsy form of iteration so convertAndWrite can read additional lines
                 line = fin.readline()
                 while line:
-                    if line.startswith("SecPistCoef"):
-                        # do secondary mirror coefficient conversions
-                        # get whole block
+                    lowLine = line.strip().lower()
+                    if lowLine.startswith("secpistcoef"):
+                        # convert secondary mirror coefficient
                         coefBlock = self.getCoefBlock(line, fin, "Sec") # will read next 4 lines from fin
-                        # convert it and write it!
                         self.convertAndWrite(coefBlock, "Sec", fout)
-                        fout.write("!coeffs converted from previous TCC settings and written by coeffConverter.\n")
-                    elif line.startswith("TertPistCoef"):
-                        # do tertiary mirror coefficient conversions
+                    elif lowLine.startswith("tertpistcoef"):
+                        # convert tertiary mirror coefficients
                         coefBlock = self.getCoefBlock(line, fin, "Tert")  # will read next 4 lines from fin
-                        # convert it and write it!
                         self.convertAndWrite(coefBlock, "Tert", fout)
-                        fout.write("!coeffs converted from previous TCC settings and written by coeffConverter.\n")
                     else:
-                        # do nothing!
+                        # copy line unconverted
                         fout.write(line)
                     line = fin.readline()
 
@@ -86,7 +108,7 @@ class FileConverter(object):
         return newOrient
 
     def _writeCoefBlock(self, coefBlock, mir, fout):
-        """ Write the coefficients in coefBlock to fout
+        """Write the coefficients in coefBlock to fout
             @param[in] coefBlock: output of getCoefBlock, a numpy array
             @param[in] mir: either "Sec" or "Tert"
             @param[in] fout: file handler to which we are writing
@@ -96,13 +118,15 @@ class FileConverter(object):
             fout.write(mir + label + "  " + numFmt + "\n")
 
     def convertAndWrite(self, coefBlock, mir, fout):
-        """ @param[in] coefBlock: output of getCoefBlock, a numpy array
-            @param[in] mir: either "Sec" or "Tert"
-            @param[in] fout: file handler to which we are writing
+        """Convert a set of coefficients and write the results
+
+        @param[in] coefBlock: output of getCoefBlock, a numpy array
+        @param[in] mir: either "Sec" or "Tert"
+        @param[in] fout: file handler to which we are writing
         """
-        # is any fitting required? Check for nonzero 2nd and 3rd terms in coefBlock
+        print "  convert %s coeffs" % (mir,)
         if numpy.all(coefBlock[:,1:] == 0):
-            # no fitting, all zeros!
+            # the sine and cosine coeffs are zero; just convert the constant coeffs
             if mir == "Sec":
                 newOrient = self.convertSecOrient(coefBlock[:,0])[:5]
             else:
@@ -111,22 +135,27 @@ class FileConverter(object):
             # insert this new orientation to the coefBlock
             coefBlock[:,0] = newOrient
         else:
-            # we must fit the cos/sin alt terms.
+            # fit the sine and cosine terms
+            print "  using least squares fitter; please wait"
             coefBlock = self.leastSquaresFitter(coefBlock, mir)
         self._writeCoefBlock(coefBlock, mir, fout)
+        currDateStr = time.strftime("%Y-%m-%d", time.localtime())
+        fout.write("! %s coeffs converted from the old TCC's mirror model by coeffConverter %s.\n" % \
+            (mir, currDateStr))        
 
     def getCoefBlock(self, firstLineOfBlock, fin, mir):
         """Create a block of Coefficients, be sure that they are all present
+
         @param[in] firstLineOfBlock: The first line (containing the pistion coeff)
         @param[in] fin: the currently open filehandler (being read one line at a time)
         @param[in] mir: string either "Sec" or "Tert"
         """
         coefBlock = numpy.zeros((5,3))
         coefBlock[0,:] = self.coefsFromLine(firstLineOfBlock)
-        for ind, check in enumerate(["XTiltCoef", "YTiltCoef", "XTransCoef", "YTransCoef"]):
+        for ind, check in enumerate(["xtiltcoef", "ytiltcoef", "xtranscoef", "ytranscoef"]):
             # check that the line matches what is expected
             line = fin.readline()
-            assert line.startswith(mir+check)
+            assert line.strip().lower().startswith((mir+check).lower())
             coefBlock[ind+1,:] = self.coefsFromLine(line)
         return coefBlock
 
@@ -140,26 +169,27 @@ class FileConverter(object):
         return numpy.asarray(numArray)
 
 def batchConvert(fromDir, toDir):
-    """Convert all instrument files with orientation coefficients.  New files will be written
-    to a new directory.
+    """Convert all instrument files with orientation coefficients.
 
     @param[in] fromDir: directory where the instrument files are
-    @param[in] toDir: directory wehre the converted files should be written.
+    @param[in] toDir: directory where the converted files should be written.
         They will have the same filename.
     """
     assert os.path.isdir(fromDir)
+    print "Converting 3.5m inst files from %r to %r" % (fromDir, toDir)
     if not os.path.isdir(toDir):
-        #make it
+        print "Creating output dir %r" % (toDir,)
         os.mkdir(toDir)
-    # create ouput directory
+
     files = glob.glob(fromDir + "/*")
-    for fin in files:
-        baseDir,fname = os.path.split(fin)
-        fout = os.path.join(toDir, fname)
-        FileConverter(fin, fout)
+    for inPath in files:
+        fileName = os.path.split(inPath)[1]
+        outPath = os.path.join(toDir, fileName)
+        FileConverter(inPath, outPath)
 
 if __name__ == "__main__":
-    batchConvert(fromDir = "/Users/csayres/APO/tccdata/inst/", toDir="/Users/csayres/APO/tccdata/instConv")
+    instDir = os.path.join(os.environ["TCC_DATA_DIR"], "inst")
+    batchConvert(fromDir = instDir, toDir="convertedInstFiles")
 
 
 
