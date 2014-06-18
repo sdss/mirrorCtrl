@@ -4,7 +4,6 @@ import itertools
 import glob
 import os
 import numpy.linalg
-from collections import OrderedDict
 from mirrorCtrl.mirrors import mir35mTertInfLink, mir35mTert, mir35mSecOldModel, mir35mSec
 from mirrorCtrl.const import convOrient2UMArcsec, convOrient2MMRad
 
@@ -25,11 +24,13 @@ class FileConverter(object):
                         coefBlock = self.getCoefBlock(line, fin, "Sec") # will read next 4 lines from fin
                         # convert it and write it!
                         self.convertAndWrite(coefBlock, "Sec", fout)
+                        fout.write("!coeffs converted from previous TCC settings and written by coeffConverter.\n")
                     elif line.startswith("TertPistCoef"):
                         # do tertiary mirror coefficient conversions
                         coefBlock = self.getCoefBlock(line, fin, "Tert")  # will read next 4 lines from fin
                         # convert it and write it!
-                        self.convertAndWrite(coefBlock, "Sec", fout)
+                        self.convertAndWrite(coefBlock, "Tert", fout)
+                        fout.write("!coeffs converted from previous TCC settings and written by coeffConverter.\n")
                     else:
                         # do nothing!
                         fout.write(line)
@@ -92,7 +93,7 @@ class FileConverter(object):
         """
         for label, row in itertools.izip(["PistCoef", "XTiltCoef", "YTiltCoef", "XTransCoef", "YTransCoef"], coefBlock):
             numFmt = "  ".join(["%.1f"%x for x in row])
-            fout.write(mir + label + "  " + numFmt + "   ! written by coeffConverter.\n")
+            fout.write(mir + label + "  " + numFmt + "\n")
 
     def convertAndWrite(self, coefBlock, mir, fout):
         """ @param[in] coefBlock: output of getCoefBlock, a numpy array

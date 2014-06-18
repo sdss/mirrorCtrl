@@ -57,7 +57,7 @@ class GalilDeviceWrapper(DeviceWrapper):
             controller = controller,
             debug = debug,
         )
-    
+
     def _makeDevice(self):
         port = self.port
         if port is None:
