@@ -2,9 +2,12 @@
 """Configuration of tertiary (flat) mirror for 3.5m APO telescope
 
 The 3.5m tertiary has an unusual coordinate system convention:
-+Z points towards secondary
-+Y points towards instrument port
-+X defined by right hand rule
+With the telescope at the horizon, and when you are standing at the instrument
+port looking in at the tertiary mirror:
+
+x is to the right (towards the primary)
+y is up (along the primary)
+z is from the tertiary mirror to the instrument port (i.e. toward you)
 
 The actuator placements are defined (below) in the plane of the mirror, so a
 coord transform is necessary.  The coords and transform method are almost identical
@@ -41,7 +44,7 @@ Name = 'mir35mTert'
 def _makeMirror():
     """Create a 3.5m Tertiary Mirror
     """
-    #rad =   11.714 * MMPerInch # old
+    #actRad =   11.714 * MMPerInch # old
     actRad =   8.96 * MMPerInch # updated 7/12 distance from center of actuator to center of mirror
     encRad = 10.69 * MMPerInch # encoders are radially offset from actuators
 
@@ -100,10 +103,8 @@ def _makeMirror():
 
 
     # rotate to final coordinate system which is:
-    # z points towards secondary
-    # y points towards the instrument port
-    # x is unchanged
-    # in other words, rotate 45 degrees about x
+    # z points towards instrument port
+    # in other words, rotate -45 degrees about x
     rotAng = -45.0 * numpy.pi / 180.0
     #rotAng = 0.
     rotMat = numpy.zeros([3,3])

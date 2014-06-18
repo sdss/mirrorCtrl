@@ -10,6 +10,7 @@ import math
 import numpy
 import scipy.optimize
 import matplotlib.pyplot
+from mpl_toolkits.mplot3d import Axes3D
 
 __all__ = ["MirrorBase", "DirectMirror", "TipTransMirror"]
 
@@ -111,7 +112,8 @@ class MirrorBase(object):
         """
         mirRad = 500 # mm
         fig = matplotlib.pyplot.figure()
-        ax = fig.gca(projection='3d')
+        # ax = fig.gca(projection='3d')
+        ax = Axes3D(fig)
         theta = numpy.linspace(0., 2 * numpy.pi, 100)
         z = numpy.zeros(100)
         fig.hold()
@@ -164,7 +166,7 @@ class MirrorBase(object):
         matplotlib.pyplot.ylim(xyrange)
         ax.set_xlabel("x")
         ax.set_ylabel("y")
-        ax.set_zlim(zrange)
+        ax.set_zlim(xyrange)
         matplotlib.pyplot.show()
 
     @property

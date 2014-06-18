@@ -22,7 +22,7 @@ Acts = ['A', 'B', 'C', 'D', 'E', 'F']
 
 MaxOrientErr = numpy.array([.1, .1, .1 , .1 , .1])
 MaxMountErr = 0.15 #um
-MaxMountAdjNoAdjErr = 0.5 # um                            
+MaxMountAdjNoAdjErr = 0.5 # um
 # output produced from massOrient2Mount.for written by russell for mirror testing
 # with fortran tcc code.
 massOrientInFiles = [
@@ -41,8 +41,8 @@ class MirVsFortran(unittest.TestCase):
 
     def _testMirrors(self, useMirDat, maxOrientErr, maxMountErr, maxMountAdjNoAdjErr):
         errLog = []
-        for file in massOrientInFiles:
-            slurper = TheSlurper(file, useMirDat)
+        for filename in massOrientInFiles:
+            slurper = TheSlurper(filename, useMirDat)
             mirName = slurper.mirFile.split('_')[1].split('.')[0] # remove the .dat part
             mirNum = str(slurper.mirNum)
             adjMountDiff = numpy.abs(slurper.adjMountDiff)  # in um
@@ -59,8 +59,8 @@ class MirVsFortran(unittest.TestCase):
                     #print 'failed: ', [adjOver, unAdjOver, orientOver]
                     errLog.append(
                         self.getErrMsg(
-                            mirName, 
-                            mirNum, 
+                            mirName,
+                            mirNum,
                             convOrient2UMArcsec(slurper.fromOrients[ind]),
                             adjMountDiff[ind],
                             unAdjMountDiff[ind],
@@ -70,7 +70,7 @@ class MirVsFortran(unittest.TestCase):
         if len(errLog) > 0:
             self._errLogPrint(errLog)
         self.assertEqual(len(errLog), 0, 'Errors Found and Printed To File')
-        
+
     def _errLogPrint(self, errLog):
         """Print the error log to a file
         """
@@ -79,7 +79,7 @@ class MirVsFortran(unittest.TestCase):
         fileName = 'Errors' + RO.Astro.Tm.isoDateTimeFromPySec(nDig=0, useGMT=False) + ".log"
         with open(fileName, 'w') as f:
             f.write("\n".join(errLog))
-   
+
     def getErrMsg(self, mirName, mirNum, desOrient, adjMtDiff, noAdjMtDiff, orientDiff):
         # ind index of list on the slurper from which to print info
         errStr = mirName + ' ' + mirNum
@@ -91,7 +91,7 @@ class MirVsFortran(unittest.TestCase):
 
     def testTertGeom(self):
         """Test the unusual 3.5 M3 geomery
-        """                             
+        """
         slurper = TheSlurper(os.path.join(dataDir,'massorient_out_35_3.dat'))
         # piston the mirror 100um.  Actuators A,B,C should lengthen by
         # roughly sqrt(100**2/2)
@@ -100,19 +100,19 @@ class MirVsFortran(unittest.TestCase):
         howClose = numpy.sqrt(100.**2/2.) - mounts
         for diff in howClose:
             self.assertTrue(numpy.abs(diff) < 1.) # within 1 micron
-        
+
 class TheSlurper(object):
     """An object for generating data on orient to mount conversions
     and comparing with the FORTRAN conversion code
     """
     def __init__(self, massorientfile, useMirDat=True):
         """Take a massorientfile, build everything, run conversions
-        
+
         @param[in] massorientfile: a data/massorient_out*.dat
         @param[in] useMirDat: boolean. construct a mirror from a mir.dat file (rather than a measured mirror, with separate encoder positions...)
 
         These are the output of Russell's massorient2mount.for script. I have manually
-        appended the correstponding data/mir*.dat file and the mirror number on the 
+        appended the correstponding data/mir*.dat file and the mirror number on the
         first two lines.
         """
         parsed = self.parseMassOrient(massorientfile)
@@ -138,25 +138,25 @@ class TheSlurper(object):
         self.orientsPY = self.mounts2orients()
         self.mountScale = numpy.asarray([link.scale for link in self.mirror.actuatorList]) # in mount units / um
         self.nRan = len(self.mountsFOR)
-     
+
     @property
     def adjMountDiff(self): # in um
         #difference between fortran mount lengths and python mount lengths from same orientation
         # returns an n x nAct array
         return (self.mountsFOR - self.mountsPY) / numpy.tile(self.mountScale, (self.nRan, 1))
-    
+
     @property
     def unAdjMountDiff(self): # in um
         #mount length difference computed from adjusted orientation, and unadjusted orientation
         # returns an n x nAct array
         return (self.mountsPY - self.mountsPYnoAdj) / numpy.tile(self.mountScale, (self.nRan, 1))
-    
+
     @property
     def orientDiff(self): # in um and arcseconds
         # difference between Fortran computed orientation and python computed orientation, from the same mount coordinates
         # note these should differ because python includes induced motions from fixed links.
         return convOrient2UMArcsec(self.toOrientsFOR - self.orientsPY)
-        
+
     def parseMassOrient(self, massorientfile):
         """return mirror info and orientation/mount data from a massorient file"""
         with open(massorientfile, 'r') as f:
@@ -175,7 +175,7 @@ class TheSlurper(object):
             fromOrients.append(convOrient2MMRad(nums[:6])) # to mm and radians
             mounts.append(numpy.asarray(nums[6:12]))
             toOrients.append(convOrient2MMRad(nums[12:])) # to mm and radians
-        return mirFile, mirNum, numpy.asarray(fromOrients), numpy.asarray(mounts), numpy.asarray(toOrients)     
+        return mirFile, mirNum, numpy.asarray(fromOrients), numpy.asarray(mounts), numpy.asarray(toOrients)
 
     def orients2mounts(self):
         mountsPYadj = []
@@ -191,7 +191,7 @@ class TheSlurper(object):
             mountsPYadj.append(mountAdj)
             mountsPYnoAdj.append(mountNoAdj)
         return numpy.asarray(mountsPYadj), numpy.asarray(mountsPYnoAdj)
-    
+
     def mounts2orients(self):
         orientsPY = []
         for mount in self.mountsFOR:
@@ -202,6 +202,6 @@ class TheSlurper(object):
                 orient = numpy.zeros(6)*numpy.nan
             orientsPY.append(orient)
         return numpy.asarray(orientsPY)
-        
+
 if __name__ == "__main__":
     unittest.main()
