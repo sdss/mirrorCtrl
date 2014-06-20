@@ -173,10 +173,49 @@ class MirrorCtrl(Actor):
             raise CommandError("Could not parse %s as a comma-separated list of floats" % (cmd.cmdArgs,))
         if not (0 < len(cmdArgList) < 6):
             raise CommandError("Must specify 1 to 5 orientation values; got %s" % (len(cmdArgList)))
-        # pad extra orientations with zeros, if not specified 5.
-        cmdOrient = self.processOrientation(cmdArgList)
         if not self.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
+
+        # convert orientation to mm and radians, padding with zeros as needed
+        cmdOrient = self.processOrientation(cmdArgList)
+        try:
+            self.cmdQueue.addCmd(cmd, functools.partial(self.galil.cmdMove, orient=cmdOrient))
+        except Exception, e:
+            traceback.print_exc(file=sys.stderr)
+            raise CommandError(str(e))
+
+        return True
+
+    def cmd_offset(self, cmd):
+        """Offset mirror orientation by the commanded amount, if device isn't busy
+
+        @param[in] cmd: new local user command (twistedActor.UserCmd)
+
+        Pass 1-5 comma seperated arguements.  Order of arguemnts corresponds to:
+        [Piston (um), Tilt X ("), Tilt Y ("), Trans X (um), Trans Y (um)]
+
+        Non-specified orientation values are commanded as zeros. When an orientation
+        is specified for a non adjustable degree of freedom (eg, 3.5m tert translation),
+        it is silently replaced with the constrained value (typically nearly zero).
+        """
+        if not cmd or not cmd.cmdArgs:
+            raise CommandError("No orientation offset specified")
+        try:
+            cmdArgList = numpy.asarray(cmd.cmdArgs.split(","), dtype=float)
+        except Exception:
+            raise CommandError("Could not parse %s as a comma-separated list of floats" % (cmd.cmdArgs,))
+        if not (0 < len(cmdArgList) < 6):
+            raise CommandError("Must specify 1 to 5 orientation values; got %s" % (len(cmdArgList)))
+        if not self.galil.conn.isConnected:
+            raise CommandError("Device Not Connected")
+
+        currOrient = self.galil.status.orient[0:5]
+        if not numpy.all(numpy.isfinite(currOrient)):
+            raise CommandError("Current orientation unknown")
+
+        # convert commanded delta- orientation to mm and radians, padding with zeros as needed
+        # and add to current orientation to get commanded orientation
+        cmdOrient = self.processOrientation(cmdArgList) + currOrient
         try:
             self.cmdQueue.addCmd(cmd, functools.partial(self.galil.cmdMove, orient=cmdOrient))
         except Exception, e:
