@@ -35,11 +35,8 @@ class MirrorCtrl(Actor):
         @param[in] maxUsers  maximum allowed simultaneous users
         @param[in] doConnect: if True then connect devices on construction
         """
-        # add a slot for a status timer, to be triggered after stop and reset commands
-        self.statusTimer = Timer()
-        # set a method cmd_<devCmdName> such that any direct commands
-        # are intercepted and put on the queue for tracking
-        setattr(self, "cmd_%s"%device.name, self.captureDirectDevCmds)
+        self.statusTimer = Timer() # used to queue status after stop and reset commands,
+            # giving the axes time to halt before status is sent
         Actor.__init__(self,
             userPort = userPort,
             devs = [device],
@@ -118,10 +115,16 @@ class MirrorCtrl(Actor):
         orientation = numpy.hstack((orientation, numpy.zeros(5-len(orientation))))
         return convOrient2MMRad(orientation)
 
-    def captureDirectDevCmds(self, cmd):
-        """This is called from the attribute set during initialization ... cmd_<devName>
-        cmdArgs are sent directly to the device, and cmd is tracked on the queue in the normal
-        way
+    def cmd_galil(self, cmd):
+        """Send an arbitrary command to the Galil mirror controller. Do not put quotes around the command.
+
+        The Galil accepts multiple commands on one line, separated by a semicolon.
+        The entire line of command should result in exactly one "OK" being printed at the end,
+        e.g. either by ending with a single "XQ#..." command or with MG "OK".
+        However, if neither appears to be present, then '; MG "OK"' is appended.
+
+        Note: this replaces twistedActor.Actor's default support for direct device commands,
+        because we want the command to be managed by the command queue.
 
         @param[in] cmd: new local user command (twistedActor.UserCmd)
         """
@@ -130,21 +133,18 @@ class MirrorCtrl(Actor):
         # if this command does not contain MG "OK" or and XQ# add an MG "OK" to force
         # command completion after sending
         cmdStr = cmd.cmdArgs
-        split = cmdStr.split(";")
-        # split will return empty string in last list item if cmdStr ends with ";"
-        lastBit = split[-1] if split[-1] else split[-2]
+        if cmdStr.endswith(";"):
+            cmdStr = cmdStr[:-1]
+
+        lastCmd = cmdStr.rsplit(";", 1)[-1].replace(" ", "")
         forceOK = True
-        if "XQ#" in lastBit.replace(" ", "") :
-            forceOK = False # XQ command will force the return ok
-        elif "MG" in lastBit:
-            # figure out if MG "OK" was sent, if so do not force an ok
-            anOK = lastBit.split("MG")[-1].strip() == '"OK"'
-            if anOK:
-                forceOK = False
+        if lastCmd.startswith("XQ#") or lastCmd == 'MG"OK"':
+            # last command is an XQ# command (all of which end by outputting OK) or explicitly outputs OK
+            forceOK = False
         if forceOK:
-            if not cmdStr[-1] == ";":
-                cmdStr = cmdStr + ";"
-            cmdStr = cmdStr + 'MG "OK"'
+            cmdStr += '; MG "OK"'
+        print "cmdStr=%r" % (cmdStr,)
+
         try:
             self.cmdQueue.addCmd(cmd, functools.partial(self.galil.runCommand, galilCmdStr=cmdStr))
         except Exception, e:
