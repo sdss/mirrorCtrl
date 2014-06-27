@@ -5,10 +5,9 @@ This mirror model uses actuators = encoders, and mirror positions as defined by 
 """
 __all__ = ["mir35mSecOldModel"]
 
-import math
 import numpy
 import mirrorCtrl
-from mirrorCtrl.const import MMPerInch, RadPerDeg
+from mirrorCtrl.const import MMPerInch
 
 ## Mirror name
 Name = 'mir35mSecOldModel'
@@ -38,11 +37,11 @@ def _makeMirror():
     # Actuators are: Axial A, B, C, Transverse D, E
     # Limits of motion (mount units) for each actuator
 
-    ActMinMount = numpy.array([-7250000., -7250000., -7250000., -95000., -95000])
-    ActMaxMount = numpy.array([ 7250000.,  7250000.,  7250000.,  95000.,  95000])
+    ActMinMount = numpy.array([-7250000., -7250000., -7250000., -95000., -95000, -numpy.inf])
+    ActMaxMount = numpy.array([ 7250000.,  7250000.,  7250000.,  95000.,  95000, numpy.inf])
 
-    ActMountOffset = numpy.array([      0.,       0.,       0.,     0.,     0.])
-    ActMountScale  = numpy.array([1259.843, 1259.843, 1259.843, 31.496, 31.496])
+    ActMountOffset = numpy.array([      0.,       0.,       0.,     0.,     0., 0.])
+    ActMountScale  = numpy.array([1259.843, 1259.843, 1259.843, 31.496, 31.496, 31.496])
 
     # All distances are in mm, all angles are in degrees
     # All numbers are for the 3.5m secondary mirror support system
@@ -50,10 +49,10 @@ def _makeMirror():
     # where up/down/left/right are as seen with the telescope at the horizon,
     # standing behind the primary mirror, looking towards the secondary mirrorCtrl.
 
-    mirAct = numpy.zeros([5,3])
-    baseAct = numpy.zeros([5,3])
-    mirEnc = numpy.zeros([5,3])
-    baseEnc = numpy.zeros([5,3])
+    # mirAct = numpy.zeros([5,3])
+    # baseAct = numpy.zeros([5,3])
+    # mirEnc = numpy.zeros([5,3])
+    # baseEnc = numpy.zeros([5,3])
 
     # generate lists of link objects for mirror configuration
     actuatorList = []
@@ -79,25 +78,35 @@ def _makeMirror():
         )
 
 
-    # FixedLengthLink
+    # An adjustible rotation link
     # located between C and B on edge of mirror opposite of A.
     linkLength = 12.36 * MMPerInch # measured
     mirRadius = 1000. # guess
     zMirAx =  -152.806 # for Axial
     fixMirPos = numpy.array([0., -1*mirRadius, zMirAx]) # opposite of A
     fixBasePos = numpy.array([linkLength, -1*mirRadius, zMirAx])
-    fixedLinkList = [mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos)]
+    actuatorList.append(
+        mirrorCtrl.AdjBaseActuator(
+                fixBasePos, fixMirPos, ActMinMount[-1], ActMaxMount[-1], ActMountScale[-1], ActMountOffset[-1]
+            )
+        )
+    encoderList.append(
+        mirrorCtrl.AdjLengthLink(
+                fixBasePos, fixMirPos, ActMinMount[-1], ActMaxMount[-1], ActMountScale[-1], ActMountOffset[-1]
+            )
+        )
+    # fixedLinkList = [mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos)]
 
     # minCorrList = [4.0e-5]*3 + [0.0016]*2 # min correction (mm); 50 actuator microsteps for all actuators
     # maxCorrList = [0.79]*3   + [0.16]*2 # max correction (mm); 1000000 actuator microsteps for A-C; 5000 for D-E
 
-    minCorrList = [50]*5 # min correction (microsteps)
-    maxCorrList = [1000000]*3   + [5000]*2 # max correction (microsteps)
+    minCorrList = [50]*6 # min correction (microsteps)
+    maxCorrList = [1000000]*3   + [5000]*3 # max correction (microsteps)
 
 
     return mirrorCtrl.DirectMirror(
         actuatorList = actuatorList,
-        fixedLinkList = fixedLinkList,
+        fixedLinkList = [],
         encoderList = encoderList,
         minCorrList = minCorrList,
         maxCorrList = maxCorrList,

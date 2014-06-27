@@ -12,6 +12,8 @@ import scipy.optimize
 import matplotlib.pyplot
 from mpl_toolkits.mplot3d import Axes3D
 
+from .const import convOrient2UMArcsec
+
 __all__ = ["MirrorBase", "DirectMirror", "TipTransMirror"]
 
 numpy.seterr(all='raise')
@@ -161,7 +163,7 @@ class MirrorBase(object):
             ax.plot(x, y, z, 'ro-')
 
         xyrange=(-1.5 * mirRad, 1.5 * mirRad)
-        zrange = (-3 * mirRad, 2 * mirRad)
+        # zrange = (-3 * mirRad, 2 * mirRad)
         matplotlib.pyplot.xlim(xyrange)
         matplotlib.pyplot.ylim(xyrange)
         ax.set_xlabel("x")
@@ -278,7 +280,7 @@ class MirrorBase(object):
             givPhys = numpy.zeros(len(self._fixedAxes))
             # only searching for solutions for the fixed axes
             initOrient = numpy.zeros(len(self._fixedAxes))
-            minOut = scipy.optimize.fmin(
+            minOut = scipy.optimize.fmin_powell(
                             self._minOrientErr, initOrient,
                             args = (givPhys, physMult, linkList, self._fixedAxes, orient),
                             maxiter = _MaxIter,
@@ -303,7 +305,6 @@ class MirrorBase(object):
             if warnflag == 1:
                 raise RuntimeError('Too many function calls')
             orient[self._fixedAxes] = fitOrient
-
         return Orientation(*orient)
 
     def _mountFromOrient(self, orient, linkList):
@@ -413,7 +414,7 @@ class MirrorBase(object):
             maxiter = _MaxIter,
             ftol = _FitTol,
             disp = 0,
-            full_output = 1
+            full_output = True
         )
         # if (re)using dhill simplex uncomment below
 #         minOut = scipy.optimize.fmin(

@@ -8,9 +8,26 @@ import shutil
 
 import numpy
 import numpy.linalg
+from matplotlib import pyplot as plt
 
 from mirrorCtrl.mirrors import mir35mTertInfLink, mir35mTert, mir35mSecOldModel, mir35mSec
 from mirrorCtrl.const import convOrient2UMArcsec, convOrient2MMRad
+
+def orientationPlotter(oldOrientations, newOrientations, oldCoefBlock, newCoefBlock, altitudes):
+    # coefBlock should be 3x5
+    panelNames = ["pistion", "x tilt", "y tilt", "x trans", "y trans"]
+    fig = plt.figure(figsize=(8,10))
+    for ii in range(5):
+        ax = fig.add_subplot(5,1, ii+1)
+        ax.plot(numpy.degrees(altitudes), oldOrientations[:,ii], '.r', label = "old orient", alpha=0.5)
+        ax.plot(numpy.degrees(altitudes), newOrientations[:,ii], '.b', label = "new orient", alpha=0.5)
+        ax.plot(numpy.degrees(altitudes), oldCoefBlock[0,ii] + numpy.sin(altitudes)*oldCoefBlock[1,ii] + numpy.cos(altitudes)*oldCoefBlock[2,ii], 'r', label="old fit")
+        ax.plot(numpy.degrees(altitudes), newCoefBlock[0,ii] + numpy.sin(altitudes)*newCoefBlock[1,ii] + numpy.cos(altitudes)*newCoefBlock[2,ii], 'b', label="new fit")
+        ax.set_ylabel(panelNames[ii])
+        if ii==0:
+            ax.legend()
+    ax.set_xlabel("altitude")
+    plt.show(block=True)
 
 class FileConverter(object):
     def __init__(self, inPath, outPath):
@@ -71,22 +88,24 @@ class FileConverter(object):
         oldCoefBlock = coefBlock.T # transpose so that dot works (must be 3x5)
         altRange = numpy.linspace(0,numpy.pi/2.,100) # 100 points equally spaced from 0 to 90 degrees alt
         altMatrix = numpy.ones((len(altRange), 3)) # matrix of altitude terms
-        altMatrix[:,1] = numpy.cos(altRange) # column 1 is cos term at each altitude
-        altMatrix[:,2] = numpy.sin(altRange) # column 2 is sin term at each altitude
+        altMatrix[:,1] = numpy.sin(altRange) # column 1 is cos term at each altitude
+        altMatrix[:,2] = numpy.cos(altRange) # column 2 is sin term at each altitude
         # compute orientations at each altitude
-        orientations = numpy.dot(altMatrix, oldCoefBlock)
+        oldOrientations = numpy.dot(altMatrix, oldCoefBlock)
+        orientations = numpy.zeros(oldOrientations.shape)
         assert orientations.shape == (len(altRange), 5)
         for ii in range(len(altRange)):
             if mir == "Sec":
-                newOrient = self.convertSecOrient(orientations[ii,:])[:5]
+                newOrient = self.convertSecOrient(oldOrientations[ii,:])[:5]
             else:
                 assert mir == "Tert"
-                newOrient = self.convertTertOrient(orientations[ii,:])[:5]
+                newOrient = self.convertTertOrient(oldOrientations[ii,:])[:5]
             # overwrite the new orientations with the old.
             orientations[ii,:] = newOrient
         # now find the new coefficients, using least squares
         newCoefBlock = numpy.linalg.lstsq(altMatrix, orientations)[0] # tuple is returned
         assert newCoefBlock.shape == oldCoefBlock.shape
+        orientationPlotter(oldOrientations, orientations, oldCoefBlock, newCoefBlock, altRange)
         return newCoefBlock.T # put it back in the right shape for output.
 
     def convertSecOrient(self, orient):
@@ -94,7 +113,7 @@ class FileConverter(object):
         Conversion is based on the modeled secondary mirror geometry (old vs new)
         """
         encPos = mir35mSecOldModel.encoderMountFromOrient(convOrient2MMRad(orient))
-        _orient = mir35mSec.orientFromEncoderMount(encPos, initOrient=convOrient2MMRad(orient))
+        _orient = mir35mSec.orientFromEncoderMount(encPos[:5], initOrient=convOrient2MMRad(orient))
         newOrient = convOrient2UMArcsec(_orient)
         return newOrient
 
@@ -141,7 +160,7 @@ class FileConverter(object):
         self._writeCoefBlock(coefBlock, mir, fout)
         currDateStr = time.strftime("%Y-%m-%d", time.localtime())
         fout.write("! %s coeffs converted from the old TCC's mirror model by coeffConverter %s.\n" % \
-            (mir, currDateStr))        
+            (mir, currDateStr))
 
     def getCoefBlock(self, firstLineOfBlock, fin, mir):
         """Create a block of Coefficients, be sure that they are all present

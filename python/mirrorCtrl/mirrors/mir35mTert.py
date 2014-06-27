@@ -45,6 +45,7 @@ def _makeMirror():
     """Create a 3.5m Tertiary Mirror
     """
     #actRad =   11.714 * MMPerInch # old
+    #encRad = 11.714 * MMPerInch
     actRad =   8.96 * MMPerInch # updated 7/12 distance from center of actuator to center of mirror
     encRad = 10.69 * MMPerInch # encoders are radially offset from actuators
 
