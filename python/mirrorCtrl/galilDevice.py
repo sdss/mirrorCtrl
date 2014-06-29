@@ -838,7 +838,7 @@ class GalilDevice(TCPDevice):
 
         actErr = [cmd - act for cmd, act in itertools.izip(self.status.modelMount[0:self.nAct], self.status.actMount[0:self.nAct])]
         self.status.mountErr = actErr[:]
-        statusStr = self.status._getKeyValStr(["modelMount", "iter", "mountErr"])
+        statusStr = self.status._getKeyValStr(["mountErr"])
         self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
 
         # error too large to correct?
@@ -850,13 +850,16 @@ class GalilDevice(TCPDevice):
         if numpy.any(numpy.abs(actErr) > self.mirror.minCorrList) and (self.status.iter < self.status.maxIter):
             newCmdActPos = [err*self.CorrectionStrength + prevMount for err, prevMount in itertools.izip(actErr, self.status.cmdMount)]
             self.status.cmdMount = newCmdActPos
+            # record the current offset which is total descrepancy between first commanded (naive) mount position
+            # and lastly commanded (iterated/converged) mount position
+            self.status.netMountOffset = [cmdLast - cmdFirst for cmdFirst, cmdLast in itertools.izip(self.status.modelMount[0:self.nAct], self.status.cmdMount[0:self.nAct])]
             self.status.mountOrient = numpy.asarray(self.mirror.orientFromActuatorMount(newCmdActPos))
             # clear or update the relevant slots before beginning a new device cmd
             self.parsedKeyList = []
             self.status.iter += 1
             self.status.duration.reset() # new timer for new move
             self.userCmd.setTimeLimit(5)
-            statusStr = self.status._getKeyValStr(["modelMount", "cmdMount", "iter", "mountOrient"])
+            statusStr = self.status._getKeyValStr(["modelMount", "cmdMount", "iter", "mountOrient", "netMountOffset"])
             self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
             # convert from numpy to simple list for command formatting
             mount = [x for x in newCmdActPos]
@@ -864,10 +867,7 @@ class GalilDevice(TCPDevice):
             self.replaceDevCmd(cmdMoveStr, nextDevCmdCall=self._moveIter)
             return
         # done
-        # record offset which is total descrepancy between first commanded (naive) mount position
-        # and lastly commanded (iterated/converged) mount position
-        # offset should be added
-        self.status.netMountOffset = [cmdLast - cmdFirst for cmdFirst, cmdLast in itertools.izip(self.status.modelMount[0:self.nAct], self.status.cmdMount[0:self.nAct])]
+        #self.status.netMountOffset = [cmdLast - cmdFirst for cmdFirst, cmdLast in itertools.izip(self.status.modelMount[0:self.nAct], self.status.cmdMount[0:self.nAct])]
         self._moveEnd()
 
     def _moveEnd(self, *args):

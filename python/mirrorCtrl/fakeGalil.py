@@ -71,7 +71,8 @@ class FakeGalil(TCPServer):
         self.userNums = self.arr(MAXINT)
 
         self.range = self.arrAB(3842048, 190000)
-        self.speed = self.arrAB(50000, 5000)
+        # self.speed = self.arrAB(50000, 5000)
+        self.speed = self.arrAB(5000, 500)
         self.homeSpeed = self.arrAB(5000, 500)
         self.accel =  self.arrAB(500000, 50000)
         self.minCorr = self.arr(0)
@@ -349,7 +350,8 @@ class FakeGalil(TCPServer):
 
         #deltaPos = numpy.abs(newCmdPos - self.cmdPos)
         deltaTimeArr = deltaPos / numpy.array(self.speed, dtype=float)
-        moveTime = min(deltaTimeArr.max(), MaxCmdTime)
+        # moveTime = min(deltaTimeArr.max(), MaxCmdTime)
+        moveTime = deltaTimeArr.max()
         self.cmdPos = newCmdPos
         # get random sample between -self.noiseRange and +self.noiseRange
         #noise = numpy.random.random_sample(size=newCmdPos.shape)*2.*self.noiseRange - self.noiseRange

@@ -9,7 +9,7 @@ import copy
 import pickle
 import matplotlib.pyplot as plt
 
-# This flag determines the initial guess to solve for orietation 
+# This flag determines the initial guess to solve for orietation
 # If False: start from a noisy (but close) guess to the solution
 # If True: start from all zeros.
 zeroFlag = False
@@ -25,7 +25,7 @@ import os
 
 #Define maximum allowable fitOrient error, reusing from mirror.py, not using z rot
 MaxOrientErr = numpy.array([.1 * MMPerMicron, .01 * RadPerArcSec, .01 * RadPerArcSec, .1 * MMPerMicron, .1 * MMPerMicron, 1*RadPerDeg])
-MaxMountErr = 0.03
+MaxMountErr = 0.04
 MaxMountAdjNoAdjErr = 0.5 # um
 # construct range of orients to test +/- (0-25mm, 0-2 degrees)
 #maxDist = 25.0 # mm
@@ -46,7 +46,7 @@ for ind in range(len(MaxOrient)):
 # orientRange = numpy.zeros((resolution * 5, 5))
 # for ind, rng in enumerate(ranges):
 #     orientRange[ind*resolution:ind*resolution+resolution, ind] = rng
-# 
+#
 # # for 35m tert, don't command translations
 # tertOrientRange = orientRange[0:resolution*1,:]
 # # construct a set of random orientations.
@@ -71,7 +71,7 @@ for orient in orientList:
 # mirrors can be viewed using the plotMirror() method, eg: genMirrors.Prim25().plotMirror()
 # mirList = [genMirrors.Prim25().makeMirror(), # defaults to AdjBase actuators.
 #            genMirrors.Prim25(actType='adjLen').makeMirror(), # AdjLen (old) type actuators.
-#            genMirrors.Prim25(fix=1).makeMirror(), 
+#            genMirrors.Prim25(fix=1).makeMirror(),
 #            genMirrors.Prim25(fix=2).makeMirror(),
 #            genMirrors.Sec25().makeMirror(),
 #            genMirrors.Sec35().makeMirror(),
@@ -175,17 +175,17 @@ class MirTests(unittest.TestCase):
                         errLog.append(errStr)
         if len(errLog) > 0:
             self._errLogPrint(errLog, 'adj_vs_noadj')
-        self.assertEqual(len(errLog), 0, 'Errors Found and Printed To File')                          
+        self.assertEqual(len(errLog), 0, 'Errors Found and Printed To File')
 
     def testOverConstraint(self, mirList=mirList):
         """Simultaneously place a fixed link exactly in place of an adjustable link
         and command a move.  Choose the first actuator in each mirror.
-        """     
-        orient = [maxDist*0.5, maxTilt*0.2, -maxTilt*0.6, maxDist*0.5, -maxDist*0.7] # chosen randomly by me            
+        """
+        orient = [maxDist*0.5, maxTilt*0.2, -maxTilt*0.6, maxDist*0.5, -maxDist*0.7] # chosen randomly by me
         mirs = []
         for mir in mirList:
             if len(mir.fixedLinkList) == 0:
-                continue # no fixed links for this mirror 
+                continue # no fixed links for this mirror
             # change the position of the first fixed link to match the position of the
             # first actuator
             mirCp = copy.deepcopy(mir)
@@ -202,12 +202,12 @@ class MirTests(unittest.TestCase):
             scaleBy = numpy.asarray([link.scale for link in mir.actuatorList]) # mount units/um
             mtAdj = numpy.asarray(mir.actuatorMountFromOrient(orient))/scaleBy
             mtNoAdj = numpy.asarray(mir.actuatorMountFromOrient(orient, adjustOrient = False))/scaleBy
-            mountErr = numpy.abs(mtAdj-mtNoAdj) # in um (scaled)            
+            mountErr = numpy.abs(mtAdj-mtNoAdj) # in um (scaled)
             self.assertTrue(True in (mountErr > MaxMountAdjNoAdjErr))
-        
-                
+
+
     def _roundTrip(self, linkType, orientList):
-    
+
         OrientNoiseAmplitude = numpy.array(MaxOrient) * 0.1
         errLog=[]
         for mirInd, mir in enumerate(mirList):
@@ -218,7 +218,7 @@ class MirTests(unittest.TestCase):
             elif linkType == 'Act':
                 mountFromOrient = mir.actuatorMountFromOrient
                 orientFromMount = mir.orientFromActuatorMount
-            
+
             numAdjOrient = mir.numAdjOrient
             testedOrientSet = set() # a set of orientations truncated to only the useful values
             for desOrient in orientList:
@@ -240,8 +240,8 @@ class MirTests(unittest.TestCase):
                         initOrient[0:numAdjOrient] += ((2 * numpy.random.random_sample(numAdjOrient)) - 1) * OrientNoiseAmplitude[0:numAdjOrient]
 #                     print "adjOrient=", adjOrient
 #                     print "initOrient=", initOrient
-                    
-                    fitOrient = orientFromMount(desMount, initOrient) 
+
+                    fitOrient = orientFromMount(desMount, initOrient)
                     #fitOrient = orientFromMount(desMount, adjOrient) # no noise
                     fitMount = mountFromOrient(fitOrient)
                 except RuntimeError as er:
@@ -252,7 +252,7 @@ class MirTests(unittest.TestCase):
                 if errStr:
                     errLog.append(errStr)
                     print errStr
-        return errLog            
+        return errLog
 
     def _fmtRunTimeErr(self, error, desOrient, mirInd):
         """For catching and printing a RuntimeError
@@ -261,7 +261,7 @@ class MirTests(unittest.TestCase):
                                (mirInd, desOrient[0], desOrient[1]/RadPerArcSec, desOrient[2]/RadPerArcSec,
                                 desOrient[3], desOrient[4]) + str(error) + '\n'
         return errstr
-        
+
     def _errLogPrint(self, errLog, linkType):
         """Print the error log to a file
         """
@@ -273,7 +273,7 @@ class MirTests(unittest.TestCase):
 
     def _checkFitErr(self, mir, mirInd, desOrient, adjOrient, initOrient, fitOrient, desMount, fitMount):
         """Check fit error and return a str describing the problem, or "" if OK
-        
+
         Inputs:
         - mir: mirror
         - mirInd: mirror index
@@ -290,7 +290,7 @@ class MirTests(unittest.TestCase):
         mountErr = numpy.abs(numpy.subtract(desMount, fitMount))
         if numpy.any(orientErr > MaxOrientErr) or numpy.any(desVsFit > MaxOrientErr[:mir.numAdjOrient]) or numpy.any(mountErr > MaxMountErr):
             fa = FormatArr()
-            
+
             return "Mirror ind=%s; numAdjOrient=%s; desOrient=%s; adjOrient=%s; initOrient=%s; orientErr=%s; mountErr=%s" % \
                    (mirInd, mir.numAdjOrient, fa(desOrient), fa(adjOrient), fa(initOrient), fa(orientErr), fa(mountErr))
         return ""
