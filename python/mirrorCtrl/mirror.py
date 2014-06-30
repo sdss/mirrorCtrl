@@ -12,8 +12,6 @@ import scipy.optimize
 import matplotlib.pyplot
 from mpl_toolkits.mplot3d import Axes3D
 
-from .const import convOrient2UMArcsec
-
 __all__ = ["MirrorBase", "DirectMirror", "TipTransMirror"]
 
 numpy.seterr(all='raise')

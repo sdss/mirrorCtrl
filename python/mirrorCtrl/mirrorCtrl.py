@@ -143,7 +143,6 @@ class MirrorCtrl(Actor):
             forceOK = False
         if forceOK:
             cmdStr += '; MG "OK"'
-        print "cmdStr=%r" % (cmdStr,)
 
         try:
             self.cmdQueue.addCmd(cmd, functools.partial(self.galil.runCommand, galilCmdStr=cmdStr))
