@@ -176,6 +176,8 @@ class GalilStatus(object):
         self.maxIter = device.MaxIter if self.mirror.hasEncoders else 1
         ## status bits
         self.status = numpy.asarray([numpy.nan]*self.nAct)
+        ## acutators which are currently moving
+        self.moving = 0.
         ## acutators which are currently homing
         self.homing = numpy.asarray(["?"]*self.nAct)
         ## actuators which are currently homed
@@ -198,6 +200,7 @@ class GalilStatus(object):
             "iter": intOrNan,
             "maxIter": intOrNan,
             "status": statusCast,
+            "moving": str,
             "homing": strArrayCast,
             "axisHomed": strArrayCast,
         }
@@ -677,6 +680,7 @@ class GalilDevice(TCPDevice):
         self.parsedKeyList = []
         self.status.iter = numpy.nan
         self.status.homing = [0]*self.nAct
+        self.status.moving = 0
         self.status.maxDuration = numpy.nan
         self.status.duration.reset()
 
@@ -744,13 +748,14 @@ class GalilDevice(TCPDevice):
         cmdMoveStr = self.formatGalilCommand(valueList=mount+ numpy.asarray(self.status.netMountOffset, dtype=float), cmd="XQ #MOVE")
         self.runCommand(userCmd, galilCmdStr=cmdMoveStr, nextDevCmdCall=self._moveIter)
         if self.currDevCmd.state == self.currDevCmd.Running:
+            self.status.moving = 1.
             self.status.modelMount = mount[:] # this will not change upon iteration
             self.status.cmdMount = mount[:] + numpy.asarray(self.status.netMountOffset, dtype=float) # this will change upon iteration
             self.status.desOrient = adjOrient[:] # initial guess for fitter
             if self.mirror.hasEncoders:
                 self.status.iter = 1
             self.status.desOrientAge.startTimer()
-            statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "modelMount", "maxIter", "iter"])
+            statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "modelMount", "maxIter", "iter", "moving"])
             self.writeToUsers('i', statusStr, cmd=userCmd)
         else:
             # dev command not running for some reason, must have failed
@@ -873,6 +878,9 @@ class GalilDevice(TCPDevice):
     def _moveEnd(self, *args):
         """ Explicitly call dev cmd callback, to set user command state to done
         """
+        self.status.moving = 0
+        statusStr = self.status._getKeyValStr(["moving"])
+        self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
         self._devCmdCallback(self.currDevCmd)
 
     def _statusCallback(self):
@@ -896,6 +904,7 @@ class GalilDevice(TCPDevice):
             "desOrient",
             "desOrientAge",
             "homing",
+            "moving",
         ])
         self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
         self._devCmdCallback(self.currDevCmd)
