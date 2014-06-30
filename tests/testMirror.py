@@ -25,7 +25,7 @@ import os
 
 #Define maximum allowable fitOrient error, reusing from mirror.py, not using z rot
 MaxOrientErr = numpy.array([.1 * MMPerMicron, .01 * RadPerArcSec, .01 * RadPerArcSec, .1 * MMPerMicron, .1 * MMPerMicron, 1*RadPerDeg])
-MaxMountErr = 0.04
+MaxMountErr = 0.05
 MaxMountAdjNoAdjErr = 0.5 # um
 # construct range of orients to test +/- (0-25mm, 0-2 degrees)
 #maxDist = 25.0 # mm
