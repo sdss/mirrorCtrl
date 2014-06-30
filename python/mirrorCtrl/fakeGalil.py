@@ -350,8 +350,8 @@ class FakeGalil(TCPServer):
 
         #deltaPos = numpy.abs(newCmdPos - self.cmdPos)
         deltaTimeArr = deltaPos / numpy.array(self.speed, dtype=float)
-        # moveTime = min(deltaTimeArr.max(), MaxCmdTime)
-        moveTime = deltaTimeArr.max()
+        moveTime = min(deltaTimeArr.max(), MaxCmdTime)
+        #moveTime = deltaTimeArr.max()
         self.cmdPos = newCmdPos
         # get random sample between -self.noiseRange and +self.noiseRange
         #noise = numpy.random.random_sample(size=newCmdPos.shape)*2.*self.noiseRange - self.noiseRange
