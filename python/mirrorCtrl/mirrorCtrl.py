@@ -11,10 +11,9 @@ from twistedActor import Actor, CommandError, writeToLog, CommandQueue, UserCmd
 from RO.Comm.TwistedTimer import Timer
 
 from .const import convOrient2MMRad
+from .version import __version__
 
 __all__ = ["MirrorCtrl", "runMirrorCtrl"]
-
-Version = 0.5
 
 DefaultMaxUsers = 5
 
@@ -41,7 +40,7 @@ class MirrorCtrl(Actor):
             userPort = userPort,
             devs = [device],
             maxUsers = maxUsers,
-            version = Version,
+            version = __version__,
             name = name,
             doConnect = doConnect,
             doDevNameCmds = False,
