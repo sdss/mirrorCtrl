@@ -322,12 +322,18 @@ def runMirrorCtrl(name, device, userPort):
     from twistedActor import startLogging
 
     # if LogDir is specified as an environment variable, begin logging to it.
-    try:
-        LogDir = os.environ["TWISTED_LOG_DIR"]
-    except KeyError:
-        pass # logging will not start
+    if os.getenv("HOSTNAME") == "tcc35m-1-p":
+        if name == "tert35m":
+            startLogging("local2")
+        else:
+            startLogging("local3")
     else:
-        startLogging(LogDir, name + ".log")
+        try:
+            LogDir = os.environ["TWISTED_LOG_DIR"]
+        except KeyError:
+            pass # logging will not start
+        else:
+            startLogging(LogDir, name + ".log")
 
     MirrorCtrl(
         name = name,
