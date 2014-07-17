@@ -31,6 +31,13 @@ Notes:
         - Fixed length links: 2 extend towards A (-y?), 1 extends towards B (+x?).
             I think this is correct convention.
         - Did not adjust Z positions.
+
+2014-07 - Remeasured encoder / actuator positions
+        actuator radius = 8.95"
+        encoder radius = 11.76"
+        transverse link (attaches at center of mirror) extends towards B = 15.25"
+        parallel links (attatch at edge of mirror) extend towards A = 11.25", 16" apart.
+        all fixed links are 1.5" from back surface of mirror..
 """
 __all__ = ["mir35mTert"]
 
@@ -46,11 +53,16 @@ def _makeMirror():
     """
     #actRad =   11.714 * MMPerInch # old
     #encRad = 11.714 * MMPerInch
-    actRad =   8.96 * MMPerInch # updated 7/12 distance from center of actuator to center of mirror
-    encRad = 10.69 * MMPerInch # encoders are radially offset from actuators
+
+    # actRad =   8.96 * MMPerInch # updated 7/12 distance from center of actuator to center of mirror
+    # encRad = 10.69 * MMPerInch # encoders are radially offset from actuators
+
+    actRad =   8.95 * MMPerInch # updated 7/14
+    encRad = 11.25 * MMPerInch #
 
     zMir =  -0.875 * MMPerInch
     zBase = -3.375 * MMPerInch
+
     #angDegList = numpy.arange(-90.0, 359.0, 360.0 / 3.0) # bug?
     angDegList = numpy.array([-90.0, 30., 150.])
     angRadList = angDegList * RadPerDeg
@@ -86,20 +98,20 @@ def _makeMirror():
         baseEnc[actInd, 2] = zBase
 
     # now add fixed link constraints:
-    # 0,1 are transverse
-    # 2 is anti-rotation
-    # positions of fixed link ends (from Nick MacDonald drawing)
-    # measurements during 2012 3.5m shutdown are pretty damn close
+    # 0,1 are parallel attach at edge of mirror
+    # 2 is transverse
+
+    # measurements during 2014 3.5m shutdown
     mirFix = numpy.zeros([3, 3])
     baseFix = numpy.zeros([3, 3])
-    mirFix[0, :] = numpy.array([-203.2, 0., 0.])
-    mirFix[1, :] = numpy.array([203.2, 0., 0.])
+    mirFix[0, :] = numpy.array([-16*MMPerInch, 0., 0.])
+    mirFix[1, :] = numpy.array([16*MMPerInch, 0., 0.])
     mirFix[2, :] = numpy.array([0., 0., 0.])
     baseFix[0, :] = mirFix[0, :]#.copy()
-    baseFix[0, 1] = -281.47 # fixed links extend towards A
+    baseFix[0, 1] = -11.25*MMPerInch # fixed links extend towards A
     baseFix[1, :] = mirAct[1, :]#.copy()
-    baseFix[1, 1] = -281.47 # fixed links extend towards A
-    baseFix[2, :] = numpy.array([281.47, 0., 0.])
+    baseFix[1, 1] = -11.25*MMPerInch # fixed links extend towards A
+    baseFix[2, :] = numpy.array([15.25*MMPerInch, 0., 0.])
 
 
 
