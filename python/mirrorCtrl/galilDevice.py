@@ -737,6 +737,11 @@ class GalilDevice(TCPDevice):
         mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient=True)
         adjOrient = numpy.asarray(adjOrient, dtype=float)
         mount = numpy.asarray(mount, dtype=float)
+        # check limits of travel
+        for mt, link in itertools.izip(mount, self.mirror.actuatorList):
+            if not (link.minMount <= mt <= link.maxMount):
+                userCmd.setState(userCmd.Failed, "Commanded orientation %s violates mount limits" % str(orient))
+                return
 
         # apply the current offset (doing this for small moves avoids unwanted mirror motion
         # for tiny corrections; doing it for large moves doesn't seem to hurt and simplifies the code).

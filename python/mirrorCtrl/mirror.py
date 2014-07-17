@@ -316,17 +316,7 @@ class MirrorBase(object):
             corresponding to the links provided in linkList
         """
         phys = self._physFromOrient(orient, linkList)
-        mountList = []
-        for p, link in itertools.izip(phys, linkList):
-            mount = link.mountFromPhys(p)
-            if link.minMount <= mount <= link.maxMount:
-                mountList.append(mount)
-            else:
-                raise RuntimeError('Mount out of range!')
-
-        return mountList
-
-        #return [link.mountFromPhys(p) for p, link in itertools.izip(phys, linkList)]
+        return [link.mountFromPhys(p) for p, link in itertools.izip(phys, linkList)]
 
     def _physFromOrient(self, orient, linkList):
         """Compute physical link length from orientation.
