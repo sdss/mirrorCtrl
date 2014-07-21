@@ -64,6 +64,7 @@ def _makeMirror():
     zBase = -3.375 * MMPerInch
 
     #angDegList = numpy.arange(-90.0, 359.0, 360.0 / 3.0) # bug?
+    # this orentation is based on looking from NA2 to the tertiary with the telescope at zenith
     angDegList = numpy.array([-90.0, 30., 150.])
     angRadList = angDegList * RadPerDeg
 

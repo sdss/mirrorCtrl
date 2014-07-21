@@ -29,6 +29,42 @@ def orientationPlotter(oldOrientations, newOrientations, oldCoefBlock, newCoefBl
     ax.set_xlabel("altitude")
     plt.show(block=True)
 
+def convertSecOrientToNew(orient):
+    """Return an orientation in um and arcseconds from the input orient in um and arcseconds.
+    Conversion is based on the modeled secondary mirror geometry (old vs new)
+    """
+    encPos = mir35mSecOldModel.encoderMountFromOrient(convOrient2MMRad(orient))
+    _orient = mir35mSec.orientFromEncoderMount(encPos[:5], initOrient=convOrient2MMRad(orient))
+    newOrient = convOrient2UMArcsec(_orient)
+    return newOrient
+
+def convertTertOrientToNew(orient):
+    """Return an orientation in um and arcseconds from the input orient in um and arcseconds.
+    Conversion is based on the modeled secondary mirror geometry (old vs new)
+    """
+    encPos = mir35mTertInfLink.encoderMountFromOrient(convOrient2MMRad(orient))
+    _orient = mir35mTert.orientFromEncoderMount(encPos[:3], initOrient=convOrient2MMRad(orient))
+    newOrient = convOrient2UMArcsec(_orient)
+    return newOrient
+
+def convertSecOrientToOld(orient):
+    """Return an orientation in um and arcseconds from the input orient in um and arcseconds.
+    Conversion is based on the modeled secondary mirror geometry (old vs new)
+    """
+    encPos = mir35mSec.encoderMountFromOrient(convOrient2MMRad(orient))
+    _orient = mir35mSecOldModel.orientFromEncoderMount(encPos[:5], initOrient=convOrient2MMRad(orient))
+    newOrient = convOrient2UMArcsec(_orient)
+    return newOrient
+
+def convertTertOrientToOld(orient):
+    """Return an orientation in um and arcseconds from the input orient in um and arcseconds.
+    Conversion is based on the modeled secondary mirror geometry (old vs new)
+    """
+    encPos = mir35mTert.encoderMountFromOrient(convOrient2MMRad(orient))
+    _orient = mir35mTertInfLink.orientFromEncoderMount(encPos[:3], initOrient=convOrient2MMRad(orient))
+    newOrient = convOrient2UMArcsec(_orient)
+    return newOrient
+
 class FileConverter(object):
     def __init__(self, inPath, outPath):
         """Searches through inFileName makes orientation coefficient conversions, saves output to outfileName
