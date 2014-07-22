@@ -152,6 +152,8 @@ class GalilStatus(object):
         self.duration = GalilTimer()
         ## actuator mount determined from a measured orientation
         self.actMount = numpy.asarray([numpy.nan]*self.nAct) # get rid of?
+        ## desired encoder mount determined from desired orientation
+        self.desEncMount = numpy.asarray([numpy.nan]*self.nAct)
         ## encoder mount reported from the galil
         self.encMount = numpy.asarray([numpy.nan]*self.nAct)
         ## the user commanded mount position
@@ -188,6 +190,7 @@ class GalilStatus(object):
             "maxDuration": floatCast,
             "duration": self.duration.getTime,
             "actMount": mountCast,
+            "desEncMount": mountCast,
             "encMount": mountCast,
             "modelMount": mountCast,
             "cmdMount": mountCast,
@@ -734,7 +737,8 @@ class GalilDevice(TCPDevice):
         """
         # enable iteration for mirrors with encoders
         # (user) commanded orient --> mount
-        mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient=True)
+        mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient = True, adjustOrient = True)
+        desEncMount = self.mirror.encoderMountFromOrient(adjOrient, adjustOrient = False)
         adjOrient = numpy.asarray(adjOrient, dtype=float)
         mount = numpy.asarray(mount, dtype=float)
         # check limits of travel
@@ -757,10 +761,11 @@ class GalilDevice(TCPDevice):
             self.status.modelMount = mount[:] # this will not change upon iteration
             self.status.cmdMount = mount[:] + numpy.asarray(self.status.netMountOffset, dtype=float) # this will change upon iteration
             self.status.desOrient = adjOrient[:] # initial guess for fitter
+            self.status.desEncMount = desEncMount
             if self.mirror.hasEncoders:
                 self.status.iter = 1
             self.status.desOrientAge.startTimer()
-            statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "modelMount", "maxIter", "iter", "moving"])
+            statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "desEncMount", "modelMount", "maxIter", "iter", "moving"])
             self.writeToUsers('i', statusStr, cmd=userCmd)
         else:
             # dev command not running for some reason, must have failed
@@ -799,11 +804,12 @@ class GalilDevice(TCPDevice):
         statusStr = self.status._getKeyValStr([
             "maxDuration",
             "duration",
-            "actMount",
-            "modelMount",
             "orient",
             "desOrient",
             "desOrientAge",
+            "actMount",
+            "desEncMount",
+            "modelMount",
             "iter",
             "maxIter",
             "homing",
@@ -908,6 +914,7 @@ class GalilDevice(TCPDevice):
             "maxIter",
             "desOrient",
             "desOrientAge",
+            "desEncMount",
             "homing",
             "moving",
         ])

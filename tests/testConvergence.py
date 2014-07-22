@@ -1,9 +1,6 @@
 #!/usr/bin/env python2
 from __future__ import division, absolute_import
 
-import itertools
-import copy
-import math
 import os
 import pickle
 
@@ -23,7 +20,7 @@ from mirrorCtrl.const import convOrient2MMRad, MMPerMicron, RadPerArcSec
 from mirrorCtrl.perturbActuators import getActEqEncMir, getActRandMove
 from mirrorCtrl.mirrors import mir35mSec, mir35mTert, mir25mSec
 from testMirrorCtrl import  CmdCallback #getOpenPort #, UserPort, MirrorCtrlTestBase,
-from mirrorCtrl import MirrorDispatcherWrapper, GalilDevice
+from mirrorCtrl import MirrorDispatcherWrapper
 import mirrorCtrl.fakeGalil
 
 pwd = os.path.dirname(__file__)
