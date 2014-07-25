@@ -112,7 +112,7 @@ def _makeMirror():
     baseFix[0, 1] = -11.25*MMPerInch # fixed links extend towards A
     baseFix[1, :] = mirAct[1, :]#.copy()
     baseFix[1, 1] = -11.25*MMPerInch # fixed links extend towards A
-    baseFix[2, :] = numpy.array([15.25*MMPerInch, 0., 0.])
+    baseFix[2, :] = numpy.array([15.25*MMPerInch, 0., 0.]) # extend towards +x
 
 
 

@@ -67,7 +67,7 @@ def convertTertOrientToOld(orient):
 
 class FileConverter(object):
     def __init__(self, inPath, outPath):
-        """Searches through inFileName makes orientation coefficient conversions, saves output to outfileName
+        """Searches through inPath makes orientation coefficient conversions, saves output to outPath
         @param[in] inPath: string, path to file to read in
         @param[in] outPath: string, path to output file
         """
@@ -243,8 +243,9 @@ def batchConvert(fromDir, toDir):
         FileConverter(inPath, outPath)
 
 if __name__ == "__main__":
-    instDir = os.path.join(os.environ["TCC_DATA_DIR"], "instWithOldMirCoeffs")
-    batchConvert(fromDir = instDir, toDir="convertedInstFiles")
+    fromDir = os.path.join(os.environ["TCC_DATA_DIR"], "instWithOldMirCoeffs")
+    toDir = os.path.join(os.environ["TCC_DATA_DIR"], "inst")
+    batchConvert(fromDir = fromDir, toDir=toDir)
 
 
 
