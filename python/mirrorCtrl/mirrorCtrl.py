@@ -7,7 +7,7 @@ import sys
 import traceback
 
 import numpy
-from twistedActor import Actor, CommandError, writeToLog, CommandQueue, UserCmd
+from twistedActor import Actor, CommandError, log, CommandQueue, UserCmd
 from RO.Comm.TwistedTimer import Timer
 
 from .const import convOrient2MMRad
@@ -47,7 +47,7 @@ class MirrorCtrl(Actor):
         )
         self.galil = device # easier access
         def killFunc(killThisCmd, killedByCmd):
-            writeToLog("%r queued, killing executing %r" % (killedByCmd, killThisCmd))
+            log.info("%r queued, killing executing %r" % (killedByCmd, killThisCmd))
             # add a stop command to the queue (will be inserted in queue before killedByCmd)
             userCmd = UserCmd()
             userCmd.cmdVerb = 'stop'
@@ -97,12 +97,12 @@ class MirrorCtrl(Actor):
         self.cmdQueue.queueTimer.cancel()
         self.statusTimer.cancel()
 
-    def logMsg(self, msgStr):
-        """Write a message string to the log.
+    # def logMsg(self, msgStr):
+    #     """Write a message string to the log.
 
-        @param[in] msgStr: message to be written to log
-        """
-        writeToLog(msgStr)
+    #     @param[in] msgStr: message to be written to log
+    #     """
+    #     log.info(msgStr)
 
     def processOrientation(self, orientation):
         """Convert a user specified orientation in um and arcseconds with possibly < 5
@@ -319,21 +319,13 @@ def runMirrorCtrl(name, device, userPort):
     @param[in] userPort: port on which actor accepts user commands
     """
     from twisted.internet import reactor
-    from twistedActor import startLogging
+    from twistedActor import startSystemLogging
 
     # if LogDir is specified as an environment variable, begin logging to it.
-    if os.getenv("HOSTNAME") == "tcc35m-1-p":
-        if name == "tert35m":
-            startLogging("local2")
-        else:
-            startLogging("local3")
+    if name == "tert35m":
+        startSystemLogging("LOCAL2")
     else:
-        try:
-            LogDir = os.environ["TWISTED_LOG_DIR"]
-        except KeyError:
-            pass # logging will not start
-        else:
-            startLogging(LogDir, name + ".log")
+        startSystemLogging("LOCAL3")
 
     MirrorCtrl(
         name = name,

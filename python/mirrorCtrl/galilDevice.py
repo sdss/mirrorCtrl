@@ -24,7 +24,7 @@ import numpy
 from RO.StringUtil import quoteStr, strFromException
 from RO.SeqUtil import asSequence
 from RO.Comm.TwistedTimer import Timer
-from twistedActor import TCPDevice, UserCmd, writeToLog
+from twistedActor import TCPDevice, UserCmd, log
 
 from .const import convOrient2UMArcsec
 
@@ -316,7 +316,7 @@ class GalilDevice(TCPDevice):
 
         Called on disconnection
         """
-        writeToLog("%s.init(userCmd=%s, timeLim=%s, getStatus=%s)" % (self, userCmd, timeLim, getStatus))
+        log.info("%s.init(userCmd=%s, timeLim=%s, getStatus=%s)" % (self, userCmd, timeLim, getStatus))
         self.cmdStop(userCmd=userCmd, getStatus=getStatus)
 
     def parseReply(self, replyStr):
@@ -491,10 +491,10 @@ class GalilDevice(TCPDevice):
         - If a command has finished, call the appropriate command callback
         """
         # print "handleReply(replyStr=%r); currDevCmd=%r" % (replyStr, self.currDevCmd)
-        writeToLog("%s read %r, currDevCmd: %r" % (self, replyStr, self.currDevCmd))
+        log.info("%s read %r, currDevCmd: %r" % (self, replyStr, self.currDevCmd))
         replyStr = replyStr.replace(":", "").strip(' ;\r\n\x01\x03\x18\x00')
         if self.currDevCmd.isDone:
-            writeToLog("Ignoring unsolicited output from Galil: %s " % replyStr)
+            log.info("Ignoring unsolicited output from Galil: %s " % replyStr)
             return
         if self.currDevCmd.state == self.currDevCmd.Cancelling:
             raise RuntimeError("Should not be set to Cancelling")
@@ -588,7 +588,7 @@ class GalilDevice(TCPDevice):
         @param[in] nextDevCmdCall: Callable to execute when the device command is done.
         """
         # print "%s.startDevCmd(galilCmdStr=%r, nextDevCmdCall=%r)" % (self, galilCmdStr, nextDevCmdCall)
-        writeToLog("%s.startDevCmd(%r, nextDevCmdCall=%s)" % (self, galilCmdStr, nextDevCmdCall))
+        log.info("%s.startDevCmd(%r, nextDevCmdCall=%s)" % (self, galilCmdStr, nextDevCmdCall))
         if not self.currDevCmd.isDone:
             raise RuntimeError("Device command collision: userCmd=%r, currDevCmd=%r, desired galilCmdStr=%r" % \
                 (self.userCmd, self.currDevCmd, galilCmdStr))
@@ -598,7 +598,7 @@ class GalilDevice(TCPDevice):
         # not self.clearAll()?
         try:
             if self.conn.isConnected:
-                writeToLog("%s writing %r" % (self, galilCmdStr))
+                log.info("%s writing %r" % (self, galilCmdStr))
                 self.conn.writeLine(galilCmdStr)
                 self.currDevCmd.setState(self.currDevCmd.Running)
             else:
@@ -675,7 +675,7 @@ class GalilDevice(TCPDevice):
             # if self.conn.isConnected:
             #     cmdStr = "ST; XQ#STOP"
             #     # cmdStr = "ST;"
-            #     writeToLog("%s writing %r in clearAll before cancelling currently executing device command %s" % (self, cmdStr, self.currDevCmd.cmdStr))
+            #     log.info("%s writing %r in clearAll before cancelling currently executing device command %s" % (self, cmdStr, self.currDevCmd.cmdStr))
             #     self.conn.writeLine(cmdStr)
             # self.timer.start(0, self.currDevCmd.setState, self.currDevCmd.Cancelled, textMsg="Device Command Cancelled via clearAll() in galilDevice")
             self.currDevCmd.setState(self.currDevCmd.Cancelled, textMsg="Device Command Cancelled via clearAll() in galilDevice")
@@ -839,7 +839,7 @@ class GalilDevice(TCPDevice):
         """A move device command ended; decide whether further move iterations are required and act accordingly.
         """
         if self.userCmd.isDone or self.userCmd.isFailing:
-            writeToLog("_moveIter early return because self.userCmd.isDone!")
+            log.info("_moveIter early return because self.userCmd.isDone!")
             return
         # check if we got all expected information from Galil...
         if not ('max sec for move' in self.parsedKeyList):

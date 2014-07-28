@@ -23,7 +23,7 @@ import re
 import numpy
 from RO.Comm.TwistedTimer import Timer
 from RO.Comm.TwistedSocket import TCPServer
-from twistedActor import writeToLog
+from twistedActor import log
 
 from mirrorCtrl.perturbActuators import getActEqEncMir
 
@@ -403,7 +403,7 @@ class FakeGalil(TCPServer):
         if self.userSock:
             self.userSock.writeLine(line)
         else:
-            writeToLog("%s.sendLine(%r) failed: no socket" % (line,), logging.WARNING)
+            log.warn("%s.sendLine(%r) failed: no socket" % (line,))
 
 
 class FakePiezoGalil(FakeGalil):

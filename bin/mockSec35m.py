@@ -12,10 +12,10 @@ from twistedActor import startLogging
 
 try:
     LogDir = os.environ["TWISTED_LOG_DIR"]
+    startSystemLogging(os.path.join(LogDir, "emulate35m.log"))
 except KeyError:
-    LogDir = None
-else:
-    startLogging(LogDir, "emulate35m.log", deleteOldLog=True)
+    # don't start logging
+    pass
 
 DefaultPort = 3520
 
