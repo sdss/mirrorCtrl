@@ -8,11 +8,11 @@ from twisted.internet import reactor
 from mirrorCtrl.mirrors import mir35mSec
 from mirrorCtrl import MirrorCtrlWrapper
 
-from twistedActor import startLogging
+from twistedActor import startFileLogging
 
 try:
     LogDir = os.environ["TWISTED_LOG_DIR"]
-    startSystemLogging(os.path.join(LogDir, "emulate35m.log"))
+    startFileLogging(os.path.join(LogDir, "emulate35m.log"))
 except KeyError:
     # don't start logging
     pass

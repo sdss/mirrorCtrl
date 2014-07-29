@@ -66,7 +66,10 @@ def floatCast(number):
         @param[in] float: a float
         @return a string
     """
-    return "%.2f" % number
+    if numpy.isnan(number):
+        return "NaN"
+    else:
+        return "%.2f" % number
 
 def mountCast(mount):
     """ Cast a mount array into a string.
@@ -133,11 +136,19 @@ class GalilTimer(object):
 
         Return nan if startTimer not called since construction or last reset.
         """
-        return "%.2f"%(time.time() - self.initTime)
+        return "%.2f"%(self._getTime())
 
+    def _getTime(self):
+        return time.time() - self.initTime
 
 class GalilStatus(object):
     """A container for holding the status of the Galil """
+    # State options
+    movingState = "Moving"
+    doneState = "Done"
+    homingState = "Homing"
+    failedState = "Failed"
+    notHomedState = "NotHomed"
     def __init__(self, device):
         """Construct a GalilStatus
 
@@ -173,7 +184,7 @@ class GalilStatus(object):
         ## age of desired orientation
         self.desOrientAge = GalilTimer()
         ## current move iteration
-        self.iter = numpy.nan
+        self.iter = 0
         ## max number allowed for move iterations
         self.maxIter = device.MaxIter if self.mirror.hasEncoders else 1
         ## status bits
@@ -203,11 +214,10 @@ class GalilStatus(object):
             "iter": intOrNan,
             "maxIter": intOrNan,
             "status": statusCast,
-            "moving": str,
+            # "moving": str,
             "homing": strArrayCast,
             "axisHomed": strArrayCast,
         }
-
 
     def _getKeyValStr(self, keywords):
         """Package and return current keyword value info in status cache
@@ -225,6 +235,33 @@ class GalilStatus(object):
                 strVal = self.castDict[keyword](val)
             strList.append("%s=%s" % (keyword, strVal))
         return "; ".join(strList)
+
+    def _getCurrentState(self):
+        """Return the state of the device
+        """
+        # are any axes homing?
+        if 1 in self.homing:
+            return self.homingState
+        # is it moving?
+        elif self.moving:
+            return self.movingState
+        elif 0 in self.axisHomed:
+            return self.notHomedState
+        # add Failed state later?
+        # this will take a little more book keeping.
+        return self.doneState
+
+    def currentStatus(self):
+        """Construct a keyword summarizing the state of the device
+        """
+        keyword = "state"
+        state = self._getCurrentState()
+        nIter = "%i" % self.iter
+        maxIter = "%i" % self.maxIter
+        totDuration = floatCast(self.maxDuration if state in [self.movingState, self.homingState] else 0)
+        remDuration = floatCast(self.maxDuration - self.duration._getTime() if state in [self.movingState, self.homingState] else 0)
+        # print keyword + "=" + ",".join([state,nIter,maxIter,remDuration,totDuration])
+        return keyword + "=" + ",".join([state,nIter,maxIter,remDuration,totDuration])
 
 
 class GalilDevice(TCPDevice):
@@ -425,6 +462,7 @@ class GalilDevice(TCPDevice):
             # append text describing time for what
             updateStr += '; Text=%s' % (quoteStr(key),)
             self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
+            self.writeToUsers("i", self.status.currentStatus(), cmd=self.userCmdOrNone)
             # adjust time limits
             if not self.currDevCmd.isDone:
                 self.currDevCmd.setTimeLimit(maxTime + 2)
@@ -681,7 +719,7 @@ class GalilDevice(TCPDevice):
             self.currDevCmd.setState(self.currDevCmd.Cancelled, textMsg="Device Command Cancelled via clearAll() in galilDevice")
 
         self.parsedKeyList = []
-        self.status.iter = numpy.nan
+        self.status.iter = 0
         self.status.homing = [0]*self.nAct
         self.status.moving = 0
         self.status.maxDuration = numpy.nan
@@ -722,6 +760,9 @@ class GalilDevice(TCPDevice):
             self.writeToUsers(">", "Text = \"Homing Actuators: %s\"" % (", ".join(str(v) for v in axisList)), cmd=userCmd)
             updateStr = self.status._getKeyValStr(["homing"])
             self.writeToUsers("i", updateStr, cmd=userCmd)
+            self.status.maxDuration = numpy.nan
+            self.status.duration.startTimer()
+            self.writeToUsers("i", self.status.currentStatus(), cmd=userCmd)
         else:
             # command failed for some reason, do nothing, should clean itself up
             pass
@@ -765,7 +806,10 @@ class GalilDevice(TCPDevice):
             if self.mirror.hasEncoders:
                 self.status.iter = 1
             self.status.desOrientAge.startTimer()
-            statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "desEncMount", "modelMount", "maxIter", "iter", "moving"])
+            self.status.maxDuration = numpy.nan
+            self.status.duration.startTimer()
+            self.writeToUsers("i", self.status.currentStatus(), cmd=userCmd)
+            statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "desEncMount", "modelMount", "maxIter", "iter"])
             self.writeToUsers('i', statusStr, cmd=userCmd)
         else:
             # dev command not running for some reason, must have failed
@@ -880,6 +924,9 @@ class GalilDevice(TCPDevice):
             # convert from numpy to simple list for command formatting
             mount = [x for x in newCmdActPos]
             cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
+            self.status.maxDuration = numpy.nan
+            self.status.duration.startTimer()
+            self.writeToUsers("i", self.status.currentStatus(), cmd=self.userCmdOrNone)
             self.replaceDevCmd(cmdMoveStr, nextDevCmdCall=self._moveIter)
             return
         # done
@@ -890,8 +937,11 @@ class GalilDevice(TCPDevice):
         """ Explicitly call dev cmd callback, to set user command state to done
         """
         self.status.moving = 0
-        statusStr = self.status._getKeyValStr(["moving"])
-        self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
+        # statusStr = self.status._getKeyValStr(["moving"])
+        # self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
+        self.status.maxDuration = numpy.nan
+        self.status.duration.startTimer()
+        self.writeToUsers("i", self.status.currentStatus(), cmd=self.userCmdOrNone)
         self._devCmdCallback(self.currDevCmd)
 
     def _statusCallback(self):
@@ -916,7 +966,7 @@ class GalilDevice(TCPDevice):
             "desOrientAge",
             "desEncMount",
             "homing",
-            "moving",
+            # "moving",
         ])
         self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
         self._devCmdCallback(self.currDevCmd)
