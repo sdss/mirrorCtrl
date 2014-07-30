@@ -2,7 +2,6 @@ from __future__ import division, absolute_import
 """ Actor for mirrors (via Galil devices).
 """
 import functools
-import os
 import sys
 import traceback
 
@@ -279,7 +278,6 @@ class MirrorCtrl(Actor):
 
         @param[in] cmd: new local user command (twistedActor.UserCmd)
         """
-
         if not self.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
