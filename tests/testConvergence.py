@@ -179,7 +179,7 @@ class ConvergenceTestBase(object):
             # reason for less than or equal:
             # if new orient is a big difference from the previous, an automatic offset
             # should have been applied, thus taking less iterations to converge
-            self.assertTrue(self.dispatcher.model.iter.valueList[0] <= nIter)
+            self.assertTrue(self.dispatcher.model.state.valueList[1] <= nIter)
         d.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdVar)
         return d
@@ -228,9 +228,9 @@ class TestIteration(ConvergenceTestBase, TestCase):
             """Check results after cmdVar is done
             """
             self.assertFalse(cmdVar.didFail)
-            print 'iterlist', self.dispatcher.model.iter.valueList[0]
+            print 'iterlist', self.dispatcher.model.state.valueList[1]
             print 'netMountOffset', self.dispatcher.model.netMountOffset.valueList[0]
-            self.assertTrue(self.dispatcher.model.iter.valueList[0] > 1)
+            self.assertTrue(self.dispatcher.model.state.valueList[1] > 1)
         d.addCallback(checkResults)
         self.dispatcher.executeCmd(cmdVar)
         return d
