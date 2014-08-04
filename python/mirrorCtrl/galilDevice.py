@@ -454,7 +454,7 @@ class GalilDevice(TCPDevice):
             self.writeToUsers("i", msgStr, cmd=self.userCmdOrNone)
             return
 
-        elif TimeEstRegEx.match(key):
+        elif TimeEstRegEx.match(key) and ("full step" not in key): # ignore sec to find full step, cuts the timeout short!
             # contains information about estimated execution time
             # update status and notify users
             dataList = numpy.asarray(dataList, dtype=float)
@@ -538,7 +538,8 @@ class GalilDevice(TCPDevice):
             log.info("Ignoring unsolicited output from Galil: %s " % replyStr)
             return
         if self.currDevCmd.state == self.currDevCmd.Cancelling:
-            raise RuntimeError("Should not be set to Cancelling")
+            raise log.error("Should not be set to Cancelling: %s"%self.currDevCmd)
+            return
 
         #replyStr = unicode(replyStr, errors='ignore')
         #replyStr = replyStr.encode("ascii", errors = "ignore")

@@ -19,20 +19,20 @@ class MirDat(object):
                "CtrMirZ",
                "CtrBaseZ"
             ]:
-                setattr(self, mir+attr, 0) 
+                setattr(self, mir+attr, 0)
             for attr in [
-                "MinMount", 
-                "MaxMount", 
-                "MountOffset", 
-                "MountScale", 
-                "ActMirX", 
-                "ActMirY", 
-                "ActMirZ", 
-                "ActBaseX", 
-                "ActBaseY", 
+                "MinMount",
+                "MaxMount",
+                "MountOffset",
+                "MountScale",
+                "ActMirX",
+                "ActMirY",
+                "ActMirZ",
+                "ActBaseX",
+                "ActBaseY",
                 "ActBaseZ",
             ]:
-                setattr(self, mir+attr, [0]*6)                        
+                setattr(self, mir+attr, [0]*6)
 
     @property
     def _WrapperList(self):
@@ -42,20 +42,20 @@ class MirDat(object):
         """Load data from a file-like object
         """
         self._WrapperList.load(f)
-    
+
     def loadPath(self, filePath):
         """Load data from a file specified by path
         """
         self._WrapperList.loadPath(filePath)
-    
+
     def dump(self, f):
         """Dump data to a file-like object
         """
-        self._WrapperList.dump(f)            
-    
+        self._WrapperList.dump(f)
+
     def __repr__(self):
         return self._WrapperList.dumpStr()
-        
+
 class MirDat35(MirDat):
 
     @property
@@ -64,7 +64,7 @@ class MirDat35(MirDat):
         """
         if hasattr(self, "__WLCache"):
             return self.__WLCache
-        
+
         wrapperList = WrapperList(name="Tune", obj=self,
             wrappers = (
                 DocWrapper("\nMiscellaneous Parameters\n"),
@@ -75,34 +75,34 @@ class MirDat35(MirDat):
                 ScalarWrapper("secNConst", dtype=int),
                 ScalarWrapper("secType", dtype=int),
                 ScalarWrapper("secNAddStatus", dtype=int),
-                
+
                 ArrayWrapper("secMinMount", numElts=5, dtype=int),
                 ArrayWrapper("secMaxMount", numElts=5, dtype=int),
                 ArrayWrapper("secMountOffset", numElts=5, dtype=float),
-                ArrayWrapper("secMountScale", numElts=5, dtype=float),    
-                
+                ArrayWrapper("secMountScale", numElts=5, dtype=float),
+
                 ArrayWrapper("secActMirX", numElts=6, dtype=float),
                 ArrayWrapper("secActMirY", numElts=6, dtype=float),
                 ArrayWrapper("secActMirZ", numElts=6, dtype=float),
                 ArrayWrapper("secActBaseX", numElts=6, dtype=float),
                 ArrayWrapper("secActBaseY", numElts=6, dtype=float),
                 ArrayWrapper("secActBaseZ", numElts=6, dtype=float),
-                
+
                 ScalarWrapper("tertNAct", dtype=int),
                 ScalarWrapper("tertNConst", dtype=int),
                 ScalarWrapper("tertNAddStatus", dtype=int),
-                
+
                 ArrayWrapper("tertMinMount", numElts=3, dtype=int),
                 ArrayWrapper("tertMaxMount", numElts=3, dtype=int),
                 ArrayWrapper("tertMountOffset", numElts=3, dtype=float),
                 ArrayWrapper("tertMountScale", numElts=3, dtype=float),
-                
+
                 ArrayWrapper("tertActMirX", numElts=6, dtype=float),
                 ArrayWrapper("tertActMirY", numElts=6, dtype=float),
                 ArrayWrapper("tertActMirZ", numElts=6, dtype=float),
                 ArrayWrapper("tertActBaseX", numElts=6, dtype=float),
                 ArrayWrapper("tertActBaseY", numElts=6, dtype=float),
-                ArrayWrapper("tertActBaseZ", numElts=6, dtype=float),                
+                ArrayWrapper("tertActBaseZ", numElts=6, dtype=float),
             )
         )
         self.__WLCache = wrapperList
@@ -115,7 +115,7 @@ class MirDat25(MirDat):
         """
         if hasattr(self, "__WLCache"):
             return self.__WLCache
-        
+
         wrapperList = WrapperList(name="Tune", obj=self,
             wrappers = (
                 DocWrapper("\nMiscellaneous Parameters\n"),
@@ -131,35 +131,35 @@ class MirDat25(MirDat):
                 ArrayWrapper("secMinMount", numElts=5, dtype=int),
                 ArrayWrapper("secMaxMount", numElts=5, dtype=int),
                 ArrayWrapper("secMountOffset", numElts=5, dtype=float),
-                ArrayWrapper("secMountScale", numElts=5, dtype=float),    
+                ArrayWrapper("secMountScale", numElts=5, dtype=float),
                 ArrayWrapper("secActMirX", numElts=6, dtype=float),
                 ArrayWrapper("secActMirY", numElts=6, dtype=float),
                 ArrayWrapper("secActMirZ", numElts=6, dtype=float),
                 ArrayWrapper("secActBaseX", numElts=6, dtype=float),
                 ArrayWrapper("secActBaseY", numElts=6, dtype=float),
                 ArrayWrapper("secActBaseZ", numElts=6, dtype=float),
-                
+
                 ScalarWrapper("tertNAct", dtype=int),
-                
+
                 ScalarWrapper("primNConst", dtype=int),
                 ScalarWrapper("primNAddStatus", dtype=int),
-                
+
                 ArrayWrapper("primMinMount", numElts=6, dtype=int),
                 ArrayWrapper("primMaxMount", numElts=6, dtype=int),
                 ArrayWrapper("primMountOffset", numElts=6, dtype=float),
                 ArrayWrapper("primMountScale", numElts=6, dtype=float),
-                
+
                 ArrayWrapper("primActMirX", numElts=6, dtype=float),
                 ArrayWrapper("primActMirY", numElts=6, dtype=float),
                 ArrayWrapper("primActMirZ", numElts=6, dtype=float),
                 ArrayWrapper("primActBaseX", numElts=6, dtype=float),
                 ArrayWrapper("primActBaseY", numElts=6, dtype=float),
-                ArrayWrapper("primActBaseZ", numElts=6, dtype=float),                
+                ArrayWrapper("primActBaseZ", numElts=6, dtype=float),
             )
         )
         self.__WLCache = wrapperList
         return self.__WLCache
-        
+
 def makeMirrors(mirDat):
     mirDict = {'prim': None, 'sec': None, 'tert': None}
     for mirName in mirDict.iterkeys():
@@ -172,13 +172,13 @@ def makeMirrors(mirDat):
                 getattr(mirDat, mirName + 'ActBaseX')[actNum],
                 getattr(mirDat, mirName + 'ActBaseY')[actNum],
                 getattr(mirDat, mirName + 'ActBaseZ')[actNum],
-                
+
             ])
             mirPos = numpy.array([
                 getattr(mirDat, mirName + 'ActMirX')[actNum],
                 getattr(mirDat, mirName + 'ActMirY')[actNum],
                 getattr(mirDat, mirName + 'ActMirZ')[actNum],
-                
+
             ])
             minMount = getattr(mirDat, mirName + 'MinMount')[actNum]
             maxMount = getattr(mirDat, mirName + 'MaxMount')[actNum]
@@ -186,7 +186,7 @@ def makeMirrors(mirDat):
             offset = getattr(mirDat, mirName + 'MountOffset')[actNum]
             actuatorList.append(
                 mirrorCtrl.AdjLengthLink(
-                    basePos, 
+                    basePos,
                     mirPos,
                     minMount,
                     maxMount,
@@ -200,14 +200,14 @@ def makeMirrors(mirDat):
                 getattr(mirDat, mirName + 'ActBaseX')[fixNum],
                 getattr(mirDat, mirName + 'ActBaseY')[fixNum],
                 getattr(mirDat, mirName + 'ActBaseZ')[fixNum],
-                
+
             ])
             mirPos = numpy.array([
                 getattr(mirDat, mirName + 'ActMirX')[fixNum],
                 getattr(mirDat, mirName + 'ActMirY')[fixNum],
                 getattr(mirDat, mirName + 'ActMirZ')[fixNum],
-                
-            ])            
+
+            ])
             fixedList.append(
                 mirrorCtrl.FixedLengthLink(
                     basePos,
@@ -237,16 +237,31 @@ def makeMirrors(mirDat):
             )
     return mirDict
 
-# read mir.dat files     
-mirDat35 = MirDat35()
-dataDir = os.path.dirname(__file__)
-file35 = os.path.join(dataDir, 'mir_35m.dat')
-mirDat35.loadPath(file35)
-mirDat25 = MirDat25()
-file25 = os.path.join(dataDir, 'mir_25m.dat')
-mirDat25.loadPath(file25)
+if __name__ == "__main__":
+    import pickle
+    # read mir.dat files
+    mirDat35 = MirDat35()
+    dataDir = os.path.dirname(__file__)
+    print 'dataDir', dataDir
+    file35 = os.path.join(dataDir, 'mir_35m.dat')
+    mirDat35.loadPath(file35)
+    mirDat25 = MirDat25()
+    file25 = os.path.join(dataDir, 'mir_25m.dat')
+    mirDat25.loadPath(file25)
 
-# make mirrors
-mirDict35 = makeMirrors(mirDat35)
- 
-mirDict25 = makeMirrors(mirDat25)
+    # make mirrors
+    mirDict35 = makeMirrors(mirDat35)
+
+    mirDict25 = makeMirrors(mirDat25)
+
+    # pickle these for unit tests to load to remove this file
+    # the only tcc dependency, from this package
+
+    output = open(os.path.join(dataDir, 'mirDict35.p'), "wb")
+    pickle.dump(mirDict35, output)
+    output.close()
+    output = open(os.path.join(dataDir, 'mirDict25.p'), "wb")
+    pickle.dump(mirDict25, output)
+    output.close()
+
+

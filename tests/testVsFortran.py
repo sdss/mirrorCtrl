@@ -4,18 +4,26 @@ from __future__ import division, absolute_import
 import os.path
 import itertools
 import unittest
+import pickle
 
 import numpy
 import numpy.random
 import RO.Astro.Tm
 
-from data.mirrorBlocks import mirDict35, mirDict25
 from mirrorCtrl.mirrors import mir35mSec, mir35mTert, mir25mSec, mir25mPrim
 from mirrorCtrl.const import convOrient2UMArcsec, convOrient2MMRad, MMPerMicron
 
 numpy.random.seed(0)
 
 dataDir = os.path.join((os.path.dirname(__file__)), "data")
+# these pickle files created using data/mirrorBlocks.py
+# they are pickled to remove any dependencies of on the tcc.
+f = open(os.path.join(dataDir, "mirDict35.p"), "rb")
+mirDict35 = pickle.load(f)
+f.close()
+f = open(os.path.join(dataDir, "mirDict25.p"), "rb")
+mirDict25 = pickle.load(f)
+f.close()
 
 Mirrors = ['prim', 'sec', 'tert']
 Acts = ['A', 'B', 'C', 'D', 'E', 'F']
