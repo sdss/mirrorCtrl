@@ -159,43 +159,43 @@ class GalilStatus(object):
         self.nAct = len(self.mirror.actuatorList)
 
         # all the Status keyword/value pairs we will cache, and their initial values
-        self.maxDuration = numpy.nan
+        self.maxDuration = 0
         self.duration = GalilTimer()
-        ## actuator mount determined from a measured orientation
+        # actuator mount determined from a measured orientation
         self.actMount = numpy.asarray([numpy.nan]*self.nAct) # get rid of?
-        ## desired encoder mount determined from desired orientation
+        # desired encoder mount determined from desired orientation
         self.desEncMount = numpy.asarray([numpy.nan]*self.nAct)
-        ## encoder mount reported from the galil
+        # encoder mount reported from the galil
         self.encMount = numpy.asarray([numpy.nan]*self.nAct)
-        ## the user commanded mount position
+        # the user commanded mount position
         self.modelMount = numpy.asarray([numpy.nan]*self.nAct)
-        ## subsequent commanded mount positions determined during iterations
+        # subsequent commanded mount positions determined during iterations
         self.cmdMount = numpy.asarray([numpy.nan]*self.nAct)
-        ## offset applied to a previously commanded mount, a new mountErr is determined each iteration
+        # offset applied to a previously commanded mount, a new mountErr is determined each iteration
         self.mountErr = numpy.asarray([0.]*self.nAct)
-        ## last computed total offset between the first commanded mount position and the last commanded mount position after iteration
+        # last computed total offset between the first commanded mount position and the last commanded mount position after iteration
         self.netMountOffset = numpy.asarray([0.]*self.nAct)
-        ## measured orientation (based on encoder lengths)
+        # measured orientation (based on encoder lengths)
         self.orient = numpy.asarray([numpy.nan]*6) # get rid of?
-        ## orientation based on commanded actuator positions
+        # orientation based on commanded actuator positions
         self.mountOrient = numpy.asarray([numpy.nan]*6)
-        ## desired orientation, user specified, but adjusted for induced motions due to fixed links.
+        # desired orientation, user specified, but adjusted for induced motions due to fixed links.
         self.desOrient = numpy.asarray([numpy.nan]*6)
-        ## age of desired orientation
+        # age of desired orientation
         self.desOrientAge = GalilTimer()
-        ## current move iteration
+        # current move iteration
         self.iter = 0
-        ## max number allowed for move iterations
+        # max number allowed for move iterations
         self.maxIter = device.MaxIter if self.mirror.hasEncoders else 1
-        ## status bits
+        # status bits
         self.status = numpy.asarray([numpy.nan]*self.nAct)
-        ## acutators which are currently moving
+        # acutators which are currently moving
         self.moving = 0.
-        ## acutators which are currently homing
+        # acutators which are currently homing
         self.homing = numpy.asarray(["?"]*self.nAct)
-        ## actuators which are currently homed
+        # actuators which are currently homed
         self.axisHomed = numpy.asarray(["?"]*self.nAct)
-        ## dictionary containing casting strageties to output current gailil status/state info
+        # dictionary containing casting strageties to output current gailil status/state info
         self.castDict = {
             "nAct": int,
             "maxDuration": floatCast,
@@ -260,8 +260,14 @@ class GalilStatus(object):
         state = self._getCurrentState(cmd)
         nIter = "%i" % self.iter
         maxIter = "%i" % self.maxIter
-        totDuration = floatCast(self.maxDuration if state in [self.movingState, self.homingState] else 0)
-        remDuration = floatCast(self.maxDuration - self.duration._getTime() if state in [self.movingState, self.homingState] else 0)
+        totDuration = floatCast(self.maxDuration)# if state in [self.movingState, self.homingState] else 0)
+        remDuration = floatCast(0)
+        if self.maxDuration:
+            duration = self.duration._getTime()
+            if not numpy.isnan(duration):
+                remDuration = floatCast(self.maxDuration - duration)
+
+        # remDuration = floatCast(self.maxDuration - self.duration._getTime() if state in [self.movingState, self.homingState] else 0)
         # print keyword + "=" + ",".join([state,nIter,maxIter,remDuration,totDuration])
         return keyword + "=" + ",".join([state,nIter,maxIter,remDuration,totDuration])
 
@@ -460,10 +466,10 @@ class GalilDevice(TCPDevice):
             dataList = numpy.asarray(dataList, dtype=float)
             maxTime = numpy.max(dataList) # get time for longest move
             self.status.maxDuration = maxTime
-            updateStr = self.status._getKeyValStr(["maxDuration"])
+            # updateStr = self.status._getKeyValStr(["maxDuration"])
             # # append text describing time for what
             # updateStr += '; Text=%s' % (quoteStr(key),)
-            self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
+            # self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
             self.sendState(cmd=self.userCmdOrNone)
             # self.writeToUsers("i", self.status.currentStatus(), cmd=self.userCmdOrNone)
             # adjust time limits
@@ -771,7 +777,7 @@ class GalilDevice(TCPDevice):
             self.writeToUsers(">", "Text = \"Homing Actuators: %s\"" % (", ".join(str(v) for v in axisList)), cmd=userCmd)
             updateStr = self.status._getKeyValStr(["homing"])
             self.writeToUsers("i", updateStr, cmd=userCmd)
-            self.status.maxDuration = numpy.nan
+            self.status.maxDuration = 0
             self.status.duration.startTimer()
             userCmd.addCallback(self.sendState)
             self.sendState(cmd=userCmd)
@@ -819,7 +825,7 @@ class GalilDevice(TCPDevice):
             if self.mirror.hasEncoders:
                 self.status.iter = 1
             self.status.desOrientAge.startTimer()
-            self.status.maxDuration = numpy.nan
+            self.status.maxDuration = 0
             self.status.duration.startTimer()
             userCmd.addCallback(self.sendState)
             self.sendState(cmd=userCmd)
@@ -861,7 +867,7 @@ class GalilDevice(TCPDevice):
         """
         self.writeToUsers("w", "Text=\"Galil is busy executing: %s, showing cached status\"" % self.currDevCmd.cmdStr, cmd = userCmd)
         statusStr = self.status._getKeyValStr([
-            "maxDuration",
+            # "maxDuration",
             # "duration",
             "orient",
             "desOrient",
@@ -941,7 +947,7 @@ class GalilDevice(TCPDevice):
             # convert from numpy to simple list for command formatting
             mount = [x for x in newCmdActPos]
             cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
-            self.status.maxDuration = numpy.nan
+            self.status.maxDuration = 0
             self.status.duration.startTimer()
             self.sendState(cmd=self.userCmdOrNone)
             # self.writeToUsers("i", self.status.currentStatus(), cmd=self.userCmdOrNone)
@@ -957,7 +963,7 @@ class GalilDevice(TCPDevice):
         self.status.moving = 0
         # statusStr = self.status._getKeyValStr(["moving"])
         # self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
-        self.status.maxDuration = numpy.nan
+        self.status.maxDuration = 0
         self.status.duration.startTimer()
         self.sendState(cmd=self.userCmdOrNone)
         # self.writeToUsers("i", self.status.currentStatus(), cmd=self.userCmdOrNone)
