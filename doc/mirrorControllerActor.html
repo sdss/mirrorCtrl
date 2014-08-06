@@ -17,59 +17,16 @@ http://www.apo.nmsu.edu/Telescopes/TCC/MessageKeywords.html
     <li><a href="#Commands">Commands</a>
     <ul>
         <li><a href="#cmd_move">move <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a>
-        <li><a href="#cmd_home">home <i>[A [,B [,C [,D [,E [,F]]]]]]</i></a>
-        <li><a href="#cmd_showparams">showparams</a>
-        <li><a href="#cmd_log">log</a>
-        <li><a href="#cmd_stop">stop</a>
+        <li><a href="#cmd_offset">offset <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a>
         <li><a href="#cmd_status">status</a>
+        <li><a href="#cmd_showparams">showparams</a>
+        <li><a href="#cmd_stop">stop</a>
+        <li><a href="#cmd_home">home <i>[actuatorList]</i></a>
+        <li><a href="#cmd_reset">reset</a>
     </ul>   
-    <li><a href="#Keywords">Keywords</a>
+    <li><a href="mirrorKeywords.html">Keywords</a>
     <ul>
-	<li><a href="#key_DesOrient">DesOrient=<i>float,float,float,float,float,float</i></a>
-	<li><a href="#key_DesOrientAge">DesOrientAge=<i>float</i></a>
-	<li><a href="#key_CmdMount">CmdMount=<i>float*nAct</i></a>
-	<li><a href="#key_Cmd">Cmd=<i>String</i></a>
-	<li><a href="#key_MaxDuration">MaxDuration=<i>float</i></a>
-	<li><a href="#key_Duration">Duration=<i>float</i></a>
-	<li><a href="#key_Text">Text=<i>string</i></a>
-	<li><a href="#key_Orient">Orient=<i>float,float,float,float,float,float</i></a>
-	<li><a href="#key_ActMount">ActMount=<i>float*nAct</i></a>
-	<li><a href="#key_Iter">Iter=<i>int</i></a>
-	<li><a href="#key_AxisHomed">AxisHomed=<i>bool*nAct</i></a>
-	<li><a href="#key_Status">Status=<i>32bits*nAct</i></a>
-	<li><a href="#key_MaxIter">MaxIter=<i>int</i></a>
-	<li><a href="#key_Homing">Homing=<i>bool*nAct</i></a>
-	<li><a href="#key_UnparsedReply">UnparsedReply=<i>string*(1,2)</i></a>
-	<li><a href="#key_BadGalilReply">BadGalilReply=<i>string*(1,2)</i></a>
-	<li><a href="#key_GParSoftwareVersion">GParSoftwareVersion=<i>float</i></a>
-	<li><a href="#key_GParNAXES">GParNAXES=<i>int</i></a>
-	<li><a href="#key_GParDOAUX">GParDOAUX=<i>int</i></a>
-	<li><a href="#key_GParMOFF">GParMOFF=<i>int</i></a>
-	<li><a href="#key_GParNCORR">GParNCORR=<i>int</i></a>
-	<li><a href="#key_GParWTIME">GParWTIME=<i>float</i></a>
-	<li><a href="#key_GParENCTIME">GParENCTIME=<i>float</i></a>
-	<li><a href="#key_GParLSTIME">GParLSTIME=<i>float</i></a>
-	<li><a href="#key_GPar_RNGxdiv2">GPar_RNGxdiv2=<i>int*nAct</i></a>
-	<li><a href="#key_GParRNGxdiv2">GParRNGxdiv2=<i>int*nAct</i></a>
-	<li><a href="#key_GParSPDx">GParSPDx=<i>int*nAct</i></a>
-	<li><a href="#key_GParHMSPDx">GParHMSPDx=<i>int*nAct</i></a>
-	<li><a href="#key_GParACCx">GParACCx=<i>int*nAct</i></a>
-	<li><a href="#key_GParMINCORRx">GParMINCORRx=<i>int*nAct</i></a>
-	<li><a href="#key_GParMAXCORRx">GParMAXCORRx=<i>int*nAct</i></a>
-	<li><a href="#key_GParST_FSx">GParST_FSx=<i>int*nAct</i></a>
-	<li><a href="#key_GParMARGx">GParMARGx=<i>int*nAct</i></a>
-	<li><a href="#key_GParINDSEP">GParINDSEP=<i>int*nAct</i></a>
-	<li><a href="#key_GParENCRESx">GParENCRESx=<i>float*nAct</i></a>
-    <li><a href="#key_devConnState"><i>dev</i>ConnState=<i>state, reason</i></a>
-    <li><a href="#key_numUsers">numUsers=<i>int</i></a>
-    <li><a href="#key_refCount">refCount=<i>refcount, object</i></a>
-    <li><a href="#key_superseded">superseded</a>
-    <li><a href="#key_text">text</a>
-    <li><a href="#key_timeout">timeout</a>
-    <li><a href="#key_unknownCommand">unknownCommand=<i>cmdVerb</i></a>
-    <li><a href="#key_userInfo">userInfo=<i>userID1, addr1, userID2, addr2, ...</i></a>
-    <li><a href="#key_version">version=<i>vers</i></a>
-    <li><a href="#key_yourUserID">yourUserID=<i>int</i></a>
+        <li><a href="#updateKeywordManual">Updating the keyword manual</a>
     </ul>
     <li><a href="#VersionHistory">Version History</a>
 </ul>
@@ -80,219 +37,83 @@ http://www.apo.nmsu.edu/Telescopes/TCC/MessageKeywords.html
 
 <p>In the future it is possible that there will be other implementations of this mirror controller interface that control the motors in some other fashion.
 
+<p>Mirror-specific information may be found <a href="http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html#DeviceSpecific">here</a>.
+
 <h2><a name="Commands">Commands</a></h2>
 
 <h3><a name="cmd_move">move <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a></h3>
 
-<p> Move the mirror to the desired orientation.  Units are um for lengths and arcseconds for angles. 
-Arguments may only appear in the exact order listed above. If fewer than 5 axes are specified, the remaining non-specified
-axes are assumed to be zero. At least 1 axis (piston) must be specified for a valid command.
-<p>
-Once a move command is received, a desired 6-axis orientation is determined based on constrained axes 
-(eg an anti-rotation link). So rotation about the Z axis may never be directly commanded, but it may 
-manifest as an induced effect. 
-<p>If encoders are present, an error between actual and desired orientation is computed. 
- Up to X subsequent moves may be automatically commanded in effort to minimize this error.
-</p>
-<p>Note: the 3.5m M3 may not be commanded to translate.
-</p>
+<p>Move the mirror to the desired orientation. Units are um for lengths and arcseconds for angles. Arguments may only appear in the exact order listed above. If fewer than 5 axes are specified, the remaining non-specified axes are assumed to be zero. At least 1 axis (piston) must be specified for a valid command.
 
-<h3><a name="cmd_home">home <i>[A [,B [,C [,D [,E [,F]]]]]]</i></a></h3>
+<p>You may not command orientation for constrained axes (e.g. rotation about Z). Most mirrors have 5 degrees of freedom, but a few only have 3. 
 
-<p> Home the desired actuators. Arguments may be in any order or omitted. 
-If no arguments are passed, all valid axes are homed.  
+<p>In detail, moves are performed as follows:
 <ul>
-    <li>2.5m M1 valid actuators: A-F 
+    <li>Compute the orientation for constrained axes, resulting in a full 6 axis desired orientation.
+    <li>Compute desired encoder lengths (for axes without encoders, this is the commanded mount position).
+    <li>Compute predicted actuator.
+    <li>Repeat the following until the number of iterations exceeds some maximum or the encoder error is sufficiently small:
+    <ul>
+        <li>Move the actuators.
+        <li>Read the encoders and compute encoder error (actual - desired encoder length).
+        <li>Use the encoder error to compute an actuator length correction.
+    </ul>
+</ul>
+
+<h3><a name="cmd_offset">offset <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a></h3>
+
+<p>Offset the mirror orientation by the desired amount. Units are um for lengths and arcseconds for angles. Arguments may only appear in the exact order listed above. If fewer than 5 axes are specified, the remaining non-specified axes are assumed to be zero. At least 1 axis (piston) must be specified for a valid command.
+
+<p>See <a href="#cmd_move">move</a> for more information.
+
+<h3><a name="cmd_status">status</a></h3>
+
+<p>Query the Galil for status.
+
+<h3><a name="cmd_showparams">showparams</a></h3>
+
+<p>Query the Galil for parameters. See <a href="http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html">Galil Documentation</a> for more info.
+
+<h3><a name="cmd_stop">stop</a></h3>
+
+<p>Stop motion, put the Galil into a known state and return status.
+
+<h3><a name="cmd_home">home <i>[actuatorList]</i></a></h3>
+
+<p>Home the desired actuators, where actuator list is a comma-separated list of actuator letters A through F (but some mirrors have fewer than 6 actuators). If no axes are specified, all axes are homed:
+<ul>
+    <li>2.5m M1 valid actuators: A-F
     <li>2.5m M2 valid actuators: A-E
     <li>3.5m M2 valid actuators: A-E
     <li>3.5m M3 valid actuators: A-C
 </ul>
-<p> More mirror specific actuator info may be found <a href="http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html#DeviceSpecific">here</a>.
 
-<h3><a name="cmd_showparams">showparams</a></h3>
+<p><b>Warning:</b> this command typically takes a very long time and typically shoul be performed with the telescope at a specific altitude.
 
-<p>
-Quieries the Galil for it's parameters. See <a href="http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html"> Galil Documentation</a> for more info.
-</p>
+<h3><a name="cmd_reset">reset</a></h3>
 
-<h3><a name="cmd_showparams">log</a></h3>
+<p>Reset the Galil by sending the RS command, which is like power cycling it. <b>Warning:</b> the axes will no longer be homed!
 
-<p>
-Spits out each raw line received from the Galil since startup via the 'Text' keyword
-</p>
+<h2><a name="updateKeywordManual">Updating the keyword manual</a></h2>
 
-<h3><a name="cmd_stop">stop</a></h3>
-
-<p>
-Sends a stop command. Any running commands will stop, and the status of the Galil will be returned.
-</p>
-
-<h2><a name="Keywords"></a>Keywords</h2>
-
-<p>Notes:
+<p>The keyword manual <code>doc/mirrorKeywords.html</code> is auto-generated from the <code>mirror.py</code> file in the actorkeys package. To generate a new copy:
 <ul>
-    <li>Numeric values (even integers) will be "NaN" if unknown
-    <li>When you first connect you are shown current status, including <a href="key_yourUserID">yourUserID</a>.
+    <li><code>$ setup mirrorCtrl</code>
+    <li><code>$ cd $MIRRORCTRL_DIR</code>
+    <li><code>$ACTORKEYS_DIR/doc/describe.py --actor mirror --tohtml mirrorKeywords.html</code>
 </ul>
 
-<h3><a name="key_DesOrient"></a>DesOrient=<i>float,float,float,float,float,float</i></h3>
-<p>
-The desired mirror orientation: piston (um), tiltX (arcsec), tiltY (arcsec), 
-transX (um), transY (um), rotZ (arcsec).
-</p>
-<h3><a name="key_DesOrientAge"></a>DesOrientAge=<i>float</i></h3>
-<p>
-Elapsed time (seconds) since a desired orientation was set.
-</p>
-
-<h3><a name="key_CmdMount"></a>CmdMount=<i>float*nAct</i></h3>
-<p>Commanded mount positions
-</p>
-<h3><a name="key_Cmd"></a>Cmd=<i>String</i></h3>
-<p>The current command (verb) executing.
-</p>
-<h3><a name="key_MaxDuration"></a>MaxDuration=<i>float</i></h3>
-<p>Maximum amount of time (seconds) expected for current process.
-</p>
-<h3><a name="key_Duration"></a>Duration=<i>float</i></h3>
-<p>Time (seconds) spent executing so far
-</p>
-<h3><a name="key_Text"></a>Text=<i>string</i></h3>
-<p>Text for humans to read
-</p>
-<h3><a name="key_Orient"></a>Orient=<i>float,float,float,float,float,float</i></h3>
-<p>The measured or actual mirror orientation: piston (um), tiltX (arcsec), tiltY (arcsec), 
-transX (um), transY (um), rotZ (arcsec).
-</p>
-<h3><a name="key_ActMount"></a>ActMount=<i>float*nAct</i></h3>
-<p>The measured or actual actuator mount positions.
-</p>
-<h3><a name="key_Iter"></a>Iter=<i>int</i></h3>
-<p>Current move iteration.
-</p>
-<h3><a name="key_AxisHomed"></a>AxisHomed=<i>bool*nAct</i></h3>
-<p>Axes that are homed
-</p>
-<h3><a name="key_Status"></a>Status=<i>32bits*nAct</i></h3>
-<p>See <a href="http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html#StatusWord"> Galil status word</a>
-</p>
-<h3><a name="key_MaxIter"></a>MaxIter=<i>int</i></h3>
-<p>Max number of allowed iterations for a move.
-</p>
-<h3><a name="key_Homing"></a>Homing=<i>bool*nAct</i></h3>
-<p>Axes that are homing
-</p>
-<h3><a name="key_UnparsedReply"></a>UnparsedReply=<i>string*(1,2)</i></h3>
-<p>Display an ignored raw Galil reply
-</p>
-<h3><a name="key_BadGalilReply"></a>BadGalilReply=<i>string*(1,2)</i></h3>
-<p>Parsed Galil reply that confused the actor
-</p>
-<h3><a name="key_GParSoftwareVersion"></a>GParSoftwareVersion=<i>float</i></h3>
-<p>Software Version on Galil
-</p>
-<h3><a name="key_GParNAXES"></a>GParNAXES=<i>int</i></h3>
-<p>Number of axes (1-6). Note: 3.5m M3 mirror has 6 axes, although only 3 may be used.
-</p>
-<h3><a name="key_GParDOAUX"></a>GParDOAUX=<i>int</i></h3>
-<p>If nonzero, status info emitted from aux serial port.
-</p>
-<h3><a name="key_GParMOFF"></a>GParMOFF=<i>int</i></h3>
-<p>Turn off all motors after each move, if nonzero.
-</p>
-<h3><a name="key_GParNCORR"></a>GParNCORR=<i>int</i></h3>
-<p>Number of encoder-based corrections after each move
-</p>
-<h3><a name="key_GParWTIME"></a>GParWTIME=<i>float</i></h3>
-<p>Settling time after a move
-</p>
-<h3><a name="key_GParENCTIME"></a>GParENCTIME=<i>float</i></h3>
-<p>Settling time after a move and after WTIME, before encoders are read
-</p>
-<h3><a name="key_GParLSTIME"></a>GParLSTIME=<i>float</i></h3>
-<p>Max time required to back out of a limit at low speed
-</p>
-<h3><a name="key_GPar_RNGxdiv2"></a>GPar_RNGxdiv2=<i>int*nAct</i></h3>
-<p>Half the negative range in microsteps
-</p>
-<h3><a name="key_GParRNGxdiv2"></a>GParRNGxdiv2=<i>int*nAct</i></h3>
-<p>Half the positive range in microsteps
-</p>
-<h3><a name="key_GParSPDx"></a>GParSPDx=<i>int*nAct</i></h3>
-<p>Max speed, in microsteps/sec
-</p>
-<h3><a name="key_GParHMSPDx"></a>GParHMSPDx=<i>int*nAct</i></h3>
-<p>Max speed for finding home switch, in microsteps/sec
-</p>
-<h3><a name="key_GParACCx"></a>GParACCx=<i>int*nAct</i></h3>
-<p>Acceleration and deceleration of each axis, in microsteps/sec^2
-</p>
-<h3><a name="key_GParMINCORRx"></a>GParMINCORRx=<i>int*nAct</i></h3>
-<p>The min error that will be corrected, 0 means correct any error
-</p>
-<h3><a name="key_GParMAXCORRx"></a>GParMAXCORRx=<i>int*nAct</i></h3>
-<p>The max error that will be corrected at the end of a move. Set to 0 if no encoder or no correction is desired
-</p>
-<h3><a name="key_GParST_FSx"></a>GParST_FSx=<i>int*nAct</i></h3>
-<p>Step resolution, in microsteps per full step. 1 for servo motor
-</p>
-<h3><a name="key_GParMARGx"></a>GParMARGx=<i>int*nAct</i></h3>
-<p>Margin between the hard and soft reverse limits, in microsteps
-</p>
-<h3><a name="key_GParINDSEP"></a>GParINDSEP=<i>int*nAct</i></h3>
-<p>If this axis has an index pulse encoder and it is used for homing, then set to the separation between index pulses in microsteps
-</p>
-<h3><a name="key_GParENCRESx"></a>GParENCRESx=<i>float*nAct</i></h3>
-<p>Resolution of encremental auxiliary encoder in ticks per microstep, 0 if no encoder
-</p>
-
-<h3><a name="key_devConnState"></a><i>dev</i>ConnState=<i><i>state, reason</i></h3>
-
-<p>State of connection to the dev hardware controller. <i>State</i> is one of Connecting, Authorizing, Connected, Disconnecting, Failing, Disconnected or Failed (the states of an RO.Comm.TCPConnection object). <i>Reason</i> is the reason it got to this state ("" if no reason specified).
-<p> Note: <i>Dev</i> is a placeholder for a device name
-
-<h3><a name="key_numUsers"></a>numUsers=<i>int</i></h3>
-
-<p>The number of users presently connected (a single integer)
-
-<h3><a name="key_refCount">refCount=<i>refcount, object</i></a></h3>
-
-<p>The reference count for an object.
-
-<h3><a name="key_superseded"></a>superseded</h3>
-
-<p>The command was superseded by some other command.
-
-<h3><a name="key_text"></a>text</h3>
-
-<p>Text message (intended for debugging and human consumption).
-
-<h3><a name="key_timeout"></a>timeout</h3>
-
-<p>The command timed out.
-
-<h3><a name="key_unknownCommand">unknownCommand=<i>cmdVerb</i></a></h3>
-
-<p>The command verb (the first word of your command string) is not supported by this actor.
-
-<h3><a name="key_userInfo"></a>userInfo=<i>userID1, addr1, userID2, addr2, ...</i></h3>
-
-<p>An variable-length array containing two entries for each user who is presently connected: userID and the IP address. The user ID is an integer and the address is a string. The userIDs will appear in sorted order but are not necessarily contiguous.
-
-<h3><a name="key_version">version=<i>vers</i></a></h3>
-
-<p>The version number (as a string) of the actor.
-
-<h3><a name="key_yourUserID"></a>yourUserID=<i>int</i></h3>
-
-<p>Your own userID.
+<p>The default title and header are simply "mirror"; I recommend manually changing those two instances to "mirror controller keywords".
 
 <h2><a name="VersionHistory">Version History</a></h2>
 
-<h3>1.0 2012-02-29</h3>
+<h3>0.9 2014-08-06</h3>
 
-<p>First release.
-
+<p>Visible changes:
+<ul>
+    <li>If one move supersedes another then the first move is reported as done.
+    <li>Updated the manual, including moving the keyword description to an auto-generated file.
+</ul>
 
 </body>
 </html>

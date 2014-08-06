@@ -1,0 +1,43 @@
+/* 004056 - 2C858D - 74CEB7 - C9FFD5 - FFFFCB */
+.actorHeader {
+	font-size: 32px;
+	font-weight: bold;
+}
+
+.actorVersion {
+	position: absolute;
+	right: 24px;
+}
+
+.key {
+	margin-top: 24px;
+	padding-right: 8px;
+}
+
+.keyname {
+	padding-left: 8px;
+	margin-bottom: 8px;
+	font-size: 18px;
+}
+
+.keydesc {
+	border-collapse: collapse;
+	display: table;
+	table-layout: fixed;
+}
+
+.descriptor {
+	display: table-row;
+}
+
+.label {
+	display: table-cell;
+	width: 120px;
+	text-align: right;
+	padding-right: 8px;
+	font-style: italic;
+}
+
+.value {
+	display: table-cell;
+}

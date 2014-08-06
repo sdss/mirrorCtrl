@@ -1,0 +1,608 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="description" content="Document created automatically on Wed Aug  6 13:59:05 2014 by rowen@Russells-MacBook-Pro.local using /Users/rowen/SDSS3/code/ops/actorkeys-newtcc/doc/describe.py">
+  <title>mirror controller keywords</title>
+  <link rel="stylesheet" type="text/css" href="describe.css">
+</head>
+<div class="actor">
+  <div class="actorHeader"><span class="actorName">mirror controller keywords</span><span class="actorVersion">1.0</span></div>
+  <div class="key">
+    <div class="keyname">actMount</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Actuator lengths determined from encMount and the mirror model. This may not match cmdMount, even if the actuators move as commanded, due to systematic errors in the mirror model. For an actuator without an encoder, the commanded actuator mount is used. </span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">axisHomed</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Axes that are homed</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Bool (int,int2)</span></div>
+      <div class="type descriptor"><span class="label">False</span><span class="value">0</span></div>
+      <div class="type descriptor"><span class="label">True</span><span class="value">1</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">?</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">badGalilReply</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Parsed Galil reply that confused the actor</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">String (str,text)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">cmd</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Current command (verb) executing</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Name</span><span class="value">cmdVerb</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">String (str,text)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">cmdMount</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Commanded actuator lengths</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">desEncMount</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Desired encoder lengths, in actuator microsteps, based on desOrient and the mirror model. There is one entry per actuator, rather than one per encoder: for an actuator without an encoder, the commanded actuator mount is used.</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">desOrient</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">desired mirror orientation</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">6</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">piston</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">um</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">x tilt</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">arcsec</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">y tilt</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">arcsec</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">x translation</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">um</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">y translation</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">um</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">z rotation</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">arcsec</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">desOrientAge</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Elapsed time since a desired orientation was set</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">seconds</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">deviceSoftwareVersion</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Software version for additional device-specific code</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">String (str,text)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">encMount</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Reported encoder lengths, in actuator microsteps. There is one entry per actuator, rather than one per encoder: for an actuator without an encoder, the commanded actuator mount is used.</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilACC</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Maximum acceleration and deceleration of each axis</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps/sec^2</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilConState</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">State of connection to the dev hardware controller. State is one of Connecting, Authorizing, Connected, Disconnecting, Failing, Disconnected or Failed (the states of an RO.Comm.TCPConnection object). &lt;i&gt;Reason&lt;/i&gt; is the reason it got to this state (&apos;&apos; if no reason specified), Note: Dev is a placeholder for a device name</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">2</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">Connection State</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Enum (str,int2)</span></div>
+      <div class="type descriptor"><span class="label">Value-0</span><span class="value">Connecting</span></div>
+      <div class="type descriptor"><span class="label">Value-1</span><span class="value">Authorizing</span></div>
+      <div class="type descriptor"><span class="label">Value-2</span><span class="value">Connected</span></div>
+      <div class="type descriptor"><span class="label">Value-3</span><span class="value">Disconnecting</span></div>
+      <div class="type descriptor"><span class="label">Value-4</span><span class="value">Disconnected</span></div>
+      <div class="type descriptor"><span class="label">Value-5</span><span class="value">Failing</span></div>
+      <div class="type descriptor"><span class="label">Value-6</span><span class="value">Failed</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">Reason</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">String (str,text)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilDOAUX</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">If nonzero, status info emitted from aux serial port</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilENCRES</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Resolution of encremental auxiliary encoder; 0 if no encoder</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">ticks/microstep</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilENCTIME</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Settling time after a move and after WTIME, before encoders are read</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">seconds</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilHalfRNG</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Half the range of motion</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilHMSPD</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Max speed for finding home switch</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps/sec</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilINDSEP</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">If this axis has an index pulse encoder and it is used for homing, then set to the separation between index pulses</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilLSTIME</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Max time required to back out of a limit at low speed</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">seconds</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilMARG</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Margin between the hard and soft reverse limits</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilMAXCORR</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">The max error that will be corrected at the end of a move. Set to 0 if no encoder or no correction is desired</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilMINCORR</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">The mininimum error that will be corrected, 0 means correct any error</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilMOFF</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Turn off all motors after each move, if nonzero</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilNAXES</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Number of axes (1-6). Note: 3.5m M3 mirror has 6 axes, although only 3 may be used</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilNCORR</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Number of encoder-based corrections after each move</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilSoftwareVersion</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Software Version on Galil</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">String (str,text)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilSPD</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Max speed</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps/sec</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilST_FS</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Step resolution; 1 for a servo motor</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps/full step</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">galilWTIME</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Settling time after a move</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">seconds</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">homing</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Axes that are currently homing</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Bool (int,int2)</span></div>
+      <div class="type descriptor"><span class="label">False</span><span class="value">0</span></div>
+      <div class="type descriptor"><span class="label">True</span><span class="value">1</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">?</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">maxDuration</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Maximum amount of time for a home or move</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">maxIter</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Maximum allowed iterations for a move</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">UInt (long,int4)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">modelMount</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Actuator lengths determined from desOrient and the mirror model</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">mountErr</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Error in length for a given iteration. Apply this delta to cmdMount each iteration.</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">moving</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Mirror currently moving</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Bool (int,int2)</span></div>
+      <div class="type descriptor"><span class="label">False</span><span class="value">0</span></div>
+      <div class="type descriptor"><span class="label">True</span><span class="value">1</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">?</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">netMountOffset</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Offset applied to a model mount at the beginning of a move, to prevent motion for a null move and speed up convergence for a small move. It primarily  compensates for systematic error in the mirror model.</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">numUsers</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Number of connected users</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">orient</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">desired mirror orientation</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">6</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">piston</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">um</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">x tilt</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">arcsec</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">y tilt</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">arcsec</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">x translation</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">um</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">y translation</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">um</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">z rotation</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">arcsec</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">refCount</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">The reference count for an object</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">2</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">refcount</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">object</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">String (str,text)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">state</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">summarizes current state of galil and any remaning time or move iterations</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">State of device, one of: Moving, Done, Homing, Failed, NotHomed</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">String (str,text)</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">current iteration; 0 if state is not Moving</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">UInt (long,int4)</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">max iterations; 0 if state is not Moving</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">UInt (long,int4)</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">remaining time on move or home</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">seconds</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">total time for move or home</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">seconds</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">status</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">see http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html#StatusWord</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Bits (long,int4)</span></div>
+      <div class="type descriptor"><span class="label">Field-0</span><span class="value">00000000000000000000000011111111 stopcode</span></div>
+      <div class="type descriptor"><span class="label">Field-1</span><span class="value">11111111111111111111111100000000 statusword</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">text</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Text message</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">String (str,text)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">unknownCommand</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">The command verb (the first word of your command string) is not supported by this actor</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">command verb</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">String (str,text)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">unknownReplyKey</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">One item of Galil data had an unrecognized key</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">data key</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">String (str,text)</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">data</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">String (str,text)</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">full reply</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">String (str,text)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">unparsedReply</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">This Galil reply could not be parsed and so is being ignored</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">String (str,text)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">userInfo</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Basic information about one user</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">2</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">user ID</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">socket address</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">String (str,text)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">version</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">The version of the actor</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">String (str,text)</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">?</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">yourUserID</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Your user ID number; use this to recognize replies triggered by your commands; never 0</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+    </div>
+  </div>
+</div>
+
+</html>
