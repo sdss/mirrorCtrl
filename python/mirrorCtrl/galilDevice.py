@@ -967,14 +967,14 @@ class GalilDevice(TCPDevice):
     def _moveEnd(self, *args):
         """ Explicitly call dev cmd callback, to set user command state to done
         """
-        self.status.moving = 0
+        # self.status.moving = 0
         # statusStr = self.status._getKeyValStr(["moving"])
         # self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
-        self.status.maxDuration = 0
-        self.status.duration.startTimer()
-        self.sendState(cmd=self.userCmdOrNone)
+        # self.status.maxDuration = 0
+        # self.status.duration.startTimer()
         # self.writeToUsers("i", self.status.currentStatus(), cmd=self.userCmdOrNone)
-        self._devCmdCallback(self.currDevCmd)
+        self._devCmdCallback(self.currDevCmd) # will call clear all
+        self.sendState(cmd=self.userCmdOrNone)
 
     def _statusCallback(self):
         """Callback for status command.
