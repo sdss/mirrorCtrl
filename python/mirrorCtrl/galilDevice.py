@@ -466,6 +466,8 @@ class GalilDevice(TCPDevice):
             dataList = numpy.asarray(dataList, dtype=float)
             maxTime = numpy.max(dataList) # get time for longest move
             self.status.maxDuration = maxTime
+            # reset the timer
+            self.status.duration.startTimer()
             # updateStr = self.status._getKeyValStr(["maxDuration"])
             # # append text describing time for what
             # updateStr += '; Text=%s' % (quoteStr(key),)
@@ -712,9 +714,11 @@ class GalilDevice(TCPDevice):
                 # succeeded and more code to execute
                 nextDevCmdCall, self.nextDevCmdCall = self.nextDevCmdCall, None
                 Timer(0, nextDevCmdCall)
+                return
 
-            elif not self.userCmd.isDone:
+            if not self.userCmd.isDone:
                 self.userCmd.setState(devCmd.state)
+            self.clearAll() # dev cmd done one way or the other
         finally:
             self._inDevCmdCallback = False
 
@@ -739,7 +743,7 @@ class GalilDevice(TCPDevice):
         self.status.iter = 0
         self.status.homing = [0]*self.nAct
         self.status.moving = 0
-        self.status.maxDuration = numpy.nan
+        self.status.maxDuration = 0
         self.status.duration.reset()
 
     def cmdHome(self, userCmd, axisList):
