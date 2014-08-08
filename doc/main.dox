@@ -3,7 +3,7 @@
 
 \section mirrorCtrl_introduction Introduction
 
-This package provides high-level mirror control as described in the <a href="mirrorControllerActor.html">Mirror Controller Actor</a> manual. This implementation interfaces to the APO <a href="http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html">Galil mirror controllers</a>.
+This package provides high-level mirror control as described in the <a href="../mirrorControllerActor.html">Mirror Controller Actor</a> manual. This implementation interfaces to the APO <a href="http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html">Galil mirror controllers</a>.
 
 This package adds the following capabilities to the Galil mirror controllers:
 * Command mirror orientation (piston, tilt and translation) to the extent supported by the actuators. (The Galil supports commanding actuator mount, not orientation.)
