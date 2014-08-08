@@ -475,10 +475,12 @@ class GalilDevice(TCPDevice):
             self.sendState(cmd=self.userCmdOrNone)
             # self.writeToUsers("i", self.status.currentStatus(), cmd=self.userCmdOrNone)
             # adjust time limits
-            if not self.currDevCmd.isDone:
-                self.currDevCmd.setTimeLimit(maxTime + 2)
-            if not self.userCmd.isDone:
-                self.userCmd.setTimeLimit(maxTime + 5)
+            #if not self.currDevCmd.isDone:
+            log.info("New timeout: %0.2f for device cmd %r"%(maxTime+4, self.currDevCmd))
+            self.currDevCmd.setTimeLimit(maxTime + 4)
+            #if not self.userCmd.isDone:
+            log.info("New timeout: %0.2f for user cmd %r"%(maxTime+6, self.userCmd))
+            self.userCmd.setTimeLimit(maxTime + 6)
 
         elif ('commanded position' == key) or ('target position' == key):
             # modelMount must not be updated for actuator error determination
