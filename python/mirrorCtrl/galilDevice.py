@@ -506,7 +506,7 @@ class GalilDevice(TCPDevice):
                 # add these new values to status
                 self.status.orient = numpy.asarray(orient[:], dtype=float)
                 self.status.actMount = actMount[:]
-            updateStr = self.status._getKeyValStr(["orient", "actMount"])
+            updateStr = self.status._getKeyValStr(["orient", "actMount", "cmdMount"])
             self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
 
         elif key == 'axis homed':
@@ -834,7 +834,7 @@ class GalilDevice(TCPDevice):
             userCmd.addCallback(self.sendState)
             self.sendState(cmd=userCmd)
             # self.writeToUsers("i", self.status.currentStatus(), cmd=userCmd)
-            statusStr = self.status._getKeyValStr(["desOrient", "desOrientAge", "desEncMount", "modelMount", "maxIter"])
+            statusStr = self.status._getKeyValStr(["desOrient", "cmdMount", "desOrientAge", "desEncMount", "modelMount", "maxIter"])
             self.writeToUsers('i', statusStr, cmd=userCmd)
         else:
             # dev command not running for some reason, must have failed
@@ -877,6 +877,7 @@ class GalilDevice(TCPDevice):
             "desOrient",
             "desOrientAge",
             "actMount",
+            "cmdMount",
             "desEncMount",
             "modelMount",
             # "iter",
