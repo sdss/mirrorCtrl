@@ -138,6 +138,10 @@ class MirrorCtrl(Actor):
         # if this command does not contain MG "OK" or and XQ# add an MG "OK" to force
         # command completion after sending
         cmdStr = cmd.cmdArgs
+        if cmdStr[0] in ["'", '"'] and cmdStr[-1] in ["'",'"']:
+            #string contains quotes, take em out
+            cmdStr = cmdStr[1:-1]
+        log.info("galil breakthrough string: %s"%cmdStr)
         if cmdStr.endswith(";"):
             cmdStr = cmdStr[:-1]
 
@@ -155,7 +159,7 @@ class MirrorCtrl(Actor):
             traceback.print_exc(file=sys.stderr)
             raise CommandError(str(e))
         return True
-        cmd.setState(cmd.Done)
+        # cmd.setState(cmd.Done)
 
     def cmd_move(self, cmd):
         """Move mirror to a commanded orientation, if device isn't busy.
