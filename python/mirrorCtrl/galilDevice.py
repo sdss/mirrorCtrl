@@ -460,7 +460,7 @@ class GalilDevice(TCPDevice):
             self.writeToUsers("i", msgStr, cmd=self.userCmdOrNone)
             return
 
-        elif TimeEstRegEx.match(key):# and ("full step" not in key): # ignore sec to find full step, cuts the timeout short!
+        elif TimeEstRegEx.match(key) and not "away" in key:# and ("full step" not in key): # ignore sec to find full step, cuts the timeout short!
             # contains information about estimated execution time
             # update status and notify users
             dataList = numpy.asarray(dataList, dtype=float)
