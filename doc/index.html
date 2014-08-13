@@ -10,15 +10,18 @@
     <li><a href="#Overview">Overview</a>
     <li><a href="#Commands">Commands</a>
     <ul>
-        <li><a href="#cmd_move">move <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a>
-        <li><a href="#cmd_offset">offset <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a>
-        <li><a href="#cmd_status">status</a>
-        <li><a href="#cmd_showparams">showparams</a>
-        <li><a href="#cmd_stop">stop</a>
+        <li><a href="#cmd_connDev">connDev</a>
+        <li><a href="#cmd_disconnDev">disconnDev</a>
+        <li><a href="#cmd_exit">exit</a>
         <li><a href="#cmd_galil">galil <i>Galil command</i></a>
         <li><a href="#cmd_home">home <i>[actuatorList]</i></a>
+        <li><a href="#cmd_move">move <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a>
+        <li><a href="#cmd_offset">offset <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a>
         <li><a href="#cmd_reset">reset</a>
-    </ul>   
+        <li><a href="#cmd_showparams">showparams</a>
+        <li><a href="#cmd_status">status</a>
+        <li><a href="#cmd_stop">stop</a>
+    </ul>
     <li><a href="messageKeywords.html">Keywords</a>
     <ul>
         <li><a href="#updateKeywordManual">Updating the keyword manual</a>
@@ -36,44 +39,22 @@
 
 <p>Mirror-specific information may be found <a href="http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html#DeviceSpecific">here</a>.
 
+<p>Information on directly commanding mirrors from the TCC can be found <a href="http://www.apo.nmsu.edu/Telescopes/TCC/OperatorsManual.html">here</a>
+
+
 <h2><a name="Commands">Commands</a></h2>
 
-<h3><a name="cmd_move">move <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a></h3>
+<h3><a name="cmd_connDev"> connDev </a></h3>
 
-<p>Move the mirror to the desired orientation. Units are um for lengths and arcseconds for angles. Arguments may only appear in the exact order listed above. If fewer than 5 axes are specified, the remaining non-specified axes are assumed to be zero. At least 1 axis (piston) must be specified for a valid command.
+<p>Connect the mirror controller to the galil. This command will be necessary after talk2boxes is used.
 
-<p>You may not command orientation for constrained axes (e.g. rotation about Z). Most mirrors have 5 degrees of freedom, but a few only have 3. 
+<h3><a name="cmd_disconnDev"> disconnDev </a></h3>
 
-<p>In detail, moves are performed as follows:
-<ul>
-    <li>Compute the orientation for constrained axes, resulting in a full 6 axis desired orientation.
-    <li>Compute desired encoder lengths (for axes without encoders, this is the commanded mount position).
-    <li>Compute predicted actuator.
-    <li>Repeat the following until the number of iterations exceeds some maximum or the encoder error is sufficiently small:
-    <ul>
-        <li>Move the actuators.
-        <li>Read the encoders and compute encoder error (actual - desired encoder length).
-        <li>Use the encoder error to compute an actuator length correction.
-    </ul>
-</ul>
+<p>Disconnect the mirror controller from the galil.
 
-<h3><a name="cmd_offset">offset <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a></h3>
+<h3><a name="cmd_exit"> exit </a></h3>
 
-<p>Offset the mirror orientation by the desired amount. Units are um for lengths and arcseconds for angles. Arguments may only appear in the exact order listed above. If fewer than 5 axes are specified, the remaining non-specified axes are assumed to be zero. At least 1 axis (piston) must be specified for a valid command.
-
-<p>See <a href="#cmd_move">move</a> for more information.
-
-<h3><a name="cmd_status">status</a></h3>
-
-<p>Query the Galil for status.
-
-<h3><a name="cmd_showparams">showparams</a></h3>
-
-<p>Query the Galil for parameters. See <a href="http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html">Galil Documentation</a> for more info.
-
-<h3><a name="cmd_stop">stop</a></h3>
-
-<p>Stop motion, put the Galil into a known state and return status.
+<p>Disconnect yourself from the mirror controller.
 
 <h3><a name="cmd_galil">galil <i>Galil Command</i></a></h3>
 
@@ -99,9 +80,46 @@
 
 <p><b>Warning:</b> this command typically takes a very long time and typically shoul be performed with the telescope at a specific altitude.
 
+<h3><a name="cmd_move">move <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a></h3>
+
+<p>Move the mirror to the desired orientation. Units are um for lengths and arcseconds for angles. Arguments may only appear in the exact order listed above. If fewer than 5 axes are specified, the remaining non-specified axes are assumed to be zero. At least 1 axis (piston) must be specified for a valid command.
+
+<p>You may not command orientation for constrained axes (e.g. rotation about Z). Most mirrors have 5 degrees of freedom, but a few only have 3.
+
+<p>In detail, moves are performed as follows:
+<ul>
+    <li>Compute the orientation for constrained axes, resulting in a full 6 axis desired orientation.
+    <li>Compute desired encoder lengths (for axes without encoders, this is the commanded mount position).
+    <li>Compute predicted actuator.
+    <li>Repeat the following until the number of iterations exceeds some maximum or the encoder error is sufficiently small:
+    <ul>
+        <li>Move the actuators.
+        <li>Read the encoders and compute encoder error (actual - desired encoder length).
+        <li>Use the encoder error to compute an actuator length correction.
+    </ul>
+</ul>
+
+<h3><a name="cmd_offset">offset <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a></h3>
+
+<p>Offset the mirror orientation by the desired amount. Units are um for lengths and arcseconds for angles. Arguments may only appear in the exact order listed above. If fewer than 5 axes are specified, the remaining non-specified axes are assumed to be zero. At least 1 axis (piston) must be specified for a valid command.
+
+<p>See <a href="#cmd_move">move</a> for more information.
+
 <h3><a name="cmd_reset">reset</a></h3>
 
 <p>Reset the Galil by sending the RS command, which is like power cycling it. <b>Warning:</b> the axes will no longer be homed!
+
+<h3><a name="cmd_showparams">showparams</a></h3>
+
+<p>Query the Galil for parameters. See <a href="http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html">Galil Documentation</a> for more info.
+
+<h3><a name="cmd_stop">stop</a></h3>
+
+<p>Stop motion, put the Galil into a known state and return status.
+
+<h3><a name="cmd_status">status</a></h3>
+
+<p>Query the Galil for status.
 
 <h2><a name="updateKeywordManual">Updating the keyword manual</a></h2>
 
@@ -121,5 +139,5 @@
 </body>
 </html>
 
- 
+
 
