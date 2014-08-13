@@ -1,23 +1,14 @@
 from __future__ import division, absolute_import
-"""Fake Galil.
+"""!Fake Galil
 
-Notes:
+@note
 - If a Galil is busy running an XQ# command then:
   - If it receives a new one it outputs "?".
   - If it receives other commands (such as ST or A=value) it executes them as usual;
   Warning: ST and RS may stop output in mid-stream.
 - Unlike a real Galil, this one receives entire lines at a time
-  (though perhaps tweaking some network setting could fix that)
-
-To do:
-- Add proper support for different mirrors:
-  - Set nAxes appropriate (3-6)
-  - Include correct mirror-specific info in status and other command output
-
-- Figure out how to set status more realistically.
 """
 import collections
-import logging
 import re
 
 import numpy
@@ -40,7 +31,7 @@ class FakeGalil(TCPServer):
             wakeUpHomed=True,
             stateCallback=None,
         ):
-        """Fake Galil TCP server
+        """!Fake Galil TCP server
 
         @param[in] mirror: a mirrorCtrl.mirror.Mirror object, the mirror this fake galil should emulate
         @param[in] port: port on which to listen for connections
@@ -85,12 +76,19 @@ class FakeGalil(TCPServer):
         self.noiseRange = 700 # steps, +/- range for adding steps to a measurement
 
     def close(self):
-        # overridden to shut down timer upon close
+        """Close the server
+
+        This override shuts down the timer on close
+        """
         self.replyTimer.cancel()
         self.nextCmdTimer.cancel()
         return TCPServer.close(self)
 
     def sockStateCallback(self, sock):
+        """Socket state callback
+
+        @param[in] sock  the socket whose state changed (RO.Comm.BaseSocket)
+        """
         if sock.isReady:
 #             print "Set user=", sock
             self.userSock = sock
@@ -99,23 +97,30 @@ class FakeGalil(TCPServer):
             self.userSock = None
 
     def arr(self, val, dtype=int):
-        """Make an array of [val0,...] of length self.nAxes
+        """!Make an array of [val, val, val...] of length self.nAxes
+
+        @param[in] val  value to duplicate
+        @param[in] dtype  array type (a numpy dtype)
         """
         return numpy.array([val]*self.nAxes, dtype=dtype)
 
     def arrAB(self, val0, val1, dtype=int):
-        """Make an array of length self.nAxes as a truncation of [val0, val0, val0, val1, val1, val1]
+        """!Make an array of length self.nAxes as a truncation of [val0, val0, val0, val1, val1, val1]
+
+        @param[in] val0  value to duplicate for the first part of the array
+        @param[in] val1  value to duplicate for the second part of the array
+        @param[in] dtype  array type (a numpy dtype)
         """
         return numpy.array([val0]*3 + [val1]*3, dtype=dtype)[0:self.nAxes]
 
     def lineReceived(self, sock):
-        """Called each time data is received.
+        """!Called each time data is received.
 
         This does not actually start a command for two reasons:
         - a single line may contain multiple commands (separated by semicolons)
         - commands can queue up
 
-        @param[in] sock: socket containing a line of data
+        @param[in] sock  socket containing a line of data
         """
         line = sock.readLine()
         if line:
@@ -123,8 +128,9 @@ class FakeGalil(TCPServer):
             self._startNextCmd()
 
     def _startNextCmd(self):
-        """Split line on linebreakes, and forward each peice to
-        self.linedReceived on at a time.
+        """!Start the next command in the command buffer
+
+        Pop line-most entry in self._cmdBuffer and start a new command
         """
         if self._cmdBuffer:
             cmdStr = self._cmdBuffer.popleft()
@@ -135,17 +141,17 @@ class FakeGalil(TCPServer):
                 self.nextCmdTimer.start(0., self._startNextCmd)
 
     def echo(self, line):
-        """Send line + "\n:" back, emulating an echo from a galil
+        """!Send line + "\n:" back, emulating an echo from a galil
 
-        @param[in] line: line received to be written back
+        @param[in] line  line received to be written back
         """
         if self.userSock:
             self.userSock.writeLine(line)
 
     def newCmd(self, cmdStr):
-        """New command received
+        """!Start a new command
 
-        @param[in] cmdStr: command
+        @param[in] cmdStr  new command
         """
         if self.verbose:
             print "received: %r" % (cmdStr,)
@@ -170,9 +176,9 @@ class FakeGalil(TCPServer):
         self.processCmd(cmdStr)
 
     def processCmd(self, cmdStr):
-        """Figure out what was commanded, and emulate galil behavior accordingly
+        """!Figure out what was commanded, and emulate galil behavior accordingly
 
-        @param[in] cmdStr: string, a galil command
+        @param[in] cmdStr  string, a Galil command
         """
 # Is there a use case for setting a variable to -MAXINT?
 #        cmdMatch = re.match(r"([A-F]) *= *(-)?MAXINT$", cmdStr)
@@ -233,14 +239,14 @@ class FakeGalil(TCPServer):
             self.done()
 
     def restart(self):
-        """Restart the galil
+        """!Restart the Galil
         """
         str1 = "Mirror controller version  0000000002.1000 started"
         self.sendLine(str1)
         self.replyTimer.start(0.2, self.sendLine, "OK")
 
     def homeStart(self):
-        """Start homing
+        """!Start homing
         """
         self.isHomed[:] = numpy.logical_and(self.isHomed, self.userNums == MAXINT)
         deltaPos = numpy.where(self.userNums == MAXINT, 0.0, -self.range)
@@ -253,7 +259,7 @@ class FakeGalil(TCPServer):
         self.replyTimer.start(moveTime, self.homeFoundHome)
 
     def homeFoundHome(self):
-        """Home, second step: found reverse limit, now move away
+        """!Home, second step: found reverse limit, now move away
         """
         deltaPos = numpy.where(self.userNums == MAXINT, 0.0, self.marg)
         deltaTimeArr = deltaPos / numpy.array(self.homeSpeed, dtype=float)
@@ -265,13 +271,13 @@ class FakeGalil(TCPServer):
         self.replyTimer.start(moveTime, self.homeMovedAway)
 
     def homeMovedAway(self):
-        """Home third step: moved away from limit switch
+        """!Home third step: moved away from limit switch
         """
         self.sendLine("Finding next full step")
         self.replyTimer.start(0.1, self.homeDone)
 
     def homeDone(self):
-        """Homing finished
+        """!Homing finished
         """
         self.isHomed[:] = numpy.logical_or(self.isHomed, self.userNums != MAXINT)
         posErr = numpy.where(self.userNums == MAXINT, 999999999,
@@ -287,15 +293,22 @@ class FakeGalil(TCPServer):
         self.done()
 
     def resetUserNums(self):
-        """Reset user nums"""
+        """!Reset userNums
+        """
         self.userNums[:] = MAXINT
 
     def formatArr(self, fmtStr, arr, suffix):
-        """ Return a comma separated string of values and a suffix"""
+        """!Return a string of comma-separated values, a space, and a suffix
+
+        @param[in] fmtStr  format string used to format each value, e.g. "%09d"
+        @param[in] arr  array of values
+        @param[in] suffix  append a space and this value to the formatted list of values
+        """
         return ", ".join([fmtStr % val for val in arr]) + " " + suffix
 
     def showStatus(self):
-        """Show the status"""
+        """!Show the status
+        """
         notHomedIndices = numpy.nonzero(numpy.logical_not(self.isHomed))
         cmdPos = self.cmdPos[:]
         measPos = self.measPos[:]
@@ -310,7 +323,8 @@ class FakeGalil(TCPServer):
             self.sendLine(msgStr)
 
     def showParams(self):
-        """Show parameters"""
+        """!Show parameters
+        """
         for msgStr in [
             "02.10, %d software version, NAXES number of axes" % (self.nAxes,),
             "1, 0, 01 DOAUX aux status? MOFF motors off when idle? NCORR # corrections",
@@ -330,9 +344,9 @@ class FakeGalil(TCPServer):
             self.sendLine(msgStr)
 
     def moveStart(self, newCmdPos):
-        """Start moving to the specified newCmdPos
+        """!Start moving to the specified newCmdPos
 
-        @param[in] newCmdPos: [int]*number of actuators.
+        @param[in] newCmdPos  new commanded position (array of ints; one value per actuator)
         """
         # first check that all axes are homed
         # for now, assume all axes need to be homed for a move
@@ -380,12 +394,12 @@ class FakeGalil(TCPServer):
         self.replyTimer.start(moveTime, self.moveDone)
 
     def moveDone(self):
-        """Called when a move is done"""
+        """!Called when a move is done"""
         self.sendLine(self.formatArr("%09d", self.measPos, "final position"))
         self.done()
 
     def done(self):
-        """Call when an XQ command is finished
+        """!Call when an XQ command is finished
 
         Reset userNums (A-F) and print OK
         """
@@ -394,9 +408,9 @@ class FakeGalil(TCPServer):
         self.sendLine("OK")
 
     def sendLine(self, line):
-        """write a line to the socket
+        """!write a line to the socket
 
-        @param[in] line: string to be written
+        @param[in] line  string to be written
         """
         if self.verbose:
             print "sending: %r" % (line,)
@@ -408,22 +422,22 @@ class FakeGalil(TCPServer):
 
 class FakePiezoGalil(FakeGalil):
     def __init__(self, mirror, port, verbose=False, wakeUpHomed=True, stateCallback=None):
-        """A fake Galil with mock piezo behavior like the 2.5m M2 mirror
+        """!A fake Galil with mock piezo behavior like the 2.5m M2 mirror
 
-        @param[in] mirror: a mirrorCtrl.mirror.Mirror object, the mirror this fake galil should emulate
-        @param[in] port: port on which to listen for connections
-        @param[in] verbose: bool. Print extra info to terminal?
-        @param[in] wakeUpHomed: bool. Should actuators be homed upon construction or not
-        @param[in] stateCallback: a function to call when this server changes state; receives one argument: this server
+        @param[in] mirror  a mirrorCtrl.mirror.Mirror object, the mirror this fake galil should emulate
+        @param[in] port  port on which to listen for connections
+        @param[in] verbose  bool. Print extra info to terminal?
+        @param[in] wakeUpHomed  bool. Should actuators be homed upon construction or not
+        @param[in] stateCallback  a function to call when this server changes state; receives one argument: this server
         """
         FakeGalil.__init__(self, mirror=mirror, port=port, verbose=verbose, wakeUpHomed=wakeUpHomed, stateCallback=stateCallback)
         self.cmdPiezoPos = numpy.array([0]*3, dtype=int)
         self.userPiezoNums = numpy.array([MAXINT]*3, dtype=int)
 
     def processCmd(self, cmdStr):
-        """Overwritten from base class to handle piezo commands also
+        """!Overwritten from base class to handle piezo commands also
 
-        @param[in] cmdStr: command string
+        @param[in] cmdStr  command string
         """
         # piezo specifics
         #print 'cmdStr: ', cmdStr
@@ -450,14 +464,15 @@ class FakePiezoGalil(FakeGalil):
             FakeGalil.processCmd(self, cmdStr)
 
     def resetUserNums(self):
-        """Reset user numbers"""
+        """!Reset userNums
+        """
         self.userNums[:] = MAXINT
         self.userPiezoNums[:] = MAXINT
 
     def movePiezo(self, piezoPos):
-        """Do a piezo move
+        """!Do a piezo move
 
-        @param[in] piezoPos: [length]*number of peizos, move em here
+        @param[in] piezoPos  [length]*number of peizos, move em here
         """
         self.showStatus()
         self.sendLine("3 piezo status word")
