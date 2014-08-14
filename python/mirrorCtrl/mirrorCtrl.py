@@ -249,6 +249,12 @@ class MirrorCtrl(Actor):
             self.cmdQueue.addCmd(cmd, functools.partial(self.galil.cmdHome, axisList = axisList))
         except Exception, e:
             raise CommandError(str(e))
+        # add a status to the queue to be executed after the home
+        # command a status for 1 second later (roughly 2x stopping time from max speed)
+        dummyCmd = UserCmd(cmdStr="%i status" % cmd.userID)
+        dummyCmd.cmdVerb = "status"
+        dummyCmd.userID = cmd.userID
+        self.cmdQueue.addCmd(dummyCmd, self.galil.cmdStatus)
         return True
 
     def cmd_status(self, cmd):
