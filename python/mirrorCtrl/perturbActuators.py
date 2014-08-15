@@ -7,7 +7,7 @@ import numpy
 
 def getActEqEncMir(mirror):
     """ Returns the same mirror as input, except actuators are moved to be exactly aligned with actuators
-    @param[in] mirror: a MirrorBase instance
+    @param[in] mirror  a MirrorBase instance
     @return a mirror instance with moved actuators
     """
     mirror = copy.deepcopy(mirror)

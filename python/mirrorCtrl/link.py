@@ -50,9 +50,9 @@ class BaseLink(object):
     """
     def __init__(self, isAdjustable, basePos, mirPos):
         """
-        @param[in] isAdjustable: True for actuators, False for fixed links.
-        @param[in] basePos: cartesian position of end of actuator fixed to the base (mm)
-        @param[in] mirPos:  cartesian position of end of actuator attached to the mirror (mm)
+        @param[in] isAdjustable  True for actuators, False for fixed links.
+        @param[in] basePos  cartesian position of end of actuator fixed to the base (mm)
+        @param[in] mirPos   cartesian position of end of actuator attached to the mirror (mm)
             when the mirror is at zero orientation
         
         Zero orientation means piston, x tilt, y tilt, x translation, y translation and z rotation
@@ -70,7 +70,7 @@ class BaseLink(object):
     def physFromMirPos(self, mirPos):
         """Compute desired physical length (mm) of adjustable element given the mirror position (mm)
 
-        @param[in] mirPos: 3 element list, describing the [x,y,z] position.
+        @param[in] mirPos  3 element list, describing the [x,y,z] position.
         The link may not be capable of achieving this length.
         
         Subclasses must override.
@@ -81,7 +81,7 @@ class BaseLink(object):
         """
         Return the desired length of link in mm.
         
-        @param[in] mirPos: 3 element numpy.array, describing the [x,y,z] mirror position.
+        @param[in] mirPos  3 element numpy.array, describing the [x,y,z] mirror position.
 
         This is the distance between the supplied mirPos and the original basePos.
         The link may not be capable of achieving this length.
@@ -93,8 +93,8 @@ class FixedLengthLink(BaseLink):
     def __init__(self, basePos, mirPos):
         """A fixed-length link with two ball joints: one attached to a base, the other attached to a mirror
 
-        @param[in] mirPos: 3 element list-like, describing the [x,y,z] position of link attachment to mirror (in neutral position)
-        @param[in] basePos: 3 element list-like, describing the [x,y,z] position of link base
+        @param[in] mirPos  3 element list-like, describing the [x,y,z] position of link attachment to mirror (in neutral position)
+        @param[in] basePos  3 element list-like, describing the [x,y,z] position of link base
         """
         BaseLink.__init__(self, isAdjustable=False, basePos=basePos, mirPos=mirPos)
     
@@ -111,13 +111,13 @@ class AdjustableLink(BaseLink):
     def __init__(self, basePos, mirPos, minMount, maxMount, scale, offset):
         """
 
-        @param[in] basePos:  cartesian position of end of actuator fixed to the base (mm)
-        @param[in] mirPos:   cartesian position of end of actuator attached to the mirror (mm)
+        @param[in] basePos   cartesian position of end of actuator fixed to the base (mm)
+        @param[in] mirPos    cartesian position of end of actuator attached to the mirror (mm)
                     when the mirror is at zero orientation
-        @param[in] minMount: minimum length (steps)
-        @param[in] maxMount: maximum length (steps)
-        @param[in] scale:    actuator scale (mount units/um)
-        @param[in] offset:   mount position when mirror is at zero orientation
+        @param[in] minMount  minimum length (steps)
+        @param[in] maxMount  maximum length (steps)
+        @param[in] scale     actuator scale (mount units/um)
+        @param[in] offset    mount position when mirror is at zero orientation
         """
         BaseLink.__init__(self, isAdjustable=True, basePos=basePos, mirPos=mirPos)
         self.minMount = float(minMount)
@@ -129,7 +129,7 @@ class AdjustableLink(BaseLink):
     def mountFromPhys(self, phys):
         """Compute mount length (steps) of adjustable element given its physical length (mm)
 
-        @param[in] phys: length in mm
+        @param[in] phys  length in mm
         @return mount: length in steps
         """
         return self.offset + (self._scale * phys)
@@ -137,14 +137,14 @@ class AdjustableLink(BaseLink):
     def physFromMount(self, mount):
         """Compute physical length (mm) of adjustable element given its mount length (steps)
 
-        @param[in] mount: length in steps
+        @param[in] mount  length in steps
         @return pyhs: length in mm
         """
         return (mount - self.offset) / (self._scale)
     
     def mountInRange(self, mount):
         """Return True if the mount position is in it's allowed range
-        @param[in] mount: mount units
+        @param[in] mount  mount units
         @return bool
         """
         return self.minMount <= mount <= self.maxMount
@@ -155,7 +155,7 @@ class AdjLengthLink(AdjustableLink):
     """
     def physFromMirPos(self, mirPos):
         """Compute physical length (mm) of adjustable element given the mirror position (mm)
-        @param[in] mirPos: xyz position
+        @param[in] mirPos  xyz position
         @return phys: physical length of the link in mm
         """
         length = self.lengthFromMirPos(mirPos)
@@ -199,8 +199,8 @@ class AdjBaseActuator(AdjLengthLink):
     def physFromMirPos(self, mirPos):
         """Compute physical length (mm) of adjustable element given the mirror position (mm)
         
-        @param[in] mirPos: cartesian position of end of actuator attached to the mirror (mm).
-        @param[in] phys: approximate actuator length (mm)
+        @param[in] mirPos  cartesian position of end of actuator attached to the mirror (mm).
+        @param[in] phys  approximate actuator length (mm)
         @return phys: physical length in mm
         """
         r_not = self.neutralLength

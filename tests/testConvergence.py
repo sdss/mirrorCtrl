@@ -39,7 +39,7 @@ m3TestOrients = [numpy.asarray(d["desOrient"]) for d in [tertMoveList[ind] for i
 LargePiston, LargeTilt, LargeTranslation = 500. * MMPerMicron, 10. * RadPerArcSec, 100. * MMPerMicron
 # def getActEqEncMir(mirror):
 #     """ Returns the same mirror as input, except actuators are moved to be exactly aligned with actuators
-#     @param[in] mirror: a MirrorBase instance
+#     @param[in] mirror  a MirrorBase instance
 #     @return a mirror instance with moved actuators
 #     """
 #     mirror = copy.deepcopy(mirror)
@@ -77,7 +77,7 @@ LargePiston, LargeTilt, LargeTranslation = 500. * MMPerMicron, 10. * RadPerArcSe
 class MirState(object):
     def __init__(self, mirror):
         """ For keeping track of a mirror orietation.
-            @param[in] mirror: a MirrorBase instance
+            @param[in] mirror  a MirrorBase instance
         """
         self.mirror = mirror
         self.orientation = numpy.zeros(5)
@@ -126,9 +126,9 @@ class ConvergenceTestBase(object):
         self.dw.actorWrapper.deviceWrapperList[0].device
 
     def _testConv(self, modelMirState, trueMirState, desOrient):
-        """ @param[in] modelMirrorState: MirState object representing an imperfect model
-            @param[in] trueMirState: MirState object representing the true mirror
-            @param[in] desOrient: a collection of 5 items: pistion, tiltx, tilty, transx, transy. units um and arcsec
+        """ @param[in] modelMirrorState  MirState object representing an imperfect model
+            @param[in] trueMirState  MirState object representing the true mirror
+            @param[in] desOrient  a collection of 5 items: pistion, tiltx, tilty, transx, transy. units um and arcsec
         """
         desOrient = convOrient2MMRad(desOrient)
         cmdActPos = numpy.asarray(modelMirState.mirror.actuatorMountFromOrient(desOrient)) # get commanded actuator position from your model
@@ -158,7 +158,7 @@ class ConvergenceTestBase(object):
         raise NotImplementedError()
 
     def _testOrient(self, orient):
-        """ @param[in] orientation: 5 element orientation in user-friendly units (um and arcsec)
+        """ @param[in] orientation  5 element orientation in user-friendly units (um and arcsec)
         """
         # print 'previous orient ', prevOrient
         # print 'testing orient', orient

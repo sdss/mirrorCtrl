@@ -68,8 +68,8 @@ def convertTertOrientToOld(orient):
 class FileConverter(object):
     def __init__(self, inPath, outPath):
         """Searches through inPath makes orientation coefficient conversions, saves output to outPath
-        @param[in] inPath: string, path to file to read in
-        @param[in] outPath: string, path to output file
+        @param[in] inPath  string, path to file to read in
+        @param[in] outPath  string, path to output file
         """
         fileName = os.path.split(inPath)[1]
         convertedRE = re.compile(r"coeffs converted.+ coeffconverter")
@@ -114,8 +114,8 @@ class FileConverter(object):
     def leastSquaresFitter(self, coefBlock, mir):
         """Used to determine a new coefBlock (from the old) for a given mirror
         where sine and cosine of altitude terms are present
-        @param[in] coefBlock: a 5x3 numpy array
-        @param[in] mir: either "Sec" or "Tert", whichever mirror we're fitting
+        @param[in] coefBlock  a 5x3 numpy array
+        @param[in] mir  either "Sec" or "Tert", whichever mirror we're fitting
 
         note: based on linear algebra strategy,
         minimizing norm(Ax-b) (see Trefethen and Bau - Numerical Linear Algebra pg 88)
@@ -164,9 +164,9 @@ class FileConverter(object):
 
     def _writeCoefBlock(self, coefBlock, mir, fout):
         """Write the coefficients in coefBlock to fout
-            @param[in] coefBlock: output of getCoefBlock, a numpy array
-            @param[in] mir: either "Sec" or "Tert"
-            @param[in] fout: file handler to which we are writing
+            @param[in] coefBlock  output of getCoefBlock, a numpy array
+            @param[in] mir  either "Sec" or "Tert"
+            @param[in] fout  file handler to which we are writing
         """
         for label, row in itertools.izip(["PistCoef", "XTiltCoef", "YTiltCoef", "XTransCoef", "YTransCoef"], coefBlock):
             numFmt = "  ".join(["%.1f"%x for x in row])
@@ -175,9 +175,9 @@ class FileConverter(object):
     def convertAndWrite(self, coefBlock, mir, fout):
         """Convert a set of coefficients and write the results
 
-        @param[in] coefBlock: output of getCoefBlock, a numpy array
-        @param[in] mir: either "Sec" or "Tert"
-        @param[in] fout: file handler to which we are writing
+        @param[in] coefBlock  output of getCoefBlock, a numpy array
+        @param[in] mir  either "Sec" or "Tert"
+        @param[in] fout  file handler to which we are writing
         """
         print "  convert %s coeffs" % (mir,)
         if numpy.all(coefBlock[:,1:] == 0):
@@ -201,9 +201,9 @@ class FileConverter(object):
     def getCoefBlock(self, firstLineOfBlock, fin, mir):
         """Create a block of Coefficients, be sure that they are all present
 
-        @param[in] firstLineOfBlock: The first line (containing the pistion coeff)
-        @param[in] fin: the currently open filehandler (being read one line at a time)
-        @param[in] mir: string either "Sec" or "Tert"
+        @param[in] firstLineOfBlock  The first line (containing the pistion coeff)
+        @param[in] fin  the currently open filehandler (being read one line at a time)
+        @param[in] mir  string either "Sec" or "Tert"
         """
         coefBlock = numpy.zeros((5,3))
         coefBlock[0,:] = self.coefsFromLine(firstLineOfBlock)
@@ -226,8 +226,8 @@ class FileConverter(object):
 def batchConvert(fromDir, toDir):
     """Convert all instrument files with orientation coefficients.
 
-    @param[in] fromDir: directory where the instrument files are
-    @param[in] toDir: directory where the converted files should be written.
+    @param[in] fromDir  directory where the instrument files are
+    @param[in] toDir  directory where the converted files should be written.
         They will have the same filename.
     """
     assert os.path.isdir(fromDir)

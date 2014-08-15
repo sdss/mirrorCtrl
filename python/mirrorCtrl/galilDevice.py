@@ -63,7 +63,7 @@ AxisEchoRegEx = re.compile(r'[A-Z]=-?(\d+)', re.IGNORECASE)
 def floatCast(number):
     """Cast a float into a string
 
-        @param[in] float: a float
+        @param[in] float  a float
         @return a string
     """
     if numpy.isnan(number):
@@ -73,28 +73,28 @@ def floatCast(number):
 
 def mountCast(mount):
     """ Cast a mount array into a string.
-        @param[in] mount: Array of mount values
+        @param[in] mount  Array of mount values
         @return a string
     """
     return ",".join([floatCast(x) for x in mount])
 
 def orientCast(orient):
     """ Cast an orientation array into a string.
-        @param[in] orientation: numpy array of orientation values in mm and radians
+        @param[in] orientation  numpy array of orientation values in mm and radians
         @return a string of orientation (in user friendly units, um and arcsec)
     """
     return ",".join([floatCast(x) for x in convOrient2UMArcsec(orient)])
 
 def strArrayCast(strArray):
     """Turn an array of strings into a single string, comma separated.
-    @param[in] strArray: an array of strings
+    @param[in] strArray  an array of strings
     @return a string
     """
     return ",".join([str(x) for x in strArray])
 
 def intOrNan(anInt):
     """Return an string int or "nan"
-    @param[in] anInt: either an integer or a nan
+    @param[in] anInt  either an integer or a nan
     @return a string
     """
     try:
@@ -104,7 +104,7 @@ def intOrNan(anInt):
 
 def statusCast(status):
     """Return a
-    @param[in] status: an array of status bits
+    @param[in] status  an array of status bits
     @ return a string, status concatenated into string of comma separated values which are possibly nans
     """
     statusStr = []
@@ -152,7 +152,7 @@ class GalilStatus(object):
     def __init__(self, device):
         """Construct a GalilStatus
 
-        @param[in] device: mirror device
+        @param[in] device  mirror device
         """
         self.mirror = device.mirror
         ## number of actuators
@@ -222,7 +222,7 @@ class GalilStatus(object):
     def _getKeyValStr(self, keywords):
         """Package and return current keyword value info in status cache
 
-        @param[in] keywords: a list of keywords for which you wish to return a formatted string.
+        @param[in] keywords  a list of keywords for which you wish to return a formatted string.
 
         @return statusStr: string in the correct keword value format to be sent to users
         """
@@ -290,15 +290,15 @@ class GalilDevice(TCPDevice):
     def __init__(self, mirror, host, port, maxIter=5, callFunc=None, name=None):
         """Construct a GalilDevice
 
-        @param[in] mirror: an instance of mirrorCtrl.MirrorBase
-        @param[in] host: host address of Galil controller
-        @param[in] port: port of Galil controller
-        @param[in] maxIter: the maximum number of iterations to refine the mirror position
-        @param[in] callFunc: function to call when state of device changes;
+        @param[in] mirror  an instance of mirrorCtrl.MirrorBase
+        @param[in] host  host address of Galil controller
+        @param[in] port  port of Galil controller
+        @param[in] maxIter  the maximum number of iterations to refine the mirror position
+        @param[in] callFunc  function to call when state of device changes;
             it receives one argument: this device.
             Note that callFunc is NOT called when the connection state changes;
             register a callback with "conn" for that.
-        @param[in] name: name of device; if None then use mirror.name
+        @param[in] name  name of device; if None then use mirror.name
         """
         self.MaxIter = maxIter
         self.mirror = mirror
@@ -342,8 +342,8 @@ class GalilDevice(TCPDevice):
     def formatAsKeyValStr(self, keyword, dataList):
         """Format a keyword=value pair string.
 
-        @param[in] keyword: a keyword (string)
-        @param[in] dataList: the associated list of values
+        @param[in] keyword  a keyword (string)
+        @param[in] dataList  the associated list of values
 
         @return outStr: a string in the correct format to be sent to the user
         """
@@ -354,9 +354,9 @@ class GalilDevice(TCPDevice):
     def init(self, userCmd=None, timeLim=None, getStatus=False):
         """Initialize Galil
 
-        @param[in] userCmd: user command that tracks this command, if any
-        @param[in] timeLim: IGNORED maximum time before command expires, in sec; None for no limit
-        @param[in] getStatus: IGNORED (status is not output)
+        @param[in] userCmd  user command that tracks this command, if any
+        @param[in] timeLim  IGNORED maximum time before command expires, in sec; None for no limit
+        @param[in] getStatus  IGNORED (status is not output)
         @return devCmd: the device command that was started (and may already have failed)
 
         Called on disconnection
@@ -371,7 +371,7 @@ class GalilDevice(TCPDevice):
         - One key for all values: true if the key contains no commas
         - A separate key for each value: true if the key contains a comma
 
-        @param[in] replyStr: Galil reply string
+        @param[in] replyStr  Galil reply string
 
         @return two values:
         - keyList: list of keys: one per element of dataListList
@@ -416,9 +416,9 @@ class GalilDevice(TCPDevice):
     def sendGalilParam(self, key, dataList):
         """Write a Galil parameter (without recording anything)
 
-        @param[in] key: Galil description key for data; a string that probably includes spaces;
+        @param[in] key  Galil description key for data; a string that probably includes spaces;
             the first word is used to generate the output keyword
-        @param[in] dataList: list of values
+        @param[in] dataList  list of values
 
         In most cases the output keyword will be Galil<firstWord>
         where firstWord is the first word in key with any trailing "x" removed.
@@ -440,9 +440,9 @@ class GalilDevice(TCPDevice):
     def actOnKey(self, key, dataList, replyStr):
         """Process data associated with one key
 
-        @param[in] key: parsed descriptive string returned by self.parseReply
-        @param[in] dataList: list of data associated with key
-        @param[in] replyStr: unparsed reply, for error messages
+        @param[in] key  parsed descriptive string returned by self.parseReply
+        @param[in] dataList  list of data associated with key
+        @param[in] replyStr  unparsed reply, for error messages
         """
          #line begins with cap letter (or -cap letter)
         if ParamRegEx.match(key):
@@ -532,7 +532,7 @@ class GalilDevice(TCPDevice):
     def handleReply(self, replyStr):
         """Handle a line of output from the device. Called whenever the device outputs a new line of data.
 
-        @param[in] replyStr:  the reply, minus any terminating \n
+        @param[in] replyStr   the reply, minus any terminating \n
 
         Tasks include:
         - Parse the reply
@@ -608,11 +608,11 @@ class GalilDevice(TCPDevice):
     def runCommand(self, userCmd, galilCmdStr, nextDevCmdCall=None, forceKill=False):
         """Begin executing a device command (or series of device commands) in reponse to a userCmd.
 
-        @param[in] userCmd: a user command, passed from the mirrorCtrl
-        @param[in] nextDevCmdCall: None, or callable.  Callable to be executed upon the sucessfull completion of the device command
-        @param[in] forceKill: bool. Should this command kill any currently executing command
+        @param[in] userCmd  a user command, passed from the mirrorCtrl
+        @param[in] nextDevCmdCall  None, or callable.  Callable to be executed upon the sucessfull completion of the device command
+        @param[in] forceKill  bool. Should this command kill any currently executing command
 
-        @raise RuntimeError if a userCommand is currently executing and a forceKill is is not requested.
+        @throw RuntimeError if a userCommand is currently executing and a forceKill is is not requested.
         """
         # print "%s.runCommand(userCmd=%r, galilCmdStr=%r, nextDevCmdCall=%r, forceKill=%r)" % (self, userCmd, galilCmdStr, nextDevCmdCall, forceKill)
         # print "    self.currDevCmd=%r" % (self.conn.state,)
@@ -636,8 +636,8 @@ class GalilDevice(TCPDevice):
 
     def startDevCmd(self, galilCmdStr, nextDevCmdCall=None):
         """
-        @param[in] galilCmdStr: string, to be sent directly to the galil.
-        @param[in] nextDevCmdCall: Callable to execute when the device command is done.
+        @param[in] galilCmdStr  string, to be sent directly to the galil.
+        @param[in] nextDevCmdCall  Callable to execute when the device command is done.
         """
         # print "%s.startDevCmd(galilCmdStr=%r, nextDevCmdCall=%r)" % (self, galilCmdStr, nextDevCmdCall)
         log.info("%s.startDevCmd(%r, nextDevCmdCall=%s)" % (self, galilCmdStr, nextDevCmdCall))
@@ -662,8 +662,8 @@ class GalilDevice(TCPDevice):
         """Replace the current device command, set the previous one to done. And remove it's callbacks, so it's finished state
         will not effect the currend user command.
 
-        @param[in] galilCmdStr: string, to be sent directly to the galil.
-        @param[in] nextDevCmdCall: Callable to execute when the device command is done.
+        @param[in] galilCmdStr  string, to be sent directly to the galil.
+        @param[in] nextDevCmdCall  Callable to execute when the device command is done.
         """
         if not self.currDevCmd.isDone:
             self.currDevCmd._removeAllCallbacks()
@@ -688,7 +688,7 @@ class GalilDevice(TCPDevice):
     def _userCmdCallback(self, userCmd):
         """Callback to be added to every user command
 
-        @param[in] userCmd: a user command, passed from the mirrorCtrl
+        @param[in] userCmd  a user command, passed from the mirrorCtrl
         """
         # print "%s._userCmdCallback(userCmd=%r)" % (self, userCmd)
         if not self._inDevCmdCallback:
@@ -702,7 +702,7 @@ class GalilDevice(TCPDevice):
     def _devCmdCallback(self, devCmd):
         """Device command callback
 
-        @param[in] devCmd: the device command, passed via callback
+        @param[in] devCmd  the device command, passed via callback
 
         startDevCmd always assigns this as the callback, which then calls and clears any user-specified callback.
         """
@@ -751,8 +751,8 @@ class GalilDevice(TCPDevice):
     def cmdHome(self, userCmd, axisList):
         """Home the specified actuators
 
-        @param[in] userCmd: a twistedActor UserCmd associated with the home command
-        @param[in] axisList: a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
+        @param[in] userCmd  a twistedActor UserCmd associated with the home command
+        @param[in] axisList  a list of axes to home (e.g. ["A", "B", C"]) or None or () for all axes; case is ignored
          """
         if not axisList:
             axisList = self.validAxisList
@@ -795,8 +795,8 @@ class GalilDevice(TCPDevice):
     def cmdMove(self, userCmd, orient):
         """Accepts an orientation then commands the move.
 
-        @param[in] userCmd: a twistedActor UserCmd object associated with this move command
-        @param[in] orient: an orientation.
+        @param[in] userCmd  a twistedActor UserCmd object associated with this move command
+        @param[in] orient  an orientation.
 
         Subsequent moves are commanded until an acceptable orientation is reached (within errors).
         Cmd not tied to state of devCmd, because of subsequent moves.
@@ -845,7 +845,7 @@ class GalilDevice(TCPDevice):
     def cmdReset(self, userCmd):
         """Reset the Galil to its power-on state. All axes will have to be re-homed. Stop is gentler!
 
-        @param[in] userCmd: a twistedActor UserCmd
+        @param[in] userCmd  a twistedActor UserCmd
 
         Send 'RS' to the Galil, causing it to reset to power-up state,
         """
@@ -857,7 +857,7 @@ class GalilDevice(TCPDevice):
     def cmdStop(self, userCmd, getStatus=False):
         """Stop the Galil.
 
-        @param[in] userCmd: a twistedActor UserCmd
+        @param[in] userCmd  a twistedActor UserCmd
 
         Send 'ST;XQ#STOP' to the Galil, causing it to stop all threads,
         """
@@ -869,7 +869,7 @@ class GalilDevice(TCPDevice):
     def cmdCachedStatus(self, userCmd):
         """Return a cached status, don't ask the galil for a fresh one
 
-        @param[in] userCmd: a twistedActor UserCmd
+        @param[in] userCmd  a twistedActor UserCmd
         """
         self.writeToUsers("w", "Text=\"Galil is busy executing: %s, showing cached status\"" % self.currDevCmd.cmdStr, cmd = userCmd)
         statusStr = self.status._getKeyValStr([
@@ -895,7 +895,7 @@ class GalilDevice(TCPDevice):
     def cmdStatus(self, userCmd):
         """Return the Galil status to the user.
 
-        @param[in] userCmd: a twistedActor UserCmd
+        @param[in] userCmd  a twistedActor UserCmd
 
         If the Galil is busy then returns cached data.
         """
@@ -904,7 +904,7 @@ class GalilDevice(TCPDevice):
     def cmdParams(self, userCmd):
         """Show Galil parameters
 
-        @param[in] userCmd: a twistedActor UserCmd
+        @param[in] userCmd  a twistedActor UserCmd
         """
         self.runCommand(userCmd, galilCmdStr="XQ#SHOWPAR")
 
@@ -1009,11 +1009,11 @@ class GalilDevice(TCPDevice):
         """Format a Galil command.
 
         Inputs:
-        @param[in] valueList: a list of values
-        @param[in] cmd: the command (e.g. "XQ #MOVE")
-        @param[in] axisPrefix: a string prefixing each axis
-        @param[in] valFmt: value format
-        @param[in] nAxes: number of axes in command; if None use all axes
+        @param[in] valueList  a list of values
+        @param[in] cmd  the command (e.g. "XQ #MOVE")
+        @param[in] axisPrefix  a string prefixing each axis
+        @param[in] valFmt  value format
+        @param[in] nAxes  number of axes in command; if None use all axes
 
         Values that are None are replaced with MAXINT
         If len(valueList) < number of actuators, the extra axes are also set to MAXINT
@@ -1055,14 +1055,14 @@ class GalilDevice25Sec(GalilDevice):
     ):
         """Construct a GalilDevice25Sec
 
-        @param[in] mirror: an instance of mirrorCtrl.MirrorBase
-        @param[in] host: host address of Galil controller
-        @param[in] port: port of Galil controller
-        @param[in] callFunc: function to call when state of device changes;
+        @param[in] mirror  an instance of mirrorCtrl.MirrorBase
+        @param[in] host  host address of Galil controller
+        @param[in] port  port of Galil controller
+        @param[in] callFunc  function to call when state of device changes;
             it receives one argument: this device.
             Note that callFunc is NOT called when the connection state changes;
             register a callback with "conn" for that.
-        @param[in] name: name of device; if None then use mirror.name
+        @param[in] name  name of device; if None then use mirror.name
         """
         GalilDevice.__init__(self,
             name = name if name else mirror.name,
@@ -1081,9 +1081,9 @@ class GalilDevice25Sec(GalilDevice):
         """An overwritten version from the base class to incorporate 2.5m Specific Keywords.
         Takes a key parsed from self.parseReply, and chooses what to do with the data
 
-        @param[in] key: parsed descriptive string returned by self.parseReply
-        @param[in] dataList: list of data associated with key
-        @param[in] replyStr: unparsed reply, for error messages
+        @param[in] key  parsed descriptive string returned by self.parseReply
+        @param[in] dataList  list of data associated with key
+        @param[in] replyStr  unparsed reply, for error messages
         """
         # look for piezo-specific parameters
 
@@ -1155,7 +1155,7 @@ class GalilDevice25Sec(GalilDevice):
     def _piezoMoveCallback(self, devCmd=None):
         """Called when the piezos are finished moving
 
-        @param[in] devCmd: passed via callback
+        @param[in] devCmd  passed via callback
         """
         if not self.currDevCmd.isDone:
             return

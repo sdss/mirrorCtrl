@@ -116,8 +116,8 @@ class TheSlurper(object):
     def __init__(self, massorientfile, useMirDat=True):
         """Take a massorientfile, build everything, run conversions
 
-        @param[in] massorientfile: a data/massorient_out*.dat
-        @param[in] useMirDat: boolean. construct a mirror from a mir.dat file (rather than a measured mirror, with separate encoder positions...)
+        @param[in] massorientfile  a data/massorient_out*.dat
+        @param[in] useMirDat  boolean. construct a mirror from a mir.dat file (rather than a measured mirror, with separate encoder positions...)
 
         These are the output of Russell's massorient2mount.for script. I have manually
         appended the correstponding data/mir*.dat file and the mirror number on the

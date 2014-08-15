@@ -35,16 +35,16 @@ class MirrorDispatcherWrapper(DispatcherWrapper):
     ):
         """Construct a MirrorDispatcherWrapper that manages everything
 
-        @param[in] userPort: port for mirror controller connections; 0 to auto-select
-        @param[in] dictName: name of actor key dictionary
-        @param[in] mirror: the Mirror object used by the fake Galil
-        @param[in] galilClass: class of fake Galil
-        @param[in] verbose: should the fake Galil run in verbose mode?
-        @param[in] wakeUpHomed: should actuators be homed upon construction, or not?
-        @param[in] readCallback: function to call when the dispatcher has data to read
-        @param[in] stateCallback: function to call when connection state of hardware controller or actor changes;
+        @param[in] userPort  port for mirror controller connections; 0 to auto-select
+        @param[in] dictName  name of actor key dictionary
+        @param[in] mirror  the Mirror object used by the fake Galil
+        @param[in] galilClass  class of fake Galil
+        @param[in] verbose  should the fake Galil run in verbose mode?
+        @param[in] wakeUpHomed  should actuators be homed upon construction, or not?
+        @param[in] readCallback  function to call when the dispatcher has data to read
+        @param[in] stateCallback  function to call when connection state of hardware controller or actor changes;
             receives one argument: this actor wrapper
-        @param[in] debug: print debug messages to stdout?
+        @param[in] debug  print debug messages to stdout?
         """
         actorWrapper = MirrorCtrlWrapper(
             mirror=mirror,

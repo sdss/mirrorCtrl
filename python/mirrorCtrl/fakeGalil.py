@@ -33,11 +33,11 @@ class FakeGalil(TCPServer):
         ):
         """!Fake Galil TCP server
 
-        @param[in] mirror: a mirrorCtrl.mirror.Mirror object, the mirror this fake galil should emulate
-        @param[in] port: port on which to listen for connections
-        @param[in] verbose: bool. Print extra info to terminal?
-        @param[in] wakeUpHomed: bool. Should actuators be homed upon construction or not
-        @param[in] stateCallback: a function to call when this server changes state; receives one argument: this server
+        @param[in] mirror  a mirrorCtrl.mirror.Mirror object, the mirror this fake galil should emulate
+        @param[in] port  port on which to listen for connections
+        @param[in] verbose  bool. Print extra info to terminal?
+        @param[in] wakeUpHomed  bool. Should actuators be homed upon construction or not
+        @param[in] stateCallback  a function to call when this server changes state; receives one argument: this server
         """
         self.verbose = bool(verbose)
         self.wakeUpHomed = bool(wakeUpHomed)
