@@ -1,26 +1,10 @@
 #!/usr/bin/env python2
-"""2.5m secondary mirror controller
+"""SDSS 2.5m secondary mirror controller
 """
-import os.path
+from twisted.internet import reactor
+from twistedActor import startSystemLogging
+from mirrorCtrl.sec25mMirrorCtrl import Sec25mMirrorCtrl
 
-import mirrorCtrl
-from mirrorCtrl.mirrors import mir25mSec
-
-UserPort = 2532
-
-# for testing
-GalilHost = 'localhost'
-GalilPort = 8000 # matches fakeGalil.py for testing
-
-name = os.path.splitext(os.path.basename(__file__))[0]
-device = mirrorCtrl.GalilDevice25Sec(
-    name = name,
-    mirror = mir25mSec,
-    host = GalilHost,
-    port = GalilPort,
-)
-mirrorCtrl.runMirrorCtrl(
-    name = name,
-    device = device,
-    userPort = UserPort,
-)
+startSystemLogging(Sec25mMirrorCtrl.Facility)
+Sec25mMirrorCtrl()
+reactor.run()

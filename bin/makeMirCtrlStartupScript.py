@@ -11,14 +11,21 @@ import argparse
 
 from twistedActor import makeStartupScript
 
+from mirrorCtrl.sec35mMirrorCtrl import Sec35mMirrorCtrl
+from mirrorCtrl.tert35mMirrorCtrl import Tert35mMirrorCtrl
+
 # dict of mirror name (lowercase): makeStartupScript argument dict
 _DataDict = {
     "sec35m": dict(
         actorName = "sec",
+        userPort = Sec35mMirrorCtrl.UserPort,
+        facility = Sec35mMirrorCtrl.Facility,
         binScript = "sec35m.py",
     ),
     "tert35m": dict(
         actorName = "tert",
+        userPort = Tert35mMirrorCtrl.UserPort,
+        facility = Tert35mMirrorCtrl.Facility,
         binScript = "tert35m.py",
     ),
     "prim25m": dict(

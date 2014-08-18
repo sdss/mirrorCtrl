@@ -3,8 +3,8 @@
 """
 from twisted.internet import reactor
 from twistedActor import startSystemLogging
-from mirrorCtrl.sec35mMirrorCtrl import Sec35mMirrorCtrl, Facility
+from mirrorCtrl.sec35mMirrorCtrl import Sec35mMirrorCtrl
 
-startSystemLogging(Facility)
+startSystemLogging(Sec35mMirrorCtrl.Facility)
 Sec35mMirrorCtrl()
 reactor.run()
