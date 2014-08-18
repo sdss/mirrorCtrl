@@ -327,20 +327,13 @@ class MirrorCtrl(Actor):
 
 
 def runMirrorCtrl(name, device, userPort):
-    """Start up a Galil actor
+    """Start up a Galil actor without any special logging; use for one-off mirrors and unit tests
 
     @param[in] name  name of controller, e.g. "sec35m"; used for the log file and log entries
     @param[in] device  a twistedActor-based Galil Device (see mirrorCtrl/galilDevice.py)
     @param[in] userPort  port on which actor accepts user commands
     """
     from twisted.internet import reactor
-    from twistedActor import startSystemLogging
-
-    # if LogDir is specified as an environment variable, begin logging to it.
-    if name == "tert35m":
-        startSystemLogging("LOCAL2")
-    else:
-        startSystemLogging("LOCAL3")
 
     MirrorCtrl(
         name = name,
