@@ -9,22 +9,6 @@ This package adds the following capabilities to the Galil mirror controllers:
 * Command mirror orientation (piston, tilt and translation) to the extent supported by the actuators. (The Galil supports commanding actuator mount, not orientation.)
 * Supports systems where the actuators and encoders attached at different points. (Unlike the old TCC interface to the Galils, which assumed that the actuators and encoders were attached to identical points). Thus this code provides more efficient mirror positioning: mirrors should go where commanded with fewer iterations.
 
-\section mirrorCtrl_requirements Requirements
-
-The following packages are required:
-* twistedActor
-
-The following packages are optional:
-* eups (from LSST): this package may be managed using eups
-* sconsUtils (from LSST): this package is pure python, so it need not be built or installed, but if you build it with scons then documentation is built and unit tests are run,
-
-The simplest way to build this package is:
-* <a href="https://dev.lsstcorp.org/trac/wiki/Installing">Install the minimal LSST software stack</a>, which includes eups and sconsUtils.
-* Install twistedActor
-* Use "eups declare -r ." to declare this package
-* Use "scons" to build it
-* Use "eups declare -r . mirrorCtrl git --current" to declare it or "scons install" to install it (either is fine).
-
 \section mirrorCtrl_howitworks How It Works
 
 Each mirror controller controls a single mirror. The mirror's position is controlled by 3-6 linear actuators, with fixed links to provide the missing constraints. Each actuator may have an associated encoder (though the encoder need not be in exactly the same location as the actuator). The controller has a model of where the actuators, encoders and fixed links are attached to the mirror (at one end) and to the stationary frame (at the other end). The code assumes the model for the the encoders (or actuators, if no associated encoder, or fixed link if neither) is perfect: we define the orientation of the mirror based on that assumption. For actuators with encoders, we treat the actuator position as imperfect and use iteration to move the mirror to the desired orientation.
