@@ -155,7 +155,7 @@ class MirrorCtrl(Actor):
 
         try:
             self.cmdQueue.addCmd(cmd, functools.partial(self.galil.runCommand, galilCmdStr=cmdStr))
-        except Exception, e:
+        except Exception as e:
             traceback.print_exc(file=sys.stderr)
             raise CommandError(str(e))
         return True
@@ -188,7 +188,7 @@ class MirrorCtrl(Actor):
         cmdOrient = self.processOrientation(cmdArgList)
         try:
             self.cmdQueue.addCmd(cmd, functools.partial(self.galil.cmdMove, orient=cmdOrient))
-        except Exception, e:
+        except Exception as e:
             traceback.print_exc(file=sys.stderr)
             raise CommandError(str(e))
 
@@ -226,7 +226,7 @@ class MirrorCtrl(Actor):
         cmdOrient = self.processOrientation(cmdArgList) + currOrient
         try:
             self.cmdQueue.addCmd(cmd, functools.partial(self.galil.cmdMove, orient=cmdOrient))
-        except Exception, e:
+        except Exception as e:
             traceback.print_exc(file=sys.stderr)
             raise CommandError(str(e))
 
@@ -247,7 +247,7 @@ class MirrorCtrl(Actor):
             raise CommandError("Device Not Connected")
         try:
             self.cmdQueue.addCmd(cmd, functools.partial(self.galil.cmdHome, axisList = axisList))
-        except Exception, e:
+        except Exception as e:
             raise CommandError(str(e))
         # add a status to the queue to be executed after the home
         # command a status for 1 second later (roughly 2x stopping time from max speed)
@@ -273,7 +273,7 @@ class MirrorCtrl(Actor):
             else:
                 # currently executing a command, send a cached status
                 self.galil.cmdCachedStatus(cmd)
-        except Exception, e:
+        except Exception as e:
             raise CommandError(str(e))
         return True
 
@@ -286,7 +286,7 @@ class MirrorCtrl(Actor):
             raise CommandError("Device Not Connected")
         try:
             self.cmdQueue.addCmd(cmd, self.galil.cmdParams)
-        except Exception, e:
+        except Exception as e:
             raise CommandError(str(e))
         return True
 
@@ -299,7 +299,7 @@ class MirrorCtrl(Actor):
             raise CommandError("Device Not Connected")
         try:
             self.cmdQueue.addCmd(cmd, self.galil.cmdStop)
-        except Exception, e:
+        except Exception as e:
             raise CommandError(str(e))
         # command a status for 1 second later (roughly 2x stopping time from max speed)
         dummyCmd = UserCmd(cmdStr="%i status" % cmd.userID)
@@ -317,7 +317,7 @@ class MirrorCtrl(Actor):
             raise CommandError("Device Not Connected")
         try:
             self.cmdQueue.addCmd(cmd, self.galil.cmdReset)
-        except Exception, e:
+        except Exception as e:
             raise CommandError(str(e))
         dummyCmd = UserCmd(cmdStr="%i status"%cmd.userID)
         dummyCmd.cmdVerb = "status"

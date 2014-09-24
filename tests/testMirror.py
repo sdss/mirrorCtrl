@@ -244,8 +244,8 @@ class MirTests(unittest.TestCase):
                     fitOrient = orientFromMount(desMount, initOrient)
                     #fitOrient = orientFromMount(desMount, adjOrient) # no noise
                     fitMount = mountFromOrient(fitOrient)
-                except RuntimeError as er:
-                    errLog.append(self._fmtRunTimeErr(er, desOrient, mirInd))
+                except RuntimeError as e:
+                    errLog.append(self._fmtRunTimeErr(e, desOrient, mirInd))
                     print errLog[-1]
                     continue
                 errStr = self._checkFitErr(mir, mirInd, desOrient, adjOrient, initOrient, fitOrient, desMount, fitMount)

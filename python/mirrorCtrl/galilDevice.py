@@ -655,7 +655,7 @@ class GalilDevice(TCPDevice):
                 self.currDevCmd.setState(self.currDevCmd.Running)
             else:
                 self.currDevCmd.setState(self.currDevCmd.Failed, "Not connected")
-        except Exception, e:
+        except Exception as e:
             self.currDevCmd.setState(self.currDevCmd.Failed, textMsg=strFromException(e))
 
     def replaceDevCmd(self, galilCmdStr, nextDevCmdCall=None):
