@@ -243,11 +243,11 @@ class GalilStatus(object):
         # are any axes homing?
         if 1 in self.homing:
             return self.homingState
+        elif 0 in self.axisHomed:
+            return self.notHomedState
         # is it moving?
         elif self.moving:
             return self.movingState
-        elif 0 in self.axisHomed:
-            return self.notHomedState
         elif cmd and cmd.didFail:
             return self.failedState
         return self.doneState
