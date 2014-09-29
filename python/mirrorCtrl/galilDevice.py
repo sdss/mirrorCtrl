@@ -558,12 +558,11 @@ class GalilDevice(TCPDevice):
         if replyStr == "":
             # ignore blank replies
             return
-        catchGOPOS = replyStr.startswith("?GOPOS")
-        if catchGOPOS:
+        if "?GOPOS" in replyStr:
             # catch on full step error. Report it but don't fail the command
             self.writeToUsers("w", "Text=\"On Full Step Error: %s\"" % (replyStr,), cmd = self.currDevCmd)
             return
-        elif replyStr.startswith("?"):
+        elif "?" in replyStr:
             # set state to failing, wait for 'OK', then fully fail
             # if cmd is failed instantly, the device could attribute the
             # following 'OK' as a reply for a different command.
@@ -730,15 +729,6 @@ class GalilDevice(TCPDevice):
         # print "%s.clearAll()\n    self.currDevCmd=%r\n    self.userCmd=%r" % (self, self.currDevCmd, self.userCmd)
         self.nextDevCmdCall = None #unnecessary?
         if not self.currDevCmd.isDone:
-            # print 'DEV CMD Cancelled via clear all'
-            # send an ST and set command state to cancelled
-            # raise RuntimeError("clearAll called in galilDevice, but currDevCmd not done: %r"%self.currDevCmd)
-            # if self.conn.isConnected:
-            #     cmdStr = "ST; XQ#STOP"
-            #     # cmdStr = "ST;"
-            #     log.info("%s writing %r in clearAll before cancelling currently executing device command %s" % (self, cmdStr, self.currDevCmd.cmdStr))
-            #     self.conn.writeLine(cmdStr)
-            # self.timer.start(0, self.currDevCmd.setState, self.currDevCmd.Cancelled, textMsg="Device Command Cancelled via clearAll() in galilDevice")
             self.currDevCmd.setState(self.currDevCmd.Cancelled, textMsg="Device Command Cancelled via clearAll() in galilDevice")
 
         self.parsedKeyList = []
