@@ -547,6 +547,9 @@ class GalilDevice(TCPDevice):
         if self.currDevCmd.isDone:
             log.info("Ignoring unsolicited output from Galil: %s " % replyStr)
             return
+        if self.currDevCmd.cmdStr == "ST":
+            log.info("ST issued, Ignoring Galil reply: %s " % replyStr)
+            return
         if self.currDevCmd.state == self.currDevCmd.Cancelling:
             raise log.error("Should not be set to Cancelling: %s"%self.currDevCmd)
             return
@@ -562,7 +565,7 @@ class GalilDevice(TCPDevice):
             # catch on full step error. Report it but don't fail the command
             self.writeToUsers("w", "Text=\"On Full Step Error: %s\"" % (replyStr,), cmd = self.currDevCmd)
             return
-        elif "?" in replyStr:
+        elif replyStr.startswith("?") or ";?" in replyStr:
             # set state to failing, wait for 'OK', then fully fail
             # if cmd is failed instantly, the device could attribute the
             # following 'OK' as a reply for a different command.
@@ -619,12 +622,13 @@ class GalilDevice(TCPDevice):
         # print "    self.conn.state=%r" % (self.conn.state,)
         if not self.userCmd.isDone:
             if forceKill:
+                log.info("New userCmd incomming: %s, force killing previous command: %s"%(userCmd, self.userCmd))
                 # self.userCmd.setState(self.userCmd.Failed, textMsg="%r command forceKilled by incomming %r command"%(self.userCmd, userCmd))
                 # print 'SAW FORCEKILL: curr %r, next: %r, devCmd: %r'%(self.userCmd, userCmd, self.currDevCmd)
                 self.clearAll() # need dev command to finish before rest of code here is executed
                 # self.userCmd.setState(self.userCmd.Cancelled, textMsg="%s cancelled by RS or ST"%self.userCmd.cmdStr)
             else:
-                raise RuntimeError("User command collision! %s blocked by currently running %s!"%(userCmd.cmdStr, self.userCmd.cmdStr))
+                raise RuntimeError("User command collision! %s blocked by currently running %s!"%(userCmd, self.userCmd))
         if userCmd is None:
             userCmd = getNullUserCmd(UserCmd.Running)
         elif userCmd.state == userCmd.Ready:
@@ -646,7 +650,6 @@ class GalilDevice(TCPDevice):
         self.currDevCmd = self.cmdClass(galilCmdStr, timeLim = self.DevCmdTimeout, callFunc=self._devCmdCallback, dev=self)
         self.nextDevCmdCall = nextDevCmdCall
         self.parsedKeyList = []
-        # not self.clearAll()?
         try:
             if self.conn.isConnected:
                 log.info("%s writing %r" % (self, galilCmdStr))
@@ -727,9 +730,9 @@ class GalilDevice(TCPDevice):
         """If a device command is currently running, kill it. Put galilDevice in a state to receive new commands.
         """
         # print "%s.clearAll()\n    self.currDevCmd=%r\n    self.userCmd=%r" % (self, self.currDevCmd, self.userCmd)
-        self.nextDevCmdCall = None #unnecessary?
+        self.nextDevCmdCall = None
         if not self.currDevCmd.isDone:
-            self.currDevCmd.setState(self.currDevCmd.Cancelled, textMsg="Device Command Cancelled via clearAll() in galilDevice")
+            self.currDevCmd.setState(self.currDevCmd.Cancelled, textMsg="Device Command: %s Cancelled via clearAll() in galilDevice"%self.currDevCmd)
 
         self.parsedKeyList = []
         self.status.iter = 0
@@ -849,12 +852,30 @@ class GalilDevice(TCPDevice):
 
         @param[in] userCmd  a twistedActor UserCmd
 
-        Send 'ST;XQ#STOP' to the Galil, causing it to stop all threads,
+        note: getStatus is ignored (status is now always output), arg is left in for fear of braking
+        outside code.
+
+        Strategy for this method:
+        1. send ST to galil, wait for 0.2 seconds. During this time all output is ignored
+        2. send XQ#STOP, wait for ok
+        3. send XQ#STATUS, wait for ok
+        4. set userCmd to Done.
         """
-        if getStatus:
-            self.runCommand(userCmd, galilCmdStr="ST;XQ#STATUS", forceKill=True)
-        else:
-            self.runCommand(userCmd, galilCmdStr="ST;XQ#STOP", forceKill=True)
+        def setSTDone():
+            if self.currDevCmd.cmdStr != "ST":
+                raise RuntimeError("currDevCmd: %s, not ST.  Only ST is expected to be set done via timer!"%self.currDevCmd)
+            log.info("Setting ST done via timer")
+            self.currDevCmd.setState(self.currDevCmd.Done)
+
+        def runXQStatus():
+            self.startDevCmd("XQ#STATUS", nextDevCmdCall=None)
+
+        def runXQStop():
+            self.startDevCmd("XQ#STOP", nextDevCmdCall=runXQStatus)
+
+        self.runCommand(userCmd, galilCmdStr="ST", nextDevCmdCall=runXQStop, forceKill=True)
+        # set device command (generated via runCommand) to done in 0.2 seconds
+        Timer(0.2, setSTDone)
 
     def cmdCachedStatus(self, userCmd):
         """Return a cached status, don't ask the galil for a fresh one

@@ -22,6 +22,7 @@ __all__ = ["FakeGalil", "FakePiezoGalil"]
 
 MAXINT = 2147483647
 MaxCmdTime = 2.0 # maximum time any command can take; sec
+queueTime = 0.01 # time replies sit on queue before being sent.
 
 class FakeGalil(TCPServer):
     def __init__(self,
@@ -46,8 +47,10 @@ class FakeGalil(TCPServer):
         self._cmdBuffer = collections.deque()
         self.replyTimer = Timer()
         self.nextCmdTimer = Timer()
+        self.queueTimer = Timer()
         self.nAxes = len(self.mirror.actuatorList)
         self.userSocket = None
+        self.replyQueue = collections.deque()
 
         TCPServer.__init__(self,
             port=port,
@@ -82,6 +85,7 @@ class FakeGalil(TCPServer):
         """
         self.replyTimer.cancel()
         self.nextCmdTimer.cancel()
+        self.queueTimer.cancel()
         return TCPServer.close(self)
 
     def sockStateCallback(self, sock):
@@ -123,6 +127,8 @@ class FakeGalil(TCPServer):
         @param[in] sock  socket containing a line of data
         """
         line = sock.readLine()
+        if self.verbose:
+            print "Line received!: %s" % line
         if line:
             self._cmdBuffer.extend(line.split(";"))
             self._startNextCmd()
@@ -146,7 +152,13 @@ class FakeGalil(TCPServer):
         @param[in] line  line received to be written back
         """
         if self.userSock:
-            self.userSock.writeLine(line)
+            if self.queueTimer.isActive:
+                # mix this echo in with the pending line to be written
+                insertHere = int(len(self.replyQueue)/2)
+                self.replyQueue[0] = self.replyQueue[0][:insertHere] + line + self.replyQueue[0][insertHere:]
+            else:
+                # write it un mixed
+                self.userSock.writeLine(line)
 
     def newCmd(self, cmdStr):
         """!Start a new command
@@ -156,6 +168,9 @@ class FakeGalil(TCPServer):
         if self.verbose:
             print "received: %r" % (cmdStr,)
         cmdStr = cmdStr.strip()
+        if not cmdStr:
+            # do nothing, return
+            return
         if cmdStr.startswith("MG"):
             # print everything after the ok (should be quoted)
             printThis = cmdStr.split("MG")[1].strip(' "')
@@ -164,6 +179,9 @@ class FakeGalil(TCPServer):
         self.echo(cmdStr)
         if cmdStr in ("ST", "RS"):
             self.replyTimer.cancel()
+            self.clearQueue()
+            if self.verbose:
+                print "reply timer canceled, received %s"%cmdStr
             if cmdStr == "RS":
                 # flush the buffer
                 self._cmdBuffer = collections.deque()
@@ -199,11 +217,15 @@ class FakeGalil(TCPServer):
 
         cmdMatch = re.match(r"XQ *#([A-Z]+)", cmdStr)
         if not cmdMatch:
+            if self.verbose:
+                print "no command match for cmdStr: %s, sending '?'"%cmdStr
             self.sendLine("?")
             return
 
         if self.replyTimer.isActive:
             # Busy, so reject new command
+            if self.verbose:
+                print "replyTimer is busy, sending '?' for cmdStr: %s"%cmdStr
             self.sendLine("?")
             return
 
@@ -404,20 +426,56 @@ class FakeGalil(TCPServer):
         Reset userNums (A-F) and print OK
         """
         self.replyTimer.cancel()
+        self.queueTimer.cancel()
         self.resetUserNums()
         self.sendLine("OK")
 
-    def sendLine(self, line):
-        """!write a line to the socket
-
-        @param[in] line  string to be written
+    def runQueue(self):
+        """! write a message waiting for output on the queue
         """
+        if self.verbose:
+            print "Run queue: %s"%str(self.replyQueue)
+        if not self.replyQueue:
+            return
+        # get the oldest message on the queue.
+        line = self.replyQueue.popleft()
+        # and write it
         if self.verbose:
             print "sending: %r" % (line,)
         if self.userSock:
             self.userSock.writeLine(line)
         else:
             log.warn("%s.sendLine(%r) failed: no socket" % (line,))
+        # is there another message waiting on the queue? send it with some delay
+        if self.replyQueue:
+            self.queueTimer.start(queueTime, self.runQueue)
+
+
+    def clearQueue(self):
+        """! throw out any pending queued replies (not yet output to user)
+        leave just the pending reply (will have echo mixed)
+        """
+        while len(self.replyQueue) > 1:
+            self.replyQueue.pop()
+        # self.replyQueue.clear()
+
+    def sendLine(self, line):
+        """!write a line to the socket
+
+        @param[in] line  string to be written
+        """
+        self.replyQueue.append(line)
+        if self.verbose:
+            print "sendLine, reply queue: %s"%str(self.replyQueue)
+        if not self.queueTimer.isActive:
+            self.queueTimer.start(queueTime, self.runQueue)
+        # build in a delay
+        # if self.verbose:
+        #     print "sending: %r" % (line,)
+        # if self.userSock:
+        #     self.userSock.writeLine(line)
+        # else:
+        #     log.warn("%s.sendLine(%r) failed: no socket" % (line,))
 
 
 class FakePiezoGalil(FakeGalil):

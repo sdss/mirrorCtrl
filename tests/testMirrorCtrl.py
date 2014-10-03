@@ -132,7 +132,7 @@ class GenericTests(TestCase):
             self.assertTrue(cmdVar.didFail)
         d.addCallback(checkResults)
         # set timeout to a very small number
-        self.dw.actor.galil.DevCmdTimeout = 0.01
+        self.dw.actor.galil.DevCmdTimeout = 0.3
         self.dispatcher.executeCmd(cmdVar)
         return d
 
