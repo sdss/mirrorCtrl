@@ -616,7 +616,7 @@ class GalilDevice(TCPDevice):
 
         @throw RuntimeError if a userCommand is currently executing and a forceKill is is not requested.
         """
-        # print "%s.runCommand(userCmd=%r, galilCmdStr=%r, nextDevCmdCall=%r, forceKill=%r)" % (self, userCmd, galilCmdStr, nextDevCmdCall, forceKill)
+        log.info("%s.runCommand(userCmd=%r, galilCmdStr=%r, nextDevCmdCall=%r, forceKill=%r)" % (self, userCmd, galilCmdStr, nextDevCmdCall, forceKill))
         # print "    self.currDevCmd=%r" % (self.conn.state,)
         # print "    self.userCmd=%r" % (self.userCmd,)
         # print "    self.conn.state=%r" % (self.conn.state,)
@@ -856,7 +856,7 @@ class GalilDevice(TCPDevice):
         outside code.
 
         Strategy for this method:
-        1. send ST to galil, wait for 0.2 seconds. During this time all output is ignored
+        1. send ST to galil, wait for 0.2 seconds. During this time all galil replies are ignored
         2. send XQ#STOP, wait for ok
         3. send XQ#STATUS, wait for ok
         4. set userCmd to Done.
