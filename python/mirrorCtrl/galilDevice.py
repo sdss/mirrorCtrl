@@ -161,7 +161,6 @@ class GalilStatus(object):
         # all the Status keyword/value pairs we will cache, and their initial values
         self.maxDuration = 0
         self.duration = GalilTimer()
-        self.stTimer = Timer()
         # actuator mount determined from a measured orientation
         self.actMount = numpy.asarray([numpy.nan]*self.nAct) # get rid of?
         # desired encoder mount determined from desired orientation
@@ -303,6 +302,7 @@ class GalilDevice(TCPDevice):
         """
         self.MaxIter = maxIter
         self.mirror = mirror
+        self.stTimer = Timer()
         TCPDevice.__init__(self,
             name = name if name else mirror.name,
             host = host,
@@ -400,7 +400,7 @@ class GalilDevice(TCPDevice):
         return outStr
 
     def init(self, userCmd=None, timeLim=None, getStatus=False):
-        """Initialize Galil
+        """Initialize the Galil
 
         @param[in] userCmd  user command that tracks this command, if any
         @param[in] timeLim  IGNORED maximum time before command expires, in sec; None for no limit
@@ -409,22 +409,8 @@ class GalilDevice(TCPDevice):
 
         Called on disconnection
         """
-        def doStop(connCmd=None):
-            """connCmd: connection UserCmd, if a connection was required.
-            """
-            if not connCmd is None and connCmd.didFail:
-                userCmd.setState(userCmd.Failed, "Could not connect.")
-            if connCmd is None or connCmd.isDone:
-                self.cmdStop(userCmd=userCmd, getStatus=getStatus)
-
         log.info("%s.init(userCmd=%s, timeLim=%s, getStatus=%s)" % (self, userCmd, timeLim, getStatus))
-        if not self.conn.isConnected:
-            # try to connect first!
-            log.info("Not Connected. Connecting... %s.init(userCmd=%s, timeLim=%s, getStatus=%s)" % (self, userCmd, timeLim, getStatus))
-            connObj = self.connect()
-            connObj.addCallback(doStop)
-        else:
-            doStop()
+        self.cmdStop(userCmd=userCmd, getStatus=getStatus)
 
     def parseReply(self, replyStr):
         """Parse a reply from the Galil and seperate into key=value format.
@@ -738,7 +724,7 @@ class GalilDevice(TCPDevice):
             self.currDevCmd.addCallback(cancelStTimer)
 
             log.info("beginning ST timer")
-            self.stTimer(0.2, setSTDone, self.currDevCmd)
+            self.stTimer.start(0.2, setSTDone, self.currDevCmd)
 
     def replaceDevCmd(self, galilCmdStr, nextDevCmdCall=None):
         """Replace the current device command, set the previous one to done. And remove it's callbacks, so it's finished state

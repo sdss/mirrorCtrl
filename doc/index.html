@@ -20,7 +20,7 @@
         <li><a href="#cmd_reset">reset</a>
         <li><a href="#cmd_showparams">showparams</a>
         <li><a href="#cmd_status">status</a>
-        <li><a href="#cmd_stop">stop</a>
+        <li><a href="#cmd_init">init</a> (or stop, a deprecated alias)
     </ul>
     <li><a href="messageKeywords.html">Keywords</a>
     <ul>
@@ -114,9 +114,9 @@
 
 <p>Query the Galil for parameters. See <a href="http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html">Galil Documentation</a> for more info.
 
-<h3><a name="cmd_stop">stop</a></h3>
+<h3><a name="cmd_init">init</a> (or stop, a deprecated alias)</h3>
 
-<p>Stop motion, put the Galil into a known state and return status.
+<p>Reconnect the Galil, if disconnected, stop motion and any executing commands, and return status.
 
 <h3><a name="cmd_status">status</a></h3>
 

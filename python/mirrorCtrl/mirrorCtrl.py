@@ -17,7 +17,7 @@ __all__ = ["MirrorCtrl", "runMirrorCtrl"]
 DefaultMaxUsers = 5
 
 class MirrorCtrl(Actor):
-    """Mirror controller actor
+    """!Mirror controller actor
     """
     def __init__(self,
         device,
@@ -26,7 +26,7 @@ class MirrorCtrl(Actor):
         name = 'MirrorCtrl',
         doConnect = True,
     ):
-        """Create a Galil mirror controller actor
+        """!Create a Galil mirror controller actor
 
         @param[in] device    A Galil device from galilDevice.py
         @param[in] userPort  port on which to listen for client connections
@@ -47,13 +47,13 @@ class MirrorCtrl(Actor):
         self.galil = device # easier access
 
     def _cancelTimers(self):
-        """Cancel all timers
+        """!Cancel all timers
         """
         self.galil.userCmdQueue.queueTimer.cancel()
         self.statusTimer.cancel()
 
     def processOrientation(self, orientation):
-        """Convert a user specified orientation in um and arcseconds with possibly < 5
+        """!Convert a user specified orientation in um and arcseconds with possibly < 5
         fields specified into an orientation of 5 values in units of radians and mm.
 
         @param[in] orientation  [Piston (um), [Tilt X ("), [Tilt Y ("), [Trans X (um), [Trans Y (um)]]]]]
@@ -63,7 +63,7 @@ class MirrorCtrl(Actor):
         return convOrient2MMRad(orientation)
 
     def cmd_galil(self, cmd):
-        """Send an arbitrary command to the Galil mirror controller. Do not put quotes around the command.
+        """!Send an arbitrary command to the Galil mirror controller. Do not put quotes around the command.
 
         The Galil accepts multiple commands on one line, separated by a semicolon.
         The entire line of command should result in exactly one "OK" being printed at the end,
@@ -104,7 +104,7 @@ class MirrorCtrl(Actor):
         # cmd.setState(cmd.Done)
 
     def cmd_move(self, cmd):
-        """Move mirror to a commanded orientation, if device isn't busy.
+        """!Move mirror to a commanded orientation, if device isn't busy.
 
         @param[in] cmd  new local user command (twistedActor.UserCmd)
 
@@ -137,7 +137,7 @@ class MirrorCtrl(Actor):
         return True
 
     def cmd_offset(self, cmd):
-        """Offset mirror orientation by the commanded amount, if device isn't busy
+        """!Offset mirror orientation by the commanded amount, if device isn't busy
 
         @param[in] cmd  new local user command (twistedActor.UserCmd)
 
@@ -175,7 +175,7 @@ class MirrorCtrl(Actor):
         return True
 
     def cmd_home(self, cmd):
-        """Home specified axes (e.g. A, B, C); home all axes if none specified
+        """!Home specified axes (e.g. A, B, C); home all axes if none specified
 
         @param[in] cmd  new local user command (twistedActor.UserCmd)
         """
@@ -191,11 +191,11 @@ class MirrorCtrl(Actor):
             self.galil.cmdHome(cmd, axisList = axisList)
         except Exception as e:
             raise CommandError(strFromException(e))
-        self.endWithStatus(cmd, delaySec=0) # no need to wait
+        self.endWithStatus(cmd)
         return True
         
     def cmd_status(self, cmd):
-        """Show status of Galil mirror controller
+        """!Show status of Galil mirror controller
 
         @param[in] cmd  new local user command (twistedActor.UserCmd)
         """
@@ -210,7 +210,7 @@ class MirrorCtrl(Actor):
         return True
 
     def cmd_showparams(self, cmd):
-        """Show parameters of Galil mirror controller
+        """!Show parameters of Galil mirror controller
 
         @param[in] cmd  new local user command (twistedActor.UserCmd)
         """
@@ -223,35 +223,43 @@ class MirrorCtrl(Actor):
         return True
 
     def cmd_init(self, cmd):
-        """! Initialize the device.
+        """!Initialize the mirror controller
 
-        @param[in] cmd new local user command (twistedActor.UserCmd)
+        Perform all of these actions:
+        - reconnect the Galil, if disconnected
+        - halt motion
+        - cancel the currently executing command, if any
+        - clear the command queue
+        - return status
 
-        Effectively equal to stop, but if the
-        device is disconnected, a connection will be established before the stop is sent.
+        @param[in] cmd  new local user command (twistedActor.UserCmd)
         """
         try:
-            self.galil.init(cmd)
+            if not self.galil.isConnected:
+                self.cmd_connDev(cmd)
+            else:
+                self.galil.init(cmd)
         except Exception as e:
             raise CommandError(str(e))
         return True
 
     def cmd_stop(self, cmd):
-        """Abort any executing Galil command, put Galil in known state
-
-        @param[in] cmd  new local user command (twistedActor.UserCmd)
+        """!Deprecated alias for init
         """
-        if not self.galil.conn.isConnected:
-            raise CommandError("Device Not Connected")
-        try:
-            self.galil.cmdStop(cmd)
-        except Exception as e:
-            raise CommandError(strFromException(e))
-        self.endWithStatus(cmd)
-        return True
+        return self.cmd_init(cmd)
 
     def cmd_reset(self, cmd):
-        """Reset the Galil using an 'RS' command.
+        """!Reset the Galil using an 'RS' command.
+
+        Perform all of these actions:
+        - reconnect the Galil, if disconnected
+        - reset the Galil to its power-on state (by sending "RS")
+        - cancel the currently executing command, if any
+        - clear the command queue
+        - return status
+
+        @warning A home command will be required after this, as it leaves the Galil not homed
+        and with no idea where it is.
 
         @param[in] cmd  new local user command (twistedActor.UserCmd)
         """
@@ -263,9 +271,9 @@ class MirrorCtrl(Actor):
             raise CommandError(strFromException(e))
         self.endWithStatus(cmd)
         return True
-    
-    def endWithStatus(self, cmd, delaySec=1):
-        """Queue a status command to run after the main command
+
+    def endWithStatus(self, cmd, delaySec=0):
+        """!Queue a status command to run after the main command
         
         @param[in] cmd  user command that is being run
         @param[in] delaySec  delay time in seconds
@@ -277,7 +285,7 @@ class MirrorCtrl(Actor):
 
 
 def runMirrorCtrl(name, device, userPort):
-    """Start up a Galil actor without any special logging; use for one-off mirrors and unit tests
+    """!Start up a Galil actor without any special logging; use for one-off mirrors and unit tests
 
     @param[in] name  name of controller, e.g. "sec35m"; used for the log file and log entries
     @param[in] device  a twistedActor-based Galil Device (see mirrorCtrl/galilDevice.py)
