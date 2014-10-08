@@ -222,6 +222,20 @@ class MirrorCtrl(Actor):
             raise CommandError(strFromException(e))
         return True
 
+    def cmd_init(self, cmd):
+        """! Initialize the device.
+
+        @param[in] cmd new local user command (twistedActor.UserCmd)
+
+        Effectively equal to stop, but if the
+        device is disconnected, a connection will be established before the stop is sent.
+        """
+        try:
+            self.galil.init(cmd)
+        except Exception as e:
+            raise CommandError(str(e))
+        return True
+
     def cmd_stop(self, cmd):
         """Abort any executing Galil command, put Galil in known state
 
