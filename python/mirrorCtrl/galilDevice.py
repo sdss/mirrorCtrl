@@ -161,6 +161,7 @@ class GalilStatus(object):
         # all the Status keyword/value pairs we will cache, and their initial values
         self.maxDuration = 0
         self.duration = GalilTimer()
+        self.stTimer = Timer()
         # actuator mount determined from a measured orientation
         self.actMount = numpy.asarray([numpy.nan]*self.nAct) # get rid of?
         # desired encoder mount determined from desired orientation
@@ -218,6 +219,9 @@ class GalilStatus(object):
             "axisHomed": strArrayCast,
         }
 
+    def cleanup(self):
+        self.stTimer.cancel()
+
     def _getKeyValStr(self, keywords):
         """Package and return current keyword value info in status cache
 
@@ -266,7 +270,7 @@ class GalilStatus(object):
             if not numpy.isnan(duration):
                 remDuration = floatCast(self.maxDuration - duration)
 
-        return keyword + "=" + ",".join([state,nIter,maxIter,remDuration,totDuration])
+        return keyword + "=" + ", ".join([state, nIter, maxIter, remDuration, totDuration])
 
 
 class GalilDevice(TCPDevice):
@@ -592,7 +596,7 @@ class GalilDevice(TCPDevice):
             log.info("Ignoring unsolicited output from Galil: %s " % replyStr)
             return
         if self.currDevCmd.cmdStr == "ST":
-            log.info("ST issued, Ignoring Galil reply: %s " % replyStr)
+            log.info("ST issued; ignoring Galil reply: %s " % replyStr)
             return
         if self.currDevCmd.state == self.currDevCmd.Cancelling:
             raise log.error("Should not be set to Cancelling: %s"%self.currDevCmd)
@@ -665,7 +669,7 @@ class GalilDevice(TCPDevice):
         def queueFunc(userCmd):
             if not self.userCmd.isDone:
                 if forceKill:
-                    log.info("New userCmd incomming: %s, force killing previous command: %s"%(userCmd, self.userCmd))
+                    log.info("New userCmd %s killing active userCmd %s" % (userCmd, self.userCmd))
                     self.clearAll() # need dev command to finish before rest of code here is executed
                 else:
                     raise RuntimeError("User command collision! %s blocked by currently running %s!"%(userCmd, self.userCmd))
@@ -701,13 +705,26 @@ class GalilDevice(TCPDevice):
                 self.currDevCmd.setState(self.currDevCmd.Failed, "Not connected")
         except Exception as e:
             self.currDevCmd.setState(self.currDevCmd.Failed, textMsg=strFromException(e))
-        # if the current device command happens to be ST, set it done on a timer
-        def setSTDone(stCmd):
-            log.info("ST timer fired, setting ST dev command done.")
-            stCmd.setState(stCmd.Done)
+    
+        # if the current device command is ST, set it done on a timer
+        # (since we cannot rely on a returned "OK" and want time for Galil output to finish)
         if self.currDevCmd.cmdStr == "ST":
-            log.info("beginning ST timer.")
-            Timer(0.2, setSTDone, self.currDevCmd)
+            def setSTDone(stCmd):
+                if not stCmd.isDone:
+                    log.info("ST timer fired, setting ST dev command done")
+                    stCmd.setState(stCmd.Done)
+                else:
+                    log.warn("ST timer fired, but ST dev command already done")
+
+            def cancelStTimer(stCmd):
+                if stCmd.isDone and self.stTimer.isActive:
+                    log.warn("ST dev command done but stTimer still active; cancelling stTimer")
+                    self.stTimer.cancel()
+
+            self.currDevCmd.addCallback(cancelStTimer)
+
+            log.info("beginning ST timer")
+            self.stTimer(0.2, setSTDone, self.currDevCmd)
 
     def replaceDevCmd(self, galilCmdStr, nextDevCmdCall=None):
         """Replace the current device command, set the previous one to done. And remove it's callbacks, so it's finished state

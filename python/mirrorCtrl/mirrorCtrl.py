@@ -1,13 +1,13 @@
 from __future__ import division, absolute_import
 """ Actor for mirrors (via Galil devices).
 """
-# import functools
 import sys
 import traceback
 
 import numpy
-from twistedActor import Actor, CommandError, log, UserCmd#, CommandQueue
+from twistedActor import Actor, CommandError, log, UserCmd
 from RO.Comm.TwistedTimer import Timer
+from RO.StringUtil import strFromException
 
 from .const import convOrient2MMRad
 from .version import __version__
@@ -99,7 +99,7 @@ class MirrorCtrl(Actor):
             self.galil.runCommand(cmd, galilCmdStr=cmdStr)
         except Exception as e:
             traceback.print_exc(file=sys.stderr)
-            raise CommandError(str(e))
+            raise CommandError(strFromException(e))
         return True
         # cmd.setState(cmd.Done)
 
@@ -132,7 +132,7 @@ class MirrorCtrl(Actor):
             self.galil.cmdMove(cmd, orient=cmdOrient)
         except Exception as e:
             traceback.print_exc(file=sys.stderr)
-            raise CommandError(str(e))
+            raise CommandError(strFromException(e))
 
         return True
 
@@ -170,7 +170,7 @@ class MirrorCtrl(Actor):
             self.galil.cmdMove(cmd, orient=cmdOrient)
         except Exception as e:
             traceback.print_exc(file=sys.stderr)
-            raise CommandError(str(e))
+            raise CommandError(strFromException(e))
 
         return True
 
@@ -190,15 +190,10 @@ class MirrorCtrl(Actor):
         try:
             self.galil.cmdHome(cmd, axisList = axisList)
         except Exception as e:
-            raise CommandError(str(e))
-        # add a status to the queue to be executed after the home
-        # command a status for 1 second later (roughly 2x stopping time from max speed)
-        dummyCmd = UserCmd(cmdStr="%i status" % cmd.userID)
-        dummyCmd.cmdVerb = "status"
-        dummyCmd.userID = cmd.userID
-        self.galil.cmdStatus(dummyCmd)
+            raise CommandError(strFromException(e))
+        self.endWithStatus(cmd, delaySec=0) # no need to wait
         return True
-
+        
     def cmd_status(self, cmd):
         """Show status of Galil mirror controller
 
@@ -211,7 +206,7 @@ class MirrorCtrl(Actor):
         try:
             self.galil.cmdStatus(cmd)
         except Exception as e:
-            raise CommandError(str(e))
+            raise CommandError(strFromException(e))
         return True
 
     def cmd_showparams(self, cmd):
@@ -224,7 +219,7 @@ class MirrorCtrl(Actor):
         try:
             self.galil.cmdParams(cmd)
         except Exception as e:
-            raise CommandError(str(e))
+            raise CommandError(strFromException(e))
         return True
 
     def cmd_stop(self, cmd):
@@ -235,15 +230,10 @@ class MirrorCtrl(Actor):
         if not self.galil.conn.isConnected:
             raise CommandError("Device Not Connected")
         try:
-            # self.cmdQueue.addCmd(cmd, self.galil.cmdStop)
             self.galil.cmdStop(cmd)
         except Exception as e:
-            raise CommandError(str(e))
-        # command a status for 1 second later (roughly 2x stopping time from max speed)
-        dummyCmd = UserCmd(cmdStr="%i status" % cmd.userID)
-        dummyCmd.cmdVerb = "status"
-        dummyCmd.userID = cmd.userID
-        self.statusTimer.start(1., self.galil.cmdStatus, dummyCmd)
+            raise CommandError(strFromException(e))
+        self.endWithStatus(cmd)
         return True
 
     def cmd_reset(self, cmd):
@@ -256,12 +246,20 @@ class MirrorCtrl(Actor):
         try:
             self.galil.cmdReset(cmd)
         except Exception as e:
-            raise CommandError(str(e))
-        dummyCmd = UserCmd(cmdStr="%i status"%cmd.userID)
-        dummyCmd.cmdVerb = "status"
-        dummyCmd.userID = cmd.userID
-        self.statusTimer.start(1., self.galil.cmdStatus, dummyCmd)
+            raise CommandError(strFromException(e))
+        self.endWithStatus(cmd)
         return True
+    
+    def endWithStatus(self, cmd, delaySec=1):
+        """Queue a status command to run after the main command
+        
+        @param[in] cmd  user command that is being run
+        @param[in] delaySec  delay time in seconds
+        """
+        statusCmd = UserCmd(cmdStr="%i status" % cmd.userID)
+        statusCmd.cmdVerb = "status"
+        statusCmd.userID = cmd.userID
+        self.statusTimer.start(delaySec, self.galil.cmdStatus, statusCmd)
 
 
 def runMirrorCtrl(name, device, userPort):
