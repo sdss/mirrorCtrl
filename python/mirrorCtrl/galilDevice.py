@@ -405,8 +405,22 @@ class GalilDevice(TCPDevice):
 
         Called on disconnection
         """
+        def doStop(connCmd=None):
+            """connCmd: connection UserCmd, if a connection was required.
+            """
+            if not connCmd is None and connCmd.didFail:
+                userCmd.setState(userCmd.Failed, "Could not connect.")
+            if connCmd is None or connCmd.isDone:
+                self.cmdStop(userCmd=userCmd, getStatus=getStatus)
+
         log.info("%s.init(userCmd=%s, timeLim=%s, getStatus=%s)" % (self, userCmd, timeLim, getStatus))
-        self.cmdStop(userCmd=userCmd, getStatus=getStatus)
+        if not self.conn.isConnected:
+            # try to connect first!
+            log.info("Not Connected. Connecting... %s.init(userCmd=%s, timeLim=%s, getStatus=%s)" % (self, userCmd, timeLim, getStatus))
+            connObj = self.connect()
+            connObj.addCallback(doStop)
+        else:
+            doStop()
 
     def parseReply(self, replyStr):
         """Parse a reply from the Galil and seperate into key=value format.
