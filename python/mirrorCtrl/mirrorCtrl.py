@@ -193,7 +193,7 @@ class MirrorCtrl(Actor):
             raise CommandError(strFromException(e))
         self.endWithStatus(cmd)
         return True
-        
+
     def cmd_status(self, cmd):
         """!Show status of Galil mirror controller
 
@@ -248,33 +248,10 @@ class MirrorCtrl(Actor):
         """
         return self.cmd_init(cmd)
 
-    def cmd_reset(self, cmd):
-        """!Reset the Galil using an 'RS' command.
-
-        Perform all of these actions:
-        - reconnect the Galil, if disconnected
-        - reset the Galil to its power-on state (by sending "RS")
-        - cancel the currently executing command, if any
-        - clear the command queue
-        - return status
-
-        @warning A home command will be required after this, as it leaves the Galil not homed
-        and with no idea where it is.
-
-        @param[in] cmd  new local user command (twistedActor.UserCmd)
-        """
-        if not self.galil.conn.isConnected:
-            raise CommandError("Device Not Connected")
-        try:
-            self.galil.cmdReset(cmd)
-        except Exception as e:
-            raise CommandError(strFromException(e))
-        self.endWithStatus(cmd)
-        return True
 
     def endWithStatus(self, cmd, delaySec=0):
         """!Queue a status command to run after the main command
-        
+
         @param[in] cmd  user command that is being run
         @param[in] delaySec  delay time in seconds
         """

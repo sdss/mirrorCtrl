@@ -17,7 +17,6 @@
         <li><a href="#cmd_home">home <i>[actuatorList]</i></a>
         <li><a href="#cmd_move">move <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a>
         <li><a href="#cmd_offset">offset <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a>
-        <li><a href="#cmd_reset">reset</a>
         <li><a href="#cmd_showparams">showparams</a>
         <li><a href="#cmd_status">status</a>
         <li><a href="#cmd_init">init</a> (or stop, a deprecated alias)
@@ -105,10 +104,6 @@
 <p>Offset the mirror orientation by the desired amount. Units are um for lengths and arcseconds for angles. Arguments may only appear in the exact order listed above. If fewer than 5 axes are specified, the remaining non-specified axes are assumed to be zero. At least 1 axis (piston) must be specified for a valid command.
 
 <p>See <a href="#cmd_move">move</a> for more information.
-
-<h3><a name="cmd_reset">reset</a></h3>
-
-<p>Reset the Galil by sending the RS command, which is like power cycling it. <b>Warning:</b> the axes will no longer be homed!
 
 <h3><a name="cmd_showparams">showparams</a></h3>
 
