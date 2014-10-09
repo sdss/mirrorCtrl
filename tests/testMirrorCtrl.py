@@ -193,30 +193,6 @@ class GenericTests(TestCase):
         return d
 
 
-    def testReset(self):
-        """Send a reset command.
-        checks:
-        1. command completes without failure
-        2. isHomed = False for all axes
-        """
-        log.info("testReset")
-        d = Deferred()
-        cmdStr = 'reset'
-        cmdVar = CmdVar (
-                actor = self.name,
-                cmdStr = cmdStr,
-                callFunc = CmdCallback(d),
-            )
-        def checkResults(cb):
-            """Check results after cmdVar is done
-            """
-            self.assertFalse(cmdVar.didFail)
-            self.assertFalse( 1 in self.dispatcher.model.axisHomed.valueList[:], msg=str(self.dispatcher.model.axisHomed.valueList[:]))
-
-        d.addCallback(checkResults)
-        self.dispatcher.executeCmd(cmdVar)
-        return d
-
     def testStop(self):
         """Send a stop command.
         checks:
@@ -272,41 +248,6 @@ class GenericTests(TestCase):
         Timer(0.02, self.dispatcher.executeCmd, cmdStop)
         return dBoth
 
-    def testResetInterrupt(self):
-        """Test that a reset command will interrupt a move command. Commands a move then a reset
-        immediately afterwards.
-        Checks:
-        1. the move fails
-        2. the reset succeeds.
-        3. check that isHomed == False (due to the reset)
-        """
-        log.info("testResetInterrupt")
-        d1 = Deferred()
-        d2 = Deferred()
-        dBoth = gatherResults([d1,d2])
-        orientation = [-2000.0, 150.0, 860.0]
-        cmdStr = 'move ' + ', '.join([str(x) for x in orientation])
-        cmdMove = CmdVar (
-                actor = self.name,
-                cmdStr = cmdStr,
-                callFunc = CmdCallback(d1),
-            )
-        cmdReset = CmdVar (
-                actor = self.name,
-                cmdStr = 'reset',
-                callFunc = CmdCallback(d2),
-            )
-        def checkResults(cb):
-            """Check results after cmdVar is done
-            """
-            self.assertTrue(cmdMove.didFail)
-            self.assertFalse(cmdReset.didFail)
-            self.assertFalse(1 in self.dispatcher.model.axisHomed.valueList[:], msg=str(self.dispatcher.model.axisHomed.valueList[:]))
-        dBoth.addCallback(checkResults)
-        self.dispatcher.executeCmd(cmdMove)
-        Timer(0.02, self.dispatcher.executeCmd, cmdReset)
-        # self.dispatcher.executeCmd(cmdReset)
-        return dBoth
 
     def testCmdQueueHome(self):
         """send a status then a home,

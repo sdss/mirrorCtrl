@@ -14,8 +14,8 @@ GalilHost = 'tccservdev.astro.washington.edu'
 GalilPort = 2011
 
 # testing using tunnel on 3500
-GalilHost = "localhost"
-GalilPort = 16000
+# GalilHost = "localhost"
+# GalilPort = 16000
 
 # Mirror.name = 'UW Bench Galil (simple 3.5m tertiary)'
 

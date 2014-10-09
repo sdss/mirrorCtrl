@@ -260,6 +260,12 @@ class MirrorCtrl(Actor):
         statusCmd.userID = cmd.userID
         self.statusTimer.start(delaySec, self.galil.cmdStatus, statusCmd)
 
+    def showVersion(self, cmd, onlyOneUser=False):
+        """! overwritten from baseActor to additionally show mirror name
+        """
+        Actor.showVersion(self, cmd, onlyOneUser)
+        self.writeToOneUser("i", "text='mirror name: %s'"%self.galil.mirror.name, cmd=cmd)
+
 
 def runMirrorCtrl(name, device, userPort):
     """!Start up a Galil actor without any special logging; use for one-off mirrors and unit tests
