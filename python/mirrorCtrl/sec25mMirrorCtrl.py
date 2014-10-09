@@ -18,7 +18,6 @@ class Sec25mMirrorCtrl(MirrorCtrl):
     def __init__(self):
         MirrorCtrl.__init__(self,
             device = GalilDevice25Sec(
-                name = self.Name,
                 mirror = mir25mSec,
                 host = GalilHost,
                 port = GalilPort,

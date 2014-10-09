@@ -287,7 +287,7 @@ class GalilDevice(TCPDevice):
     DevCmdTimeout = 2.
     ## scale the determined move offset correction by this much, eg go only 90%
     CorrectionStrength = 0.9
-    def __init__(self, mirror, host, port, maxIter=5, callFunc=None, name=None):
+    def __init__(self, mirror, host, port, maxIter=5, callFunc=None):
         """Construct a GalilDevice
 
         @param[in] mirror  an instance of mirrorCtrl.MirrorBase
@@ -298,13 +298,12 @@ class GalilDevice(TCPDevice):
             it receives one argument: this device.
             Note that callFunc is NOT called when the connection state changes;
             register a callback with "conn" for that.
-        @param[in] name  name of device; if None then use mirror.name
         """
         self.MaxIter = maxIter
         self.mirror = mirror
         self.stTimer = Timer()
         TCPDevice.__init__(self,
-            name = name if name else mirror.name,
+            name = "galil",
             host = host,
             port = port,
             callFunc = callFunc,
@@ -705,7 +704,7 @@ class GalilDevice(TCPDevice):
                 self.currDevCmd.setState(self.currDevCmd.Failed, "Not connected")
         except Exception as e:
             self.currDevCmd.setState(self.currDevCmd.Failed, textMsg=strFromException(e))
-    
+
         # if the current device command is ST, set it done on a timer
         # (since we cannot rely on a returned "OK" and want time for Galil output to finish)
         if self.currDevCmd.cmdStr == "ST":
@@ -1108,7 +1107,6 @@ class GalilDevice25Sec(GalilDevice):
         host,
         port,
         callFunc=None,
-        name=None,
     ):
         """Construct a GalilDevice25Sec
 
@@ -1122,7 +1120,6 @@ class GalilDevice25Sec(GalilDevice):
         @param[in] name  name of device; if None then use mirror.name
         """
         GalilDevice.__init__(self,
-            name = name if name else mirror.name,
             mirror = mirror,
             host = host,
             port = port,

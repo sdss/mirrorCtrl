@@ -19,7 +19,6 @@ class Tert35mMirrorCtrl(MirrorCtrl):
     def __init__(self):
         MirrorCtrl.__init__(self,
             device = GalilDevice(
-                name = Tert35mMirrorCtrl.Name,
                 mirror = mir35mTert,
                 host = GalilHost,
                 port = GalilPort,
