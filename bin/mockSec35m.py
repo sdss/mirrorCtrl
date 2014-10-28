@@ -1,7 +1,6 @@
 #!/usr/bin/env python2
 """Fake 3.5m secondary Galil
 """
-import os
 from argparse import ArgumentParser
 from twisted.internet import reactor
 
@@ -11,8 +10,7 @@ from mirrorCtrl import MirrorCtrlWrapper
 from twistedActor import startFileLogging
 
 try:
-    LogDir = os.environ["TWISTED_LOG_DIR"]
-    startFileLogging(os.path.join(LogDir, "emulate35m.log"))
+    startFileLogging("mockSec35m")
 except KeyError:
     # don't start logging
     pass

@@ -2,12 +2,8 @@
 from __future__ import absolute_import, division
 """Talk to a bench mirror with only 3 axes: same parameters as 3.5m tertiary
 """
-import syslog
-
 from mirrorCtrl import GalilDevice, MirrorCtrl
 from mirrorCtrl.mirrors import mir35mTert
-
-# UserPort = 3532
 
 # for testing
 GalilHost = 'tccservdev.astro.washington.edu'
@@ -17,12 +13,9 @@ GalilPort = 2011
 # GalilHost = "localhost"
 # GalilPort = 16000
 
-# Mirror.name = 'UW Bench Galil (simple 3.5m tertiary)'
-
 class UWBenchMirrorCtrl(MirrorCtrl):
     Name = "uwBench"
-    UserPort = 3532
-    # Facility = syslog.LOG_LOCAL3
+    UserPort = 35320
     def __init__(self):
         MirrorCtrl.__init__(self,
             device = GalilDevice(
@@ -38,6 +31,6 @@ if __name__ == "__main__":
     from twisted.internet import reactor
     from twistedActor import startFileLogging
 
-    startFileLogging("/Users/csayres/Desktop/")
+    startFileLogging("uwBenchGalil")
     UWBenchMirrorCtrl()
     reactor.run()
