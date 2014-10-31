@@ -1,4 +1,4 @@
-from __future__ import division, absolute_import
+from __future__ import absolute_import, division, print_function
 """Galil Device.
 
 This talks to a Galil motor controller, which commands actuators to move the mirror and
@@ -294,12 +294,13 @@ class GalilDevice(TCPDevice):
     but doing so when the command begins is probably sufficient,
     or when the state is Running.
     """
-    ## initial timeout to use for every device command
-    ## the following are thresholds (large moves) beyond which automatic (previously computed)
-    ## move offsets should not be used
-    DevCmdTimeout = 2.
-    ## scale the determined move offset correction by this much, eg go only 90%
+    ## initial timeout to use for every device command (sec)
+    DevCmdTimeout = 2.0
+    # extra time for move to complete beyond Galil estimate (sec)
+    MoveExtraTime = 5.0 
+    # scale the determined move offset correction by this much, eg go only 90%
     CorrectionStrength = 0.9
+    
     def __init__(self, mirror, host, port, maxIter=5, callFunc=None):
         """Construct a GalilDevice
 
@@ -448,7 +449,7 @@ class GalilDevice(TCPDevice):
             -000006732,  000014944,  000003741,  999999999,  999999999 position error
              1,  1,  1,  0,  0 axis homed
         """
-        # print "parseReply(replyStr=%r)" % (replyStr,)
+        # print("parseReply(replyStr=%r)" % (replyStr,))
         # Grab the data
         # Match only numbers (including decimal pt and negative sign) that are not preceeded by '/'
         # or immediately surrounded by any letters letters.
@@ -522,25 +523,15 @@ class GalilDevice(TCPDevice):
 
         elif TimeEstRegEx.match(key) and not "away" in key:# and ("full step" not in key): # ignore sec to find full step, cuts the timeout short!
             # contains information about estimated execution time
-            # update status and notify users
             dataList = numpy.asarray(dataList, dtype=float)
             maxTime = numpy.max(dataList) # get time for longest move
             self.status.maxDuration = maxTime
-            # reset the timer
             self.status.duration.startTimer()
-            # updateStr = self.status._getKeyValStr(["maxDuration"])
-            # # append text describing time for what
-            # updateStr += '; Text=%s' % (quoteStr(key),)
-            # self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
             self.writeState(cmd=self.userCmdOrNone)
-            # self.writeToUsers("i", self.status.currentStatus(), cmd=self.userCmdOrNone)
-            # adjust time limits
-            #if not self.currDevCmd.isDone:
-            log.info("New timeout: %0.2f for device cmd %r"%(maxTime+4, self.currDevCmd))
-            self.currDevCmd.setTimeLimit(maxTime + 4)
-            #if not self.userCmd.isDone:
-            log.info("New timeout: %0.2f for user cmd %r"%(maxTime+6, self.userCmd))
-            self.userCmd.setTimeLimit(maxTime + 6)
+            newTimeLim = maxTime + self.MoveExtraTime
+            if not self.currDevCmd.isDone:
+                log.info("New time limit %0.2f sec for currDevCmd %r" % (newTimeLim, self.currDevCmd))
+                self.currDevCmd.setTimeLimit(newTimeLim)
 
         elif ('commanded position' == key) or ('target position' == key):
             # modelMount must not be updated for actuator error determination
@@ -601,7 +592,7 @@ class GalilDevice(TCPDevice):
         - Parse status to update the model parameters
         - If a command has finished, call the appropriate command callback
         """
-        # print "handleReply(replyStr=%r); currDevCmd=%r" % (replyStr, self.currDevCmd)
+        # print("handleReply(replyStr=%r); currDevCmd=%r" % (replyStr, self.currDevCmd))
         log.info("%s read %r, currDevCmd: %r" % (self, replyStr, self.currDevCmd))
         replyStr = replyStr.replace(":", "").strip(' ;\r\n\x01\x03\x18\x00')
         if self.currDevCmd.isDone:
@@ -700,7 +691,7 @@ class GalilDevice(TCPDevice):
         @param[in] galilCmdStr  string, to be sent directly to the galil.
         @param[in] nextDevCmdCall  Callable to execute when the device command is done.
         """
-        # print "%s.startDevCmd(galilCmdStr=%r, nextDevCmdCall=%r)" % (self, galilCmdStr, nextDevCmdCall)
+        # print("%s.startDevCmd(galilCmdStr=%r, nextDevCmdCall=%r)" % (self, galilCmdStr, nextDevCmdCall))
         log.info("%s.startDevCmd(%r, nextDevCmdCall=%s)" % (self, galilCmdStr, nextDevCmdCall))
         if not self.currDevCmd.isDone:
             raise RuntimeError("Device command collision: userCmd=%r, currDevCmd=%r, desired galilCmdStr=%r" % \
@@ -777,7 +768,7 @@ class GalilDevice(TCPDevice):
 
         @param[in] userCmd  a user command, passed from the mirrorCtrl
         """
-        # print "%s._userCmdCallback(userCmd=%r)" % (self, userCmd)
+        # print("%s._userCmdCallback(userCmd=%r)" % (self, userCmd))
         if not self._inDevCmdCallback:
             if userCmd.isDone:
                 self.clearAll()
@@ -792,7 +783,7 @@ class GalilDevice(TCPDevice):
 
         startDevCmd always assigns this as the callback, which then calls and clears any user-specified callback.
         """
-        # print "%s._devCmdCallback(devCmd=%r); self.userCmd=%r" % (self, devCmd, self.userCmd)
+        # print("%s._devCmdCallback(devCmd=%r); self.userCmd=%r" % (self, devCmd, self.userCmd))
         self._inDevCmdCallback = True
         try:
             if not devCmd.isDone:
@@ -805,7 +796,7 @@ class GalilDevice(TCPDevice):
                 return
 
             if not self.userCmd.isDone:
-                self.userCmd.setState(devCmd.state)
+                self.userCmd.setState(devCmd.state, textMsg=devCmd.textMsg, hubMsg=devCmd.hubMsg)
             self.clearAll() # dev cmd done one way or the other
         finally:
             self._inDevCmdCallback = False
@@ -813,10 +804,10 @@ class GalilDevice(TCPDevice):
     def clearAll(self):
         """If a device command is currently running, kill it. Put galilDevice in a state to receive new commands.
         """
-        # print "%s.clearAll()\n    self.currDevCmd=%r\n    self.userCmd=%r" % (self, self.currDevCmd, self.userCmd)
+        # print("%s.clearAll(); self.currDevCmd=%r; self.userCmd=%r" % (self, self.currDevCmd, self.userCmd))
         self.nextDevCmdCall = None
         if not self.currDevCmd.isDone:
-            self.currDevCmd.setState(self.currDevCmd.Cancelled, textMsg="Device Command: %s Cancelled via clearAll() in galilDevice"%self.currDevCmd)
+            self.currDevCmd.setState(self.currDevCmd.Cancelled, textMsg="cancelled by GalilDevice.clearAll()")
 
         self.parsedKeyList = []
         self.status.iter = 0
