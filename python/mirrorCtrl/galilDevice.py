@@ -282,7 +282,7 @@ class GalilStatus(object):
                 if not numpy.isnan(duration):
                     remDuration = floatCast(self.maxDuration - duration)
         msgStr = "%s=%s, %s, %s, %s, %s" % (keyword, state, nIter, maxIter, remDuration, totDuration)
-        self.device.writeToUsers(msgCode, msgStr)
+        self.device.writeToUsers(msgCode, msgStr, cmd=self.device.userCmdOrNone)
 
 
 class GalilDevice(TCPDevice):
