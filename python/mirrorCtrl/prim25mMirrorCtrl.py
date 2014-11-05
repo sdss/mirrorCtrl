@@ -3,21 +3,21 @@ from __future__ import absolute_import, division
 """
 import syslog
 
-from mirrorCtrl import GalilDevice, MirrorCtrl
+from mirrorCtrl import GalilDevice25Prim, MirrorCtrl
 from mirrorCtrl.mirrors import mir25mPrim
 
-__all__ = ["Sec25mMirrorCtrl"]
+__all__ = ["Prim25mMirrorCtrl"]
 
 GalilHost = "t-g-sdss-2"
 GalilPort = 2900 # terminal server port 9
 
-class Sec25mMirrorCtrl(MirrorCtrl):
+class Prim25mMirrorCtrl(MirrorCtrl):
     Name = "sec25m"
     UserPort = 2531
     Facility = syslog.LOG_LOCAL2
     def __init__(self):
         MirrorCtrl.__init__(self,
-            device = GalilDevice(
+            device = GalilDevice25Prim(
                 name = self.Name,
                 mirror = mir25mPrim,
                 host = GalilHost,
