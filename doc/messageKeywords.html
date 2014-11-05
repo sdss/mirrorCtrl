@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta name="description" content="Document created automatically on Fri Aug 29 11:38:14 2014 by rowen@d-128-208-13-159.dhcp4.washington.edu using /Users/rowen/SDSS3/code/ops/actorkeys-newtcc/doc/describe.py">
+  <meta name="description" content="Document created automatically on Fri Oct 31 13:19:20 2014 by rowen@Russells-MacBook-Pro.local using /Users/rowen/SDSS3/code/ops/actorkeys-newtcc/doc/describe.py">
   <title>mirrorCtrl Message Keyword Dictionary</title>
   <link rel="stylesheet" type="text/css" href="describe.css">
 </head>
@@ -158,9 +158,9 @@
     </div>
   </div>
   <div class="key">
-    <div class="keyname">galilConState</div>
+    <div class="keyname">galilConnState</div>
     <div class="keydesc">
-      <div class="key descriptor"><span class="label">Description</span><span class="value">State of connection to the dev hardware controller. State is one of Connecting, Authorizing, Connected, Disconnecting, Failing, Disconnected or Failed (the states of an RO.Comm.TCPConnection object). &lt;i&gt;Reason&lt;/i&gt; is the reason it got to this state (&apos;&apos; if no reason specified), Note: Dev is a placeholder for a device name</span></div>
+      <div class="key descriptor"><span class="label">Description</span><span class="value">State of connection to the Galil (a device the mirror controller talks to)</span></div>
       <div class="key descriptor"><span class="label">Values</span><span class="value">2</span></div>
       <div class="separator">&nbsp;</div>
       <div class="type descriptor"><span class="label">Description</span><span class="value">Connection State</span></div>
@@ -173,7 +173,7 @@
       <div class="type descriptor"><span class="label">Value-5</span><span class="value">Failing</span></div>
       <div class="type descriptor"><span class="label">Value-6</span><span class="value">Failed</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Description</span><span class="value">Reason</span></div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">Reason for this state, if any</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">String (str,text)</span></div>
     </div>
   </div>
@@ -495,12 +495,12 @@
       <div class="type descriptor"><span class="label">Description</span><span class="value">max iterations; 0 if state is not Moving</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">UInt (long,int4)</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Description</span><span class="value">remaining time on move or home</span></div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">remaining time for command, if known, else 0</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">seconds</span></div>
       <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Description</span><span class="value">total time for move or home</span></div>
+      <div class="type descriptor"><span class="label">Description</span><span class="value">total time for command, if known, else 0</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">seconds</span></div>
       <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>

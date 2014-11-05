@@ -1,4 +1,4 @@
-from __future__ import division, absolute_import
+from __future__ import absolute_import, division, print_function
 """Galil Device.
 
 This talks to a Galil motor controller, which commands actuators to move the mirror and
@@ -144,6 +144,7 @@ class GalilTimer(object):
 class GalilStatus(object):
     """A container for holding the status of the Galil """
     # State options
+    disconnState = "Disconnected"
     movingState = "Moving"
     doneState = "Done"
     homingState = "Homing"
@@ -155,6 +156,7 @@ class GalilStatus(object):
         @param[in] device  mirror device
         """
         self.mirror = device.mirror
+        self.device = device
         ## number of actuators
         self.nAct = len(self.mirror.actuatorList)
 
@@ -240,36 +242,47 @@ class GalilStatus(object):
 
     def _getCurrentState(self, cmd=None):
         """Return the state of the device
-        @param[in] cmd, a command whos state to watch for failure.
+
+        @param[in] cmd  command for which failure will be reported if nothing more important is reported
         """
-        # are any axes homing?
+        if not self.device.isConnected:
+            return self.disconnState
         if 1 in self.homing:
             return self.homingState
         elif 0 in self.axisHomed:
             return self.notHomedState
-        # is it moving?
         elif self.moving:
             return self.movingState
         elif cmd and cmd.didFail:
             return self.failedState
         return self.doneState
 
-    def currentStatus(self, cmd=None):
-        """Construct a keyword summarizing the state of the device
-        @param[in] cmd, a command whos state to watch for failure.
+    def writeState(self, cmd=None):
+        """Write the state keyword
+
+        @param[in] cmd  command to use to report state; also if this command is failed
+            and state is otherwise normal, then the state is reported as Failed
         """
         keyword = "state"
         state = self._getCurrentState(cmd)
+        if state in (self.movingState, self.doneState):
+            msgCode = "i"
+        else:
+            msgCode = "w"
         nIter = "%i" % self.iter
         maxIter = "%i" % self.maxIter
-        totDuration = floatCast(self.maxDuration)# if state in [self.movingState, self.homingState] else 0)
-        remDuration = floatCast(0)
-        if self.maxDuration:
-            duration = self.duration._getTime()
-            if not numpy.isnan(duration):
-                remDuration = floatCast(self.maxDuration - duration)
-
-        return keyword + "=" + ", ".join([state, nIter, maxIter, remDuration, totDuration])
+        if state == self.disconnState:
+            remDuration = 0
+            totDuration = 0
+        else:
+            totDuration = floatCast(self.maxDuration)# if state in [self.movingState, self.homingState] else 0)
+            remDuration = floatCast(0)
+            if self.maxDuration:
+                duration = self.duration._getTime()
+                if not numpy.isnan(duration):
+                    remDuration = floatCast(self.maxDuration - duration)
+        msgStr = "%s=%s, %s, %s, %s, %s" % (keyword, state, nIter, maxIter, remDuration, totDuration)
+        self.device.writeToUsers(msgCode, msgStr, cmd=self.device.userCmdOrNone)
 
 
 class GalilDevice(TCPDevice):
@@ -281,12 +294,13 @@ class GalilDevice(TCPDevice):
     but doing so when the command begins is probably sufficient,
     or when the state is Running.
     """
-    ## initial timeout to use for every device command
-    ## the following are thresholds (large moves) beyond which automatic (previously computed)
-    ## move offsets should not be used
-    DevCmdTimeout = 2.
-    ## scale the determined move offset correction by this much, eg go only 90%
+    ## initial timeout to use for every device command (sec)
+    DevCmdTimeout = 2.0
+    # extra time for move to complete beyond Galil estimate (sec)
+    MoveExtraTime = 5.0 
+    # scale the determined move offset correction by this much, eg go only 90%
     CorrectionStrength = 0.9
+    
     def __init__(self, mirror, host, port, maxIter=5, callFunc=None):
         """Construct a GalilDevice
 
@@ -435,7 +449,7 @@ class GalilDevice(TCPDevice):
             -000006732,  000014944,  000003741,  999999999,  999999999 position error
              1,  1,  1,  0,  0 axis homed
         """
-        # print "parseReply(replyStr=%r)" % (replyStr,)
+        # print("parseReply(replyStr=%r)" % (replyStr,))
         # Grab the data
         # Match only numbers (including decimal pt and negative sign) that are not preceeded by '/'
         # or immediately surrounded by any letters letters.
@@ -509,25 +523,15 @@ class GalilDevice(TCPDevice):
 
         elif TimeEstRegEx.match(key) and not "away" in key:# and ("full step" not in key): # ignore sec to find full step, cuts the timeout short!
             # contains information about estimated execution time
-            # update status and notify users
             dataList = numpy.asarray(dataList, dtype=float)
             maxTime = numpy.max(dataList) # get time for longest move
             self.status.maxDuration = maxTime
-            # reset the timer
             self.status.duration.startTimer()
-            # updateStr = self.status._getKeyValStr(["maxDuration"])
-            # # append text describing time for what
-            # updateStr += '; Text=%s' % (quoteStr(key),)
-            # self.writeToUsers("i", updateStr, cmd=self.userCmdOrNone)
-            self.sendState(cmd=self.userCmdOrNone)
-            # self.writeToUsers("i", self.status.currentStatus(), cmd=self.userCmdOrNone)
-            # adjust time limits
-            #if not self.currDevCmd.isDone:
-            log.info("New timeout: %0.2f for device cmd %r"%(maxTime+4, self.currDevCmd))
-            self.currDevCmd.setTimeLimit(maxTime + 4)
-            #if not self.userCmd.isDone:
-            log.info("New timeout: %0.2f for user cmd %r"%(maxTime+6, self.userCmd))
-            self.userCmd.setTimeLimit(maxTime + 6)
+            self.writeState(cmd=self.userCmdOrNone)
+            newTimeLim = maxTime + self.MoveExtraTime
+            if not self.currDevCmd.isDone:
+                log.info("New time limit %0.2f sec for currDevCmd %r" % (newTimeLim, self.currDevCmd))
+                self.currDevCmd.setTimeLimit(newTimeLim)
 
         elif ('commanded position' == key) or ('target position' == key):
             # modelMount must not be updated for actuator error determination
@@ -588,7 +592,7 @@ class GalilDevice(TCPDevice):
         - Parse status to update the model parameters
         - If a command has finished, call the appropriate command callback
         """
-        # print "handleReply(replyStr=%r); currDevCmd=%r" % (replyStr, self.currDevCmd)
+        # print("handleReply(replyStr=%r); currDevCmd=%r" % (replyStr, self.currDevCmd))
         log.info("%s read %r, currDevCmd: %r" % (self, replyStr, self.currDevCmd))
         replyStr = replyStr.replace(":", "").strip(' ;\r\n\x01\x03\x18\x00')
         if self.currDevCmd.isDone:
@@ -687,7 +691,7 @@ class GalilDevice(TCPDevice):
         @param[in] galilCmdStr  string, to be sent directly to the galil.
         @param[in] nextDevCmdCall  Callable to execute when the device command is done.
         """
-        # print "%s.startDevCmd(galilCmdStr=%r, nextDevCmdCall=%r)" % (self, galilCmdStr, nextDevCmdCall)
+        # print("%s.startDevCmd(galilCmdStr=%r, nextDevCmdCall=%r)" % (self, galilCmdStr, nextDevCmdCall))
         log.info("%s.startDevCmd(%r, nextDevCmdCall=%s)" % (self, galilCmdStr, nextDevCmdCall))
         if not self.currDevCmd.isDone:
             raise RuntimeError("Device command collision: userCmd=%r, currDevCmd=%r, desired galilCmdStr=%r" % \
@@ -737,12 +741,15 @@ class GalilDevice(TCPDevice):
             self.currDevCmd.setState(self.currDevCmd.Done)
         self.startDevCmd(galilCmdStr, nextDevCmdCall)
 
-    def sendState(self, cmd=None):
+    def writeState(self, cmd=None):
         """Send the state of the galil to users.
-        @param[in] cmd, a command this state is associated with, useful to register this method as a callback.
-            upon state change.
+
+        A convienient alias for self.status writeState
+
+        @param[in] cmd  command to use to report state; also if this command is failed
+            and state is otherwise normal, then the state is reported as Failed
         """
-        self.writeToUsers("i", self.status.currentStatus(cmd), cmd=cmd)
+        self.status.writeState(cmd=cmd)
 
     def _connCallback(self, conn=None):
         """If the connection closes, fail any current command
@@ -752,12 +759,16 @@ class GalilDevice(TCPDevice):
             if not self.conn.isConnected and not self.currDevCmd.isDone:
                 self.currDevCmd.setState(self.currDevCmd.Failed, "Connection closed")
 
+    def _doCallbacks(self, *args, **kwargs):
+        self.writeState()
+        TCPDevice._doCallbacks(self, *args, **kwargs)
+
     def _userCmdCallback(self, userCmd):
         """Callback to be added to every user command
 
         @param[in] userCmd  a user command, passed from the mirrorCtrl
         """
-        # print "%s._userCmdCallback(userCmd=%r)" % (self, userCmd)
+        # print("%s._userCmdCallback(userCmd=%r)" % (self, userCmd))
         if not self._inDevCmdCallback:
             if userCmd.isDone:
                 self.clearAll()
@@ -772,7 +783,7 @@ class GalilDevice(TCPDevice):
 
         startDevCmd always assigns this as the callback, which then calls and clears any user-specified callback.
         """
-        # print "%s._devCmdCallback(devCmd=%r); self.userCmd=%r" % (self, devCmd, self.userCmd)
+        # print("%s._devCmdCallback(devCmd=%r); self.userCmd=%r" % (self, devCmd, self.userCmd))
         self._inDevCmdCallback = True
         try:
             if not devCmd.isDone:
@@ -785,7 +796,7 @@ class GalilDevice(TCPDevice):
                 return
 
             if not self.userCmd.isDone:
-                self.userCmd.setState(devCmd.state)
+                self.userCmd.setState(devCmd.state, textMsg=devCmd.textMsg, hubMsg=devCmd.hubMsg)
             self.clearAll() # dev cmd done one way or the other
         finally:
             self._inDevCmdCallback = False
@@ -793,10 +804,10 @@ class GalilDevice(TCPDevice):
     def clearAll(self):
         """If a device command is currently running, kill it. Put galilDevice in a state to receive new commands.
         """
-        # print "%s.clearAll()\n    self.currDevCmd=%r\n    self.userCmd=%r" % (self, self.currDevCmd, self.userCmd)
+        # print("%s.clearAll(); self.currDevCmd=%r; self.userCmd=%r" % (self, self.currDevCmd, self.userCmd))
         self.nextDevCmdCall = None
         if not self.currDevCmd.isDone:
-            self.currDevCmd.setState(self.currDevCmd.Cancelled, textMsg="Device Command: %s Cancelled via clearAll() in galilDevice"%self.currDevCmd)
+            self.currDevCmd.setState(self.currDevCmd.Cancelled, textMsg="cancelled by GalilDevice.clearAll()")
 
         self.parsedKeyList = []
         self.status.iter = 0
@@ -843,9 +854,7 @@ class GalilDevice(TCPDevice):
                 self.writeToUsers("i", updateStr, cmd=userCmd)
                 self.status.maxDuration = 0
                 self.status.duration.startTimer()
-                userCmd.addCallback(self.sendState)
-                self.sendState(cmd=userCmd)
-                # self.writeToUsers("i", self.status.currentStatus(), cmd=userCmd)
+                userCmd.addCallback(self.writeState, callNow=True)
         userCmd.addCallback(whenRunning)
         self.runCommand(userCmd, galilCmdStr=cmdStr)
 
@@ -891,8 +900,7 @@ class GalilDevice(TCPDevice):
                 self.status.desOrientAge.startTimer()
                 self.status.maxDuration = 0
                 self.status.duration.startTimer()
-                userCmd.addCallback(self.sendState)
-                self.sendState(cmd=userCmd)
+                userCmd.addCallback(self.writeState, callNow=True)
                 statusStr = self.status._getKeyValStr(["desOrient", "cmdMount", "desOrientAge", "desEncMount", "modelMount", "maxIter"])
                 self.writeToUsers('i', statusStr, cmd=userCmd)
         userCmd.addCallback(whenRunning)
@@ -953,7 +961,7 @@ class GalilDevice(TCPDevice):
             "axisHomed",
         ])
         self.writeToUsers("i", statusStr, cmd=userCmd)
-        self.sendState(cmd=userCmd)
+        self.writeState(cmd=userCmd)
         userCmd.setState(userCmd.Done)
 
     def cmdStatus(self, userCmd):
@@ -1023,7 +1031,7 @@ class GalilDevice(TCPDevice):
             cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
             self.status.maxDuration = 0
             self.status.duration.startTimer()
-            self.sendState(cmd=self.userCmdOrNone)
+            self.writeState(cmd=self.userCmdOrNone)
             # self.writeToUsers("i", self.status.currentStatus(), cmd=self.userCmdOrNone)
             self.replaceDevCmd(cmdMoveStr, nextDevCmdCall=self._moveIter)
             return
@@ -1035,7 +1043,7 @@ class GalilDevice(TCPDevice):
         """ Explicitly call dev cmd callback, to set user command state to done
         """
         self._devCmdCallback(self.currDevCmd) # will call clear all
-        self.sendState(cmd=self.userCmdOrNone)
+        self.writeState(cmd=self.userCmdOrNone)
 
     def _statusCallback(self):
         """Callback for status command.
@@ -1058,7 +1066,7 @@ class GalilDevice(TCPDevice):
             "homing",
         ])
         self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
-        self.sendState(cmd=self.userCmdOrNone)
+        self.writeState(cmd=self.userCmdOrNone)
         self._devCmdCallback(self.currDevCmd)
 
     def formatGalilCommand(self, valueList, cmd, axisPrefix="", valFmt="%0.f", nAxes=None):

@@ -6,6 +6,27 @@
 <body>
 <h1><a href="index.html">Mirror Controller</a> Version History</h1>
 
+<h3>1.0.3 2014-10-31</h3>
+
+<ul>
+    <li>Bug fix: the state keyword did not have user command info associated with it.
+</ul>
+
+<h3>1.0.2 2014-10-30</h3>
+
+<ul>
+    <li>The state keyword now shows Disconnected if the Galil is not connected.
+    <li>The state keyword now is output with message code "w" unless the state is Done or Moving.
+    <li>Bug fix: predicted durations from the Galil set the time limit of the user command instead of the device command; this fix should make long moves more robust.
+</ul>
+
+<h3>1.0.1 2014-10-28</h3>
+
+<ul>
+    <li>Removed remaining use of environment variable TWISTED_LOG_DIR.
+    <li>Removed one explicit use of path "/Users/csayres".
+</ul>
+
 <h3>1.0.0 2014-10-09</h3>
 
 <ul>
