@@ -240,7 +240,7 @@ class FakeGalil(TCPServer):
         elif cmdVerb == "MOVEREL":
             deltaPos = numpy.where(self.userNums == MAXINT, 0, self.userNums)
             newCmdPos = self.cmdPos + deltaPos
-            self.move(newCmdPos)
+            self.moveStart(newCmdPos)
 
         elif cmdVerb == "STATUS":
             self.showStatus()

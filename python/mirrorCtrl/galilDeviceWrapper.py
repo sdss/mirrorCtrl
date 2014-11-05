@@ -4,7 +4,7 @@ from __future__ import division, absolute_import
 from twistedActor import DeviceWrapper
 
 from .fakeGalil import FakeGalil
-from .galilDevice import GalilDevice
+from .galilDevice import GalilDevice, GalilDevice25Sec, GalilDevice25Prim
 
 __all__ = ["GalilDeviceWrapper"]
 
@@ -63,7 +63,14 @@ class GalilDeviceWrapper(DeviceWrapper):
         if port is None:
             raise RuntimeError("Controller port is unknown")
         #print "_makeDevice, port=", port
-        self.device = GalilDevice(
+        # determine which device to use based on mirror
+        if self._mirror.name == "mir25mPrim":
+            GalilDevClass = GalilDevice25Prim
+        elif self._mirror.name == "mir25mSec":
+            GalilDevClass = GalilDevice25Sec
+        else:
+            GalilDevClass = GalilDevice
+        self.device = GalilDevClass(
             mirror=self._mirror,
             host="localhost",
             port=port,
