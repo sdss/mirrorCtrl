@@ -150,7 +150,7 @@ class ConvergenceTestBase(object):
         """overwritten by subclasses
 
         must set the following instance variables (shown by example):
-        self.fakeGalilFactory: fake Galil factory, e.g. FakeGalilFactory or FakePiezoGalilFactory
+        self.fakeGalilFactory: fake Galil factory, e.g. FakeGalilFactory
         self.mirror: mirorCtrl Mirror, e.g. mirrorCtrl.mirrors.mir35mTert
         self.mirDev: mirror device, e.g. mirrorCtrl.GalilDevice
         self.name: name of keyword dict for this mirror
@@ -202,12 +202,8 @@ class ConvergenceTestBase(object):
 
 class TestIteration(ConvergenceTestBase, TestCase):
     def setVars(self):
-        # self.userPort = getOpenPort()
-        # self.fakeGalilFactory = FakeGalil
         self.trueMirror = mir35mSec
         self.mirror = mir35mSec # set equal because the fake galil autimatically sets act=enc
-        #self.mirror = getActEqEncMir(self.trueMirror)
-        # self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror"
 
     def testIteration(self):
@@ -237,11 +233,8 @@ class TestIteration(ConvergenceTestBase, TestCase):
 
 class ConvergenceTestActEqEnc(ConvergenceTestBase, TestCase):
     def setVars(self):
-        # self.userPort = getOpenPort()
-        # self.fakeGalilFactory = FakeGalil
         self.trueMirror = mir35mSec
         self.mirror = getActEqEncMir(self.trueMirror)
-        # self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror"
 
     def testOrients(self):
@@ -268,11 +261,8 @@ class ConvergenceTestActEqEnc(ConvergenceTestBase, TestCase):
 
 class ConvergenceTestM3(ConvergenceTestBase, TestCase):
     def setVars(self):
-        # self.userPort = getOpenPort()
-        # self.fakeGalilFactory = FakeGalil
         self.trueMirror = mir35mTert
         self.mirror = getActEqEncMir(self.trueMirror)
-        # self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror"
 
     def testOrients(self):
@@ -280,11 +270,8 @@ class ConvergenceTestM3(ConvergenceTestBase, TestCase):
 
 class ConvergenceTestSDSSM2(ConvergenceTestBase, TestCase):
     def setVars(self):
-        # self.userPort = getOpenPort()
-        # self.fakeGalilFactory = FakePiezoGalil
         self.trueMirror = mir25mSec
         self.mirror = getActEqEncMir(self.trueMirror)
-        # self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror"
 
     def testOrients(self):
@@ -296,11 +283,8 @@ class ConvergenceTestSDSSM2(ConvergenceTestBase, TestCase):
 
 class ConvergenceTestRandAct(ConvergenceTestBase, TestCase):
     def setVars(self):
-        # self.userPort = getOpenPort()
-        # self.fakeGalilFactory = FakeGalil
         self.trueMirror = mir35mSec
         self.mirror = getActRandMove(self.trueMirror, seed=45)
-        # self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror"
 
     def testOrients(self):
@@ -310,11 +294,8 @@ class ConvergenceTestPerfect(ConvergenceTestBase, TestCase):
     """model exactly represents truth, no iterations
     """
     def setVars(self):
-        # self.userPort = getOpenPort()
-        # self.fakeGalilFactory = FakeGalil
         self.trueMirror = mir35mSec
         self.mirror = getActEqEncMir(mir35mSec) # fake galil uses a non-perfect model
-        # self.mirDev = mirrorCtrl.GalilDevice
         self.name = "mirror"
 
     def testOrients(self):

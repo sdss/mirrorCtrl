@@ -18,13 +18,16 @@ from twistedActor import log
 
 from mirrorCtrl.perturbActuators import getActEqEncMir
 
-__all__ = ["FakeGalil", "FakePiezoGalil"]
+__all__ = ["FakeGalil"]
 
 MAXINT = 2147483647
 MaxCmdTime = 2.0 # maximum time any command can take; sec
 queueTime = 0.01 # time replies sit on queue before being sent.
 
 class FakeGalil(TCPServer):
+    # provided to be overridden on an instance by instance level
+    # if true random noise will be added to "encoder" measurements.
+    ADDNOISE = False
     def __init__(self,
             mirror,
             port=0,
@@ -77,6 +80,9 @@ class FakeGalil(TCPServer):
         self.encRes =  self.arrAB(-3.1496, 1.5750, dtype=float)
         self.status =  self.arr(8196*6)
         self.noiseRange = 700 # steps, +/- range for adding steps to a measurement
+        # piezo functionality
+        self.cmdPiezoPos = numpy.array([0]*3, dtype=int)
+        self.userPiezoNums = numpy.array([MAXINT]*3, dtype=int)
 
     def close(self):
         """Close the server
@@ -215,6 +221,14 @@ class FakeGalil(TCPServer):
             self.userNums[ind] = val
             return
 
+        cmdMatch = re.match(r"LDESPOS([A-F]) *= *((-)?\d+)$", cmdStr)
+        if cmdMatch:
+            axis = cmdMatch.groups()[0]
+            val = int(cmdMatch.groups()[1])
+            ind = ord(axis) - ord("A")
+            self.userPiezoNums[ind] = val
+            return
+
         cmdMatch = re.match(r"XQ *#([A-Z]+)", cmdStr)
         if not cmdMatch:
             if self.verbose:
@@ -229,6 +243,8 @@ class FakeGalil(TCPServer):
             self.sendLine("?")
             return
 
+        # piezo specifics
+        #print 'cmdStr: ', cmdStr
         cmdVerb = cmdMatch.groups()[0]
 
         if cmdVerb == "MOVE":
@@ -255,7 +271,10 @@ class FakeGalil(TCPServer):
 
         elif cmdVerb == "STOP":
             self.done()
-
+        elif cmdVerb == "LMOVE":
+            # round user nums to nearest st_fs step
+            newCmdPos = numpy.where(self.userPiezoNums == MAXINT, self.cmdPiezoPos, self.userPiezoNums)
+            self.movePiezo(newCmdPos)
         else:
             self.sendLine("?")
             self.done()
@@ -318,6 +337,7 @@ class FakeGalil(TCPServer):
         """!Reset userNums
         """
         self.userNums[:] = MAXINT
+        self.userPiezoNums[:] = MAXINT
 
     def formatArr(self, fmtStr, arr, suffix):
         """!Return a string of comma-separated values, a space, and a suffix
@@ -390,8 +410,10 @@ class FakeGalil(TCPServer):
         #moveTime = deltaTimeArr.max()
         self.cmdPos = newCmdPos
         # get random sample between -self.noiseRange and +self.noiseRange
-        #noise = numpy.random.random_sample(size=newCmdPos.shape)*2.*self.noiseRange - self.noiseRange
-        noise = numpy.zeros(len(newCmdPos))
+        if self.ADDNOISE:
+            noise = numpy.random.random_sample(size=newCmdPos.shape)*2.*self.noiseRange - self.noiseRange
+        else:
+            noise = numpy.zeros(len(newCmdPos))
         if 0 in self.encRes:
             # no noise should be added to any axis with a 0 encoder resolution
             zeroit = numpy.nonzero(self.encRes==0)
@@ -477,55 +499,6 @@ class FakeGalil(TCPServer):
         # else:
         #     log.warn("%s.sendLine(%r) failed: no socket" % (line,))
 
-
-class FakePiezoGalil(FakeGalil):
-    def __init__(self, mirror, port, verbose=False, wakeUpHomed=True, stateCallback=None):
-        """!A fake Galil with mock piezo behavior like the 2.5m M2 mirror
-
-        @param[in] mirror  a mirrorCtrl.mirror.Mirror object, the mirror this fake galil should emulate
-        @param[in] port  port on which to listen for connections
-        @param[in] verbose  bool. Print extra info to terminal?
-        @param[in] wakeUpHomed  bool. Should actuators be homed upon construction or not
-        @param[in] stateCallback  a function to call when this server changes state; receives one argument: this server
-        """
-        FakeGalil.__init__(self, mirror=mirror, port=port, verbose=verbose, wakeUpHomed=wakeUpHomed, stateCallback=stateCallback)
-        self.cmdPiezoPos = numpy.array([0]*3, dtype=int)
-        self.userPiezoNums = numpy.array([MAXINT]*3, dtype=int)
-
-    def processCmd(self, cmdStr):
-        """!Overwritten from base class to handle piezo commands also
-
-        @param[in] cmdStr  command string
-        """
-        # piezo specifics
-        #print 'cmdStr: ', cmdStr
-        cmdMatch = re.match(r"LDESPOS([A-F]) *= *((-)?\d+)$", cmdStr)
-        if cmdMatch:
-            axis = cmdMatch.groups()[0]
-            val = int(cmdMatch.groups()[1])
-            ind = ord(axis) - ord("A")
-            self.userPiezoNums[ind] = val
-            return
-
-
-        cmdMatch = re.match(r"XQ *#(L[A-Z]+)", cmdStr)
-        if cmdMatch and self.replyTimer.isActive:
-            # Busy, so reject new command
-            self.sendLine("?")
-            return
-        elif cmdMatch and cmdMatch.groups()[0] == "LMOVE":
-            # round user nums to nearest st_fs step
-            newCmdPos = numpy.where(self.userPiezoNums == MAXINT, self.cmdPiezoPos, self.userPiezoNums)
-            self.movePiezo(newCmdPos)
-        else:
-            # normal stuff
-            FakeGalil.processCmd(self, cmdStr)
-
-    def resetUserNums(self):
-        """!Reset userNums
-        """
-        self.userNums[:] = MAXINT
-        self.userPiezoNums[:] = MAXINT
 
     def movePiezo(self, piezoPos):
         """!Do a piezo move

@@ -31,6 +31,7 @@ class MirrorCtrl(Actor):
         @param[in] device    A Galil device from galilDevice.py
         @param[in] userPort  port on which to listen for client connections
         @param[in] maxUsers  maximum allowed simultaneous users
+        @param[in] name      the name of this mirror ctrl
         @param[in] doConnect  if True then connect devices on construction
         """
         self.statusTimer = Timer() # used to queue status after stop and reset commands,
