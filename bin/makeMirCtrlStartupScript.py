@@ -13,6 +13,8 @@ from twistedActor import makeStartupScript
 
 from mirrorCtrl.sec35mMirrorCtrl import Sec35mMirrorCtrl
 from mirrorCtrl.tert35mMirrorCtrl import Tert35mMirrorCtrl
+from mirrorCtrl.prim25mMirrorCtrl import Prim25mMirrorCtrl
+from mirrorCtrl.sec25mMirrorCtrl import Sec25mMirrorCtrl
 
 # dict of mirror name (lowercase): makeStartupScript argument dict
 _DataDict = {
@@ -30,10 +32,14 @@ _DataDict = {
     ),
     "prim25m": dict(
         actorName = "prim",
+        userPort = Prim25mMirrorCtrl.UserPort,
+        facility = Prim25mMirrorCtrl.Facility,
         binScript = "prim25m.py",
     ),
     "sec25m": dict(
         actorName = "sec",
+        userPort = Sec25mMirrorCtrl.UserPort,
+        facility = Sec25mMirrorCtrl.Facility,
         binScript = "sec25m.py",
     ),
 }
