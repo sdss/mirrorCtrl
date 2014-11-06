@@ -28,7 +28,7 @@ from twistedActor import TCPDevice, UserCmd, log, CommandQueue
 
 from .const import convOrient2UMArcsec
 
-__all__ = ["GalilDevice", "GalilDevice25Sec"]
+__all__ = ["GalilDevice", "GalilDevice25Sec", "GalilDevice25Prim"]
 
 ## a blank userCmd that is already set as done
 def getNullUserCmd(state):
@@ -188,7 +188,7 @@ class GalilStatus(object):
         # current move iteration
         self.iter = 0
         # max number allowed for move iterations
-        self.maxIter = device.MaxIter if self.mirror.hasEncoders else 1
+        self.maxIter = device.maxIter
         # status bits
         self.status = numpy.asarray([numpy.nan]*self.nAct)
         # acutators which are currently moving
@@ -297,10 +297,11 @@ class GalilDevice(TCPDevice):
     ## initial timeout to use for every device command (sec)
     DevCmdTimeout = 2.0
     # extra time for move to complete beyond Galil estimate (sec)
-    MoveExtraTime = 5.0 
+    MoveExtraTime = 5.0
     # scale the determined move offset correction by this much, eg go only 90%
     CorrectionStrength = 0.9
-    
+    # specify to round commanded moves to nearest integer amount
+    RoundMount = None
     def __init__(self, mirror, host, port, maxIter=5, callFunc=None):
         """Construct a GalilDevice
 
@@ -313,7 +314,7 @@ class GalilDevice(TCPDevice):
             Note that callFunc is NOT called when the connection state changes;
             register a callback with "conn" for that.
         """
-        self.MaxIter = maxIter
+        self.maxIter = maxIter if mirror.hasEncoders else 1
         self.mirror = mirror
         self.stTimer = Timer()
         TCPDevice.__init__(self,
@@ -860,7 +861,7 @@ class GalilDevice(TCPDevice):
 
 
     def cmdMove(self, userCmd, orient):
-        """Accepts an orientation then commands the move.
+        """!Accepts an orientation then commands the move.
 
         @param[in] userCmd  a twistedActor UserCmd object associated with this move command
         @param[in] orient  an orientation.
@@ -874,6 +875,10 @@ class GalilDevice(TCPDevice):
         desEncMount = self.mirror.encoderMountFromOrient(adjOrient, adjustOrient = False)
         adjOrient = numpy.asarray(adjOrient, dtype=float)
         mount = numpy.asarray(mount, dtype=float)
+        if self.RoundMount is not None:
+            roundedMount = numpy.round(mount/self.RoundMount)*self.RoundMount
+            log.info("Rounding mount units to nearest %i.  %s --> %s"%(self.RoundMount, str(mount), str(roundedMount)))
+            mount = roundedMount
         # check limits of travel
         for mt, link in itertools.izip(mount, self.mirror.actuatorList):
             if not (link.minMount <= mt <= link.maxMount):
@@ -895,8 +900,7 @@ class GalilDevice(TCPDevice):
                 self.status.cmdMount = mount[:] + numpy.asarray(self.status.netMountOffset, dtype=float) # this will change upon iteration
                 self.status.desOrient = adjOrient[:] # initial guess for fitter
                 self.status.desEncMount = desEncMount
-                if self.mirror.hasEncoders:
-                    self.status.iter = 1
+                self.status.iter = 1
                 self.status.desOrientAge.startTimer()
                 self.status.maxDuration = 0
                 self.status.duration.startTimer()
@@ -1005,14 +1009,14 @@ class GalilDevice(TCPDevice):
         self.status.mountErr = actErr[:]
         statusStr = self.status._getKeyValStr(["mountErr"])
         self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
-
         # error too large to correct?
-        if numpy.any(numpy.abs(actErr) > self.mirror.maxCorrList):
+        # mirror may not have maxCorrList (sdss primary)
+        if hasattr(self.mirror, "maxCorrList") and numpy.any(numpy.abs(actErr) > self.mirror.maxCorrList):
             self.currDevCmd.setState(self.currDevCmd.Failed, "Error too large to correct")
             return
 
         # perform another iteration?
-        if numpy.any(numpy.abs(actErr) > self.mirror.minCorrList) and (self.status.iter < self.status.maxIter):
+        if (self.status.iter < self.status.maxIter) and numpy.any(numpy.abs(actErr) > self.mirror.minCorrList):
             newCmdActPos = [err*self.CorrectionStrength + prevMount for err, prevMount in itertools.izip(actErr, self.status.cmdMount)]
             self.status.cmdMount = newCmdActPos
             # record the current offset which is total descrepancy between first commanded (naive) mount position
@@ -1193,6 +1197,7 @@ class GalilDevice25Sec(GalilDevice):
             # not piezo-related, try classical approach
             GalilDevice.actOnKey(self, key=key, dataList=dataList, replyStr=replyStr)
 
+
     def movePiezos(self):
         """Move piezo actuators to attempt to correct residual error
 
@@ -1238,3 +1243,82 @@ class GalilDevice25Sec(GalilDevice):
             # self.currDevCmd.setState(self.currDevCmd.Failed, "Piezo correction failed: %s" % (self.currDevCmd._textMsg,))
         else:
             self._devCmdCallback(self.currDevCmd) # will set self.userCmd to done
+
+
+class GalilDevice25Prim(GalilDevice):
+    # specify to round commanded moves to nearest integer amount
+    RoundMount = 50
+
+    def cmdMove(self, userCmd, orient):
+        """!Accepts an orientation then commands the move.
+
+        @param[in] userCmd  a twistedActor UserCmd object associated with this move command
+        @param[in] orient  an orientation, numpy array.
+
+        Subsequent moves are commanded until an acceptable orientation is reached (within errors).
+        Cmd not tied to state of devCmd, because of subsequent moves.
+
+        Special case:
+
+        If a commanded new orientation only differs by piston, then offset A, B and C by the same
+        number of integral WHOLE steps. This avoids unwanted tilts induced by moving small amounts in
+        A, B and C that get rounded differently by the Galil. The # of steps/microstep should be a
+        named parameter or constant that defaults to 50. To implement this feature, it will probably
+        be necessary always command positions that are exact multiples of microsteps/step (usually = 50),
+        and that is something all mirror controllers *could* do (though we might want to be able to disable it when MOFF=0).
+
+        question: how to handled desired encoder mount here?  It will always be discrepant. No iteration right? just the
+        commanded offset.
+        """
+
+        # note orientations are adjusted by the base class cmdMove routine
+        # however the sdss primary has 6 degrees of freedom so adjusted
+        # should always be equal to commanded, unit test this?
+        orientChanged = numpy.abs(numpy.asarray(orient[:5])-numpy.asarray(self.status.desOrient[:5])) > 1e-7
+        noChange = numpy.all(orientChanged==False)
+        pistonOnly = orientChanged[0]==True and numpy.all(orientChanged[1:]==False)
+        if noChange:
+            # do what?
+            log.info("Incoming orientation unchanged from previous desOrient")
+            pass
+        if pistonOnly:
+            # command A,B,C actuators equally, find the closest multiple of microstep/step
+            # note adjusted orient should be equal to input orient, because we have 6 degrees of freedome here.
+            mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient = True, adjustOrient = True)
+            desEncMount = self.mirror.encoderMountFromOrient(adjOrient, adjustOrient = False)
+            if numpy.any(numpy.abs(adjOrient[:5]-orient[:5])>1e-7):
+                log.warn("Adjusted and commanded orietations not equal! SDSS Primary:")
+                log.warn("Adjusted: [%s]  Commanded: [%s]"%(",".join(["%.2f"%o for o in adjOrient]), ",".join(["%.2f"%o for o in orient])))
+            # determine mount offset from current position for A,B,C actuators
+            # model mount is used because cmdMount includes a global offset which we dont care about
+            # this move will end up being an offset anyways
+            mountAvgDiffABC = numpy.mean(mount[:3] - self.status.modelMount[:3])
+            # round to nearest 50
+            pistonOffset = numpy.round(mountAvgDiffABC/self.RoundMount)*self.RoundMount
+            log.info("Pure pistion offset: %i steps, offsetting A,B,C equally"%pistonOffset)
+            cmdOffsetStr = self.formatGalilCommand(valueList=[pistonOffset]*3, cmd="XQ #MOVEREL", nAxes=3)
+
+            # check limits here?  for offset?
+
+            def whenRunning(cmd):
+                if cmd.state == cmd.Running:
+                    self.status.moving = 1.
+                    # append the offset to model mount
+                    for ii in range(3):
+                        self.status.modelMount[ii] += pistonOffset
+                    # how to deal with commanded mounts when offsetting?, like this?
+                    self.status.cmdMount = self.status.modelMount[:] + numpy.asarray(self.status.netMountOffset, dtype=float) # this will change upon iteration
+                    self.status.desOrient = adjOrient[:] # initial guess for fitter
+                    self.status.desEncMount = desEncMount
+                    self.status.desOrientAge.startTimer()
+                    self.status.maxDuration = 0
+                    self.status.duration.startTimer()
+                    userCmd.addCallback(self.writeState, callNow=True)
+                    statusStr = self.status._getKeyValStr(["desOrient", "cmdMount", "desOrientAge", "desEncMount", "modelMount", "maxIter"])
+                    self.writeToUsers('i', statusStr, cmd=userCmd)
+            userCmd.addCallback(whenRunning)
+            self.runCommand(userCmd, galilCmdStr=cmdOffsetStr, nextDevCmdCall=None)
+        else:
+            GalilDevice.cmdMove(self, userCmd, orient)
+
+
