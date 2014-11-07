@@ -12,13 +12,12 @@ GalilHost = "t-g-sdss-2"
 GalilPort = 2900 # terminal server port 9
 
 class Prim25mMirrorCtrl(MirrorCtrl):
-    Name = "sec25m"
+    Name = "prim25m"
     UserPort = 2531
     Facility = syslog.LOG_LOCAL2
     def __init__(self):
         MirrorCtrl.__init__(self,
             device = GalilDevice25Prim(
-                name = self.Name,
                 mirror = mir25mPrim,
                 host = GalilHost,
                 port = GalilPort,
