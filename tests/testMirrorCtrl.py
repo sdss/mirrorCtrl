@@ -18,8 +18,8 @@ RO.Comm.Generic.setFramework("twisted")
 from RO.Comm.TwistedTimer import Timer
 from opscore.actor import CmdVar
 
-from mirrorCtrl.mirrors import mir25mSec, mir35mTert
-from mirrorCtrl import FakePiezoGalil, MirrorDispatcherWrapper
+from mirrorCtrl.mirrors import mir35mTert
+from mirrorCtrl import MirrorDispatcherWrapper
 
 ## speed up fake galil responses
 import mirrorCtrl.fakeGalil
@@ -631,66 +631,6 @@ class GenericTests(TestCase):
         self.dispatcher.executeCmd(cmdVar)
         return d
 
-class PiezoTests(TestCase):
-    """Tests a piezo mirror setup
-    """
-    def setUp(self):
-        self.name = "piezomirror"
-        self.dw = MirrorDispatcherWrapper(
-            mirror=mir25mSec,
-            dictName=self.name,
-            galilClass=FakePiezoGalil,
-        )
-        return self.dw.readyDeferred
-
-    def tearDown(self):
-        from twisted.internet import reactor
-        delayedCalls = reactor.getDelayedCalls()
-        for call in delayedCalls:
-            call.cancel()
-        return self.dw.close()
-
-    @property
-    def dispatcher(self):
-        """Return the actor dispatcher that talks to the mirror controller
-        """
-        return self.dw.dispatcher
-
-    @property
-    def actor(self):
-        return self.dw.actorWrapper.actor
-
-    @property
-    def fakeGalil(self):
-        """Return the fake Galil (instance of FakeGalil)
-        """
-        return self.dw.actorWrapper.deviceWrapperList[0].controller
-
-    def testHome(self):
-        """Sets isHomed to false then tests home command.
-        checks:
-        1. command doesn't fail
-        2. all axes are set to homed on the model.
-        """
-        log.info("piezoTestHome")
-        # force all axes on the fakeGalil to unhomed
-        self.fakeGalil.isHomed = self.fakeGalil.isHomed*0.
-        d = Deferred()
-        cmdStr = 'home A,B,C,D,E'
-        cmdVar = CmdVar (
-                actor = self.name,
-                cmdStr = cmdStr,
-                callFunc = CmdCallback(d),
-            )
-        def checkResults(cb):
-            """Check results after cmdVar is done
-            """
-            self.assertFalse(cmdVar.didFail)
-            self.assertFalse( 0 in self.dispatcher.model.axisHomed.valueList[:], msg=str(self.dispatcher.model.axisHomed.valueList[:]))
-
-        d.addCallback(checkResults)
-        self.dispatcher.executeCmd(cmdVar)
-        return d
 
 if __name__ == '__main__':
     from unittest import main

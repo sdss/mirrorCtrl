@@ -23,11 +23,11 @@ __all__ = ["FakeGalil"]
 MAXINT = 2147483647
 MaxCmdTime = 2.0 # maximum time any command can take; sec
 queueTime = 0.01 # time replies sit on queue before being sent.
+ADDNOISE = False
 
 class FakeGalil(TCPServer):
     # provided to be overridden on an instance by instance level
     # if true random noise will be added to "encoder" measurements.
-    ADDNOISE = False
     def __init__(self,
             mirror,
             port=0,
@@ -410,7 +410,7 @@ class FakeGalil(TCPServer):
         #moveTime = deltaTimeArr.max()
         self.cmdPos = newCmdPos
         # get random sample between -self.noiseRange and +self.noiseRange
-        if self.ADDNOISE:
+        if ADDNOISE:
             noise = numpy.random.random_sample(size=newCmdPos.shape)*2.*self.noiseRange - self.noiseRange
         else:
             noise = numpy.zeros(len(newCmdPos))
@@ -424,6 +424,9 @@ class FakeGalil(TCPServer):
         # add noise to encoder measurement
         noisyEnc = trueEnc + noise
         self.measPos = noisyEnc
+        if not self.mirror.hasEncoders:
+            # no encoders, no noise
+            self.measPos = self.cmdPos[:]
 
  #       print "fake Galil Meas Pos", self.measPos
 #         noisyPos = newCmdPos + noise
