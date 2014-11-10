@@ -1223,8 +1223,8 @@ class GalilDevice25Sec(GalilDevice):
 
         @param[in] *args: passed automatically due to twistedActor callback framework
         """
-        GalilDevice._moveEnd(self, *args) # to ditch piezo moves
-        # self.movePiezos()
+        # GalilDevice._moveEnd(self, *args) # to ditch piezo moves
+        self.movePiezos()
 
     def _piezoMoveCallback(self, devCmd=None):
         """Called when the piezos are finished moving
