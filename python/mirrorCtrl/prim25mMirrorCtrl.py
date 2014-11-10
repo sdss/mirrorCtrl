@@ -10,6 +10,7 @@ __all__ = ["Prim25mMirrorCtrl"]
 
 GalilHost = "t-g-sdss-2"
 GalilPort = 2900 # terminal server port 9
+# GalilHost = "localhost"
 
 class Prim25mMirrorCtrl(MirrorCtrl):
     Name = "prim25m"

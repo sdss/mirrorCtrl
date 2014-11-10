@@ -10,11 +10,12 @@ __all__ = ["Sec25mMirrorCtrl"]
 
 GalilHost = "t-g-sdss-2"
 GalilPort = 3000 # terminal server port 10
+# GalilHost = "localhost"
 
 class Sec25mMirrorCtrl(MirrorCtrl):
     Name = "sec25m"
     UserPort = 2532
-    Facility = syslog.LOG_LOCAL2
+    Facility = syslog.LOG_LOCAL3
     def __init__(self):
         MirrorCtrl.__init__(self,
             device = GalilDevice25Sec(

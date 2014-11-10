@@ -1210,6 +1210,12 @@ class GalilDevice25Sec(GalilDevice):
         cmdStr = "%s; %s" % ("; ".join(argList), "XQ #LMOVE")
         #cmdStr = self.formatGalilCommand(actErr, "XQ #LMOVE", axisPrefix="LDESPOS", nAxes=3)
         self.replaceDevCmd(cmdStr, nextDevCmdCall=self._piezoMoveCallback)
+        # update timeout
+        if not self.currDevCmd.isDone:
+            # note still getting timeout
+            newTimeLim = 2
+            log.info("New time limit %0.2f sec for currDevCmd %r for piezo move" % (newTimeLim, self.currDevCmd))
+            self.currDevCmd.setTimeLimit(newTimeLim)
 
     def _moveEnd(self, *args):
         """Overwritten from base class, to allow for a piezo move command after all the
@@ -1217,7 +1223,8 @@ class GalilDevice25Sec(GalilDevice):
 
         @param[in] *args: passed automatically due to twistedActor callback framework
         """
-        self.movePiezos()
+        GalilDevice._moveEnd(self, *args) # to ditch piezo moves
+        # self.movePiezos()
 
     def _piezoMoveCallback(self, devCmd=None):
         """Called when the piezos are finished moving
