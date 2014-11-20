@@ -599,6 +599,9 @@ class GalilDevice(TCPDevice):
         if self.currDevCmd.isDone:
             log.info("Ignoring unsolicited output from Galil: %s " % replyStr)
             return
+        if self.currDevCmd.showReplies:
+            msgStr = "%sReply=%s" % (self.name, quoteStr(replyStr),)
+            self.writeToUsers(msgCode='i', msgStr=msgStr)
         if self.currDevCmd.cmdStr == "ST":
             log.info("ST issued; ignoring Galil reply: %s " % replyStr)
             return
@@ -659,12 +662,13 @@ class GalilDevice(TCPDevice):
                 self.actOnKey(key=key, dataList=[data], replyStr=replyStr)
                 self.parsedKeyList.append(key)
 
-    def runCommand(self, userCmd, galilCmdStr, nextDevCmdCall=None, forceKill=False):
+    def runCommand(self, userCmd, galilCmdStr, nextDevCmdCall=None, forceKill=False, showReplies=False):
         """Begin executing a device command (or series of device commands) in reponse to a userCmd.
 
         @param[in] userCmd  a user command, passed from the mirrorCtrl
         @param[in] nextDevCmdCall  None, or callable.  Callable to be executed upon the sucessfull completion of the device command
         @param[in] forceKill  bool. Should this command kill any currently executing command
+        @param[in] showReplies  show all replies as plain text?
 
         @throw RuntimeError if a userCommand is currently executing and a forceKill is is not requested.
         """
@@ -683,21 +687,22 @@ class GalilDevice(TCPDevice):
                 userCmd.setState(userCmd.Running)
             self.userCmd = userCmd
             self.userCmd.addCallback(self._userCmdCallback)
-            self.startDevCmd(galilCmdStr, nextDevCmdCall)
+            self.startDevCmd(galilCmdStr, nextDevCmdCall, showReplies=showReplies)
         self.userCmdQueue.addCmd(userCmd, queueFunc)
         log.info("%s.runCommand(userCmd=%r, galilCmdStr=%r, cmdQueue: %r"%(self, userCmd, galilCmdStr, self.userCmdQueue))
 
-    def startDevCmd(self, galilCmdStr, nextDevCmdCall=None):
+    def startDevCmd(self, galilCmdStr, nextDevCmdCall=None, showReplies=False):
         """
         @param[in] galilCmdStr  string, to be sent directly to the galil.
         @param[in] nextDevCmdCall  Callable to execute when the device command is done.
+        @param[in] showReplies  show all replies as plain text?
         """
         # print("%s.startDevCmd(galilCmdStr=%r, nextDevCmdCall=%r)" % (self, galilCmdStr, nextDevCmdCall))
         log.info("%s.startDevCmd(%r, nextDevCmdCall=%s)" % (self, galilCmdStr, nextDevCmdCall))
         if not self.currDevCmd.isDone:
             raise RuntimeError("Device command collision: userCmd=%r, currDevCmd=%r, desired galilCmdStr=%r" % \
                 (self.userCmd, self.currDevCmd, galilCmdStr))
-        self.currDevCmd = self.cmdClass(galilCmdStr, timeLim = self.DevCmdTimeout, callFunc=self._devCmdCallback, dev=self)
+        self.currDevCmd = self.cmdClass(galilCmdStr, timeLim = self.DevCmdTimeout, callFunc=self._devCmdCallback, dev=self, showReplies=showReplies)
         self.nextDevCmdCall = nextDevCmdCall
         self.parsedKeyList = []
         try:

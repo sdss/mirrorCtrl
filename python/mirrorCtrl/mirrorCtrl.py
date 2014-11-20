@@ -97,7 +97,7 @@ class MirrorCtrl(Actor):
             cmdStr += '; MG "OK"'
 
         try:
-            self.galil.runCommand(cmd, galilCmdStr=cmdStr)
+            self.galil.runCommand(cmd, galilCmdStr=cmdStr, showReplies=True)
         except Exception as e:
             traceback.print_exc(file=sys.stderr)
             raise CommandError(strFromException(e))
