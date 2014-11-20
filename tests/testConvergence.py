@@ -29,6 +29,7 @@ tertMoveList = pickle.load(open(os.path.join(pwd, "data/tertMoveList.p")))
 
 mirrorCtrl.galilDevice.MaxIter = 12
 mirrorCtrl.fakeGalil.MaxCmdTime = 0.025
+mirrorCtrl.fakeGalil.ADDNOISE = False # add no noise to encoder reading, assume perfect
 
 RussellsOrient = numpy.asarray([834.26, -24.03, 366.27, -192.64, 1388.21]) # in um, arcsec
 randInds = numpy.random.randint(0, len(secMoveList), 2)# a few random indices from real mirror positions from log
@@ -37,42 +38,6 @@ m2TestOrients.append(RussellsOrient)
 m3TestOrients = [numpy.asarray(d["desOrient"]) for d in [tertMoveList[ind] for ind in randInds]]
 
 LargePiston, LargeTilt, LargeTranslation = 500. * MMPerMicron, 10. * RadPerArcSec, 100. * MMPerMicron
-# def getActEqEncMir(mirror):
-#     """ Returns the same mirror as input, except actuators are moved to be exactly aligned with actuators
-#     @param[in] mirror  a MirrorBase instance
-#     @return a mirror instance with moved actuators
-#     """
-#     mirror = copy.deepcopy(mirror)
-#     for act, enc in itertools.izip(mirror.actuatorList, mirror.encoderList):
-#         act.mirPos = enc.mirPos[:]
-#         act.basePos = enc.basePos[:]
-#     return mirror
-
-# def getActRandMove(mirror, seed=10):
-#     """ Apply a random xy translation to ABC actuators,
-#         Apply a random z translation to DE actuators
-#     """
-#     enc0BasePos = mir35mSec.encoderList[0].basePos
-#     encRad = math.hypot(enc0BasePos[0], enc0BasePos[1])
-#     act0BasePos = mir35mSec.actuatorList[0].basePos
-#     actRad = math.hypot(act0BasePos[0], act0BasePos[1])
-#     numpy.random.seed(seed)
-#     mirror = copy.deepcopy(mirror)
-#     lengthScale = numpy.abs(actRad - encRad)*2.
-#     for act in mirror.actuatorList[:3]:
-#         # let offsets vary by magnitude of true offset in any direction
-#         xOff, yOff = numpy.random.sample(2)*2.*lengthScale - lengthScale
-#         offset = numpy.asarray([xOff, yOff, 0.])
-#         act.mirPos += offset
-#         act.basePos += offset
-#     for act in mirror.actuatorList[3:]:
-#         # let offset vary by magnitude of true offset in z direction
-#         zOff = numpy.random.sample()*2.*lengthScale*0.5 - lengthScale*0.5
-#         offset = numpy.asarray([0., 0., zOff])
-#         act.mirPos += offset
-#         act.basePos += offset
-#     return mirror
-
 
 class MirState(object):
     def __init__(self, mirror):
