@@ -6,10 +6,16 @@
 <body>
 <h1><a href="index.html">Mirror Controller</a> Version History</h1>
 
-<h3>1.0.3+ 2014-11-06</h3>
+<h3>1.0.4 2014-11-20</h3>
 
 <ul>
-    <li>Corrected some issues for SDSS: the mirror controller script and makeMirCtrlStartupScript both needed a bit of work.
+    <li>The "galil" breakthrough command now echoes all replies. Note that this means commands such as "galil XQ#SHOWPAR" will produce a lot of duplicated information: the raw output and the keywords produced by parsing that raw text.
+    <li>Improved SDSS 2.5m support, including:
+    <ul>
+        <li>Modifying Prim25mMirrorCtrl to use new GalilDevice25mPrim, a device that never introduces tilt for pure changes in focus.
+        <li>Finishing the prim25m.py and sec25m.py startup scripts.
+        <li>Adding SDSS support to makeMirCtrlStartupScript.py
+    </ul>
 </ul>
 
 <h3>1.0.3 2014-10-31</h3>

@@ -17,7 +17,6 @@ __all__ = ["mir35mTertInfLink"]
 
 import numpy
 import mirrorCtrl
-from mirrorCtrl.const import MMPerInch, RadPerDeg
 
 ## Mirror name
 Name = 'mir35mTertInfLink'
