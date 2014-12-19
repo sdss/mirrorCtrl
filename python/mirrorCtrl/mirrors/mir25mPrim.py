@@ -64,7 +64,7 @@ def _makeMirror():
     # and the corresponding PrimMountOffset in this file (values to physically center
     # the primary mirror in its cell) were:
     # PrimMountOffset  9700       800       5650      -1650      -6900      -6900
-    ActMountOffset = numpy.array([11300.,  -650.,  5500., -1650., -6900., -6900.])
+    ActMountOffset = numpy.array([10850., -450., 5750., -1650., -6900., -6900])
     # do we want a higher resolution scale?
     ActMountScale = numpy.array([15.696, 15.696, 15.696, 15.696,  33.22, 32.53])
 

@@ -16,6 +16,9 @@ notes:
             actuators but about 2 inches away (a greater theta)
             Could not measure transverse encoder offset, will assume the
             same offset as 3.5m secondary for now
+    12/19/14 - Talked to French verified with Russell set correct fixed link extension direction
+                setting enc == act for transverse (there are no real encoders)
+                setting all encoders to mir.dat actuator positions, offsetting actuators.
 """
 __all__ = ["mir25mSec"]
 
@@ -32,7 +35,7 @@ def _makeMirror():
     """
 
     # from 3.5m secondary.  THIS IS NOT VERIFIED TO BE TRUE FOR THIS MIRROR!!!!!
-    zEncOffsetTrans = 0.90 * MMPerInch # Transverse encoders are between actuator and glass.
+    # zEncOffsetTrans = 0.90 * MMPerInch # Transverse encoders are between actuator and glass.
 
     # Warnings:
     # - most of this info is from drawings and may be a bit off
@@ -82,8 +85,14 @@ def _makeMirror():
     for i in range(5):
         baseAct = numpy.array([ActBaseX[i], ActBaseY[i], ActBaseZ[i]])
         mirAct = numpy.array([ActMirX[i], ActMirY[i], ActMirZ[i]])
-        actuatorList.append(
-            mirrorCtrl.AdjBaseActuator(
+        # actuatorList.append(
+        #     mirrorCtrl.AdjBaseActuator(
+        #         baseAct, mirAct, ActMinMount[i],
+        #         ActMaxMount[i], ActMountScale[i], ActMountOffset[i]
+        #     )
+        # )
+        encoderList.append(
+            mirrorCtrl.AdjLengthLink(
                 baseAct, mirAct, ActMinMount[i],
                 ActMaxMount[i], ActMountScale[i], ActMountOffset[i]
             )
@@ -95,12 +104,21 @@ def _makeMirror():
             radius = numpy.sqrt(numpy.sum(mirAct[0:2]**2))
             theta = numpy.arctan2(mirAct[1], mirAct[0])
             # offset by 2 inch along circular arc
-            deltaTheta = 2 * MMPerInch / radius
+            # deltaTheta = 2 * MMPerInch / radius
+            # offset by -2 inch along circular arc
+            deltaTheta = -2 * MMPerInch / radius
             newTheta = theta + deltaTheta
             xPos = radius * numpy.cos(newTheta)
             yPos = radius * numpy.sin(newTheta)
-            encoderList.append(
-                mirrorCtrl.AdjLengthLink(
+            # encoderList.append(
+            #     mirrorCtrl.AdjLengthLink(
+            #         numpy.array([xPos, yPos, baseAct[2]]),
+            #         numpy.array([xPos, yPos, mirAct[2]]),
+            #         ActMinMount[i], ActMaxMount[i],
+            #         ActMountScale[i], ActMountOffset[i]
+            #     )
+            actuatorList.append(
+                mirrorCtrl.AdjBaseActuator(
                     numpy.array([xPos, yPos, baseAct[2]]),
                     numpy.array([xPos, yPos, mirAct[2]]),
                     ActMinMount[i], ActMaxMount[i],
@@ -108,11 +126,11 @@ def _makeMirror():
                 )
             )
         else:
-            # transverse encoders
-            encoderList.append(
-                mirrorCtrl.AdjLengthLink(
-                    numpy.array([baseAct[0], baseAct[1], baseAct[2] + zEncOffsetTrans]),
-                    numpy.array([mirAct[0], mirAct[1], mirAct[2] + zEncOffsetTrans]),
+            # transverse actuators == encoders
+            actuatorList.append(
+                mirrorCtrl.AdjBaseActuator(
+                    numpy.array([baseAct[0], baseAct[1], baseAct[2]]), # + zEncOffsetTrans]),
+                    numpy.array([mirAct[0], mirAct[1], mirAct[2]]),# + zEncOffsetTrans]),
                     ActMinMount[i], ActMaxMount[i],
                     ActMountScale[i], ActMountOffset[i]
                 )
@@ -125,7 +143,7 @@ def _makeMirror():
     # note: French's model has Z = 1 inch below glass, but I'm adopting Z = actuators' mir pos.
     fixedLinkList = []
     fixMirPos = numpy.array([0., -17.296 * MMPerInch, -193.0])
-    fixBasePos = numpy.array([13.125 * MMPerInch, -17.296 * MMPerInch, -193.0])
+    fixBasePos = numpy.array([-13.125 * MMPerInch, -17.296 * MMPerInch, -193.0])
     fixedLinkList.append(mirrorCtrl.FixedLengthLink(fixBasePos, fixMirPos))
 
     # minCorrList = [4.0e-5]*3 + [0]*2 # min correction (mm); 50 actuator microsteps
