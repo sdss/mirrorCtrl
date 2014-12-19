@@ -34,8 +34,8 @@ MaxMountAdjNoAdjErr = 0.5 # um
 # output produced from massOrient2Mount.for written by russell for mirror testing
 # with fortran tcc code.
 massOrientInFiles = [
-    os.path.join(dataDir, "massorient_out_25_1.dat"),
-    os.path.join(dataDir, 'massorient_out_25_2.dat'),
+    # os.path.join(dataDir, "massorient_out_25_1.dat"), mirrors changed (prim offsets)
+    # os.path.join(dataDir, 'massorient_out_25_2.dat'),
     os.path.join(dataDir, 'massorient_out_35_2.dat'),
 ]
 
