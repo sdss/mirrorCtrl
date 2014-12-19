@@ -8,3 +8,5 @@ from .mir35mTertInfLink import *
 from .mir35mTertFixedInfLink import *
 from .mir35mTertInfLinkNewEncPos import *
 from .mir35mSecOldModel import *
+from .mir25mPrimFortranTest import *
+from .mir25mSecFortranTest import *

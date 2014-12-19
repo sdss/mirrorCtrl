@@ -380,11 +380,11 @@ class GalilDevice(TCPDevice):
             newCmds = ['home'],
             queuedCmds = ['move'],
         )
-        cmdQueue.addRule(
-            action = CommandQueue.CancelNew,
-            newCmds = ['status'],
-            queuedCmds = ['status'],
-        )
+        # cmdQueue.addRule(
+        #     action = CommandQueue.CancelNew,
+        #     newCmds = ['status'],
+        #     queuedCmds = ['status'],
+        # )
         cmdQueue.addRule(
             action = CommandQueue.CancelNew,
             newCmds = ['showparams'],

@@ -10,7 +10,7 @@ import numpy
 import numpy.random
 import RO.Astro.Tm
 
-from mirrorCtrl.mirrors import mir35mSec, mir35mTert, mir25mSec, mir25mPrim
+from mirrorCtrl.mirrors import mir35mSec, mir35mTert, mir25mSecFortranTest, mir25mPrimFortranTest
 from mirrorCtrl.const import convOrient2UMArcsec, convOrient2MMRad, MMPerMicron
 
 numpy.random.seed(0)
@@ -34,8 +34,8 @@ MaxMountAdjNoAdjErr = 0.5 # um
 # output produced from massOrient2Mount.for written by russell for mirror testing
 # with fortran tcc code.
 massOrientInFiles = [
-    # os.path.join(dataDir, "massorient_out_25_1.dat"), mirrors changed (prim offsets)
-    # os.path.join(dataDir, 'massorient_out_25_2.dat'),
+    os.path.join(dataDir, "massorient_out_25_1.dat"),
+    os.path.join(dataDir, 'massorient_out_25_2.dat'),
     os.path.join(dataDir, 'massorient_out_35_2.dat'),
 ]
 
@@ -131,7 +131,7 @@ class TheSlurper(object):
             if useMirDat:
                 self.mirror = mirDict25[Mirrors[self.mirNum]]
             else:
-                self.mirror = mir25mSec if self.mirNum==1 else mir25mPrim
+                self.mirror = mir25mSecFortranTest if self.mirNum==1 else mir25mPrimFortranTest
         elif self.mirFile == 'mir_35m.dat':
             if useMirDat:
                 self.mirror = mirDict35[Mirrors[self.mirNum]]
