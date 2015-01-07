@@ -1290,9 +1290,11 @@ class GalilDevice25Prim(GalilDevice):
         noChange = numpy.all(orientChanged==False)
         pistonOnly = orientChanged[0]==True and numpy.all(orientChanged[1:]==False)
         if noChange:
-            # do what?
             log.info("(%r) Incoming orientation unchanged from previous desOrient"%self)
-            pass
+            # finish command and write status
+            self.writeState(cmd=userCmd)
+            userCmd.setState(userCmd.Done)
+            return
         if pistonOnly:
             # command A,B,C actuators equally, find the closest multiple of microstep/step
             # note adjusted orient should be equal to input orient, because we have 6 degrees of freedome here.
@@ -1330,7 +1332,7 @@ class GalilDevice25Prim(GalilDevice):
                     statusStr = self.status._getKeyValStr(["desOrient", "cmdMount", "desOrientAge", "desEncMount", "modelMount", "maxIter"])
                     self.writeToUsers('i', statusStr, cmd=userCmd)
             userCmd.addCallback(whenRunning)
-            self.runCommand(userCmd, galilCmdStr=cmdOffsetStr, nextDevCmdCall=None)
+            self.runCommand(userCmd, galilCmdStr=cmdOffsetStr, nextDevCmdCall=self._moveEnd)
         else:
             GalilDevice.cmdMove(self, userCmd, orient)
 
