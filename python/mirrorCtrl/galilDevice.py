@@ -1287,14 +1287,7 @@ class GalilDevice25Prim(GalilDevice):
         # however the sdss primary has 6 degrees of freedom so adjusted
         # should always be equal to commanded, unit test this?
         orientChanged = numpy.abs(numpy.asarray(orient[:5])-numpy.asarray(self.status.desOrient[:5])) > 1e-7
-        noChange = numpy.all(orientChanged==False)
         pistonOnly = orientChanged[0]==True and numpy.all(orientChanged[1:]==False)
-        if noChange:
-            log.info("(%r) Incoming orientation unchanged from previous desOrient"%self)
-            # finish command and write status
-            self.writeState(cmd=userCmd)
-            userCmd.setState(userCmd.Done)
-            return
         if pistonOnly:
             # command A,B,C actuators equally, find the closest multiple of microstep/step
             # note adjusted orient should be equal to input orient, because we have 6 degrees of freedome here.
