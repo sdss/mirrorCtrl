@@ -1255,7 +1255,7 @@ class GalilDevice25Sec(GalilDevice):
             # self.currDevCmd.setState(self.currDevCmd.Failed, "Piezo correction failed: %s" % (self.currDevCmd._textMsg,))
         else:
             self._devCmdCallback(self.currDevCmd) # will set self.userCmd to done
-
+            self.writeState(cmd=self.userCmdOrNone)
 
 class GalilDevice25Prim(GalilDevice):
     # specify to round commanded moves to nearest integer amount

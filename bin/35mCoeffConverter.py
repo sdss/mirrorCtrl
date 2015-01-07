@@ -243,8 +243,8 @@ def batchConvert(fromDir, toDir):
         FileConverter(inPath, outPath)
 
 if __name__ == "__main__":
-    fromDir = os.path.join(os.environ["TCC_DATA_DIR"], "instWithOldMirCoeffs")
-    toDir = os.path.join(os.environ["TCC_DATA_DIR"], "inst")
+    fromDir = os.path.join(os.environ["TCC_35MDATA_DIR"], "instWithOldMirCoeffs")
+    toDir = os.path.join(os.environ["TCC_35MDATA_DIR"], "inst")
     batchConvert(fromDir = fromDir, toDir=toDir)
 
 

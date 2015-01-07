@@ -2,8 +2,7 @@
 """Configuration of secondary mirror for 2.5m SDSS telescope
 
 To Do:
-1. need to incorporate actual encoder positions
-2. get actual address info
+-need to incorporate actual encoder positions (I have crude estimates from shutdown)
 3. French's model places the anti-rotation arm Z height = 1 inch below the glass. I don't know
     what the z offset from the vertex of the mirror is for this dimension. So I adoped the Z
     position of the A,B,C actuators instead.  Also the X and Y axes were not labeled, so
@@ -34,16 +33,6 @@ def _makeMirror():
     """Construct a 2.5m Secondary mirror
     """
 
-    # from 3.5m secondary.  THIS IS NOT VERIFIED TO BE TRUE FOR THIS MIRROR!!!!!
-    # zEncOffsetTrans = 0.90 * MMPerInch # Transverse encoders are between actuator and glass.
-
-    # Warnings:
-    # - most of this info is from drawings and may be a bit off
-    # - M2 offsets are based on feeler gauge measurements of
-    #   the position of the actuator puck in the hole
-    #-
-    #+
-    #+
     #      Secondary Mirror
     #
     # The secondary mirror has three axial actuators. In addition,
@@ -138,7 +127,6 @@ def _makeMirror():
 
 
     # Fixed Link from French's anti-rotation arm drawings.
-    # note: x and y poitions were not labeled, so may be transposed
 
     # note: French's model has Z = 1 inch below glass, but I'm adopting Z = actuators' mir pos.
     fixedLinkList = []
