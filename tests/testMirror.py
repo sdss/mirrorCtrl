@@ -7,7 +7,6 @@ import numpy.random
 import itertools
 import copy
 import pickle
-import matplotlib.pyplot as plt
 
 # This flag determines the initial guess to solve for orietation
 # If False: start from a noisy (but close) guess to the solution
@@ -43,19 +42,6 @@ for ind in range(len(MaxOrient)):
         fitOrient[ind] = MaxOrient[ind] * mult
         orientRange.append(fitOrient)
 
-# orientRange = numpy.zeros((resolution * 5, 5))
-# for ind, rng in enumerate(ranges):
-#     orientRange[ind*resolution:ind*resolution+resolution, ind] = rng
-#
-# # for 35m tert, don't command translations
-# tertOrientRange = orientRange[0:resolution*1,:]
-# # construct a set of random orientations.
-# num=5
-# orientRand = numpy.zeros((num, 5))
-# distRand = numpy.random.random_sample(num) * maxDist # pist, transXY
-# tiltRand = numpy.random.random_sample(num) * maxTilt
-# orientRand[:,[0, 3, 4]] = numpy.vstack((distRand, distRand, distRand)).T
-# orientRand[:,[1, 2]] = numpy.vstack((tiltRand, tiltRand)).T
 
 # choose what type of orientation set you want to use in tests, right now there are:
 # orientRange and orientRand
@@ -63,27 +49,6 @@ orientList = orientRange
 print "Testing %s orientations:" % (len(orientList),)
 for orient in orientList:
     print "* ", orient
-
-
-# choose which mirrors you want to include in the tests
-# there are options for various mirrors, eg fixing a link on the 2.5m primary
-# they are shown in genMirrors. genMirrors contains generally fictious mirrors
-# mirrors can be viewed using the plotMirror() method, eg: genMirrors.Prim25().plotMirror()
-# mirList = [genMirrors.Prim25().makeMirror(), # defaults to AdjBase actuators.
-#            genMirrors.Prim25(actType='adjLen').makeMirror(), # AdjLen (old) type actuators.
-#            genMirrors.Prim25(fix=1).makeMirror(),
-#            genMirrors.Prim25(fix=2).makeMirror(),
-#            genMirrors.Sec25().makeMirror(),
-#            genMirrors.Sec35().makeMirror(),
-#            genMirrors.Tert35().makeMirror(), # new non-inf length links
-#            genMirrors.Tert35(vers='old').makeMirror() # old semi-inf length links
-#            ]
-def plotABC(mirror):
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    for act, letter in itertools.izip(mirror.actuatorList[:3], ("A", "B", "C")):
-        ax.plot(act.mirPos[0], act.mirPos[1], 'or')
-        ax.annotate(letter, xy=act.mirPos[:2], xycoords='data')
 
 # mirrors can be viewed using the plotMirror() method, eg: mirrorCtrl.mirrors.mir25mPrim.plotMirror()
 # use the non-fictitous mirrors:
@@ -94,13 +59,7 @@ mirList = [
     mir35mTert,
 ]
 print 'mirList len: ', len(mirList)
-#from data.loadMirDat import mirDict35Adj
-#print 'mirDict35', mirDict35["tert"].plotMirror()
-#mirrorCtrl.mirrors.mir35mTert.plotMirror()
-# plotABC(mirDict35["tert"])
-# plt.show()
-# plotABC(mirrorCtrl.mirrors.mir35mTert)
-# plt.show()
+
 pwd = os.path.dirname(__file__)
 secMoveList = pickle.load(open(os.path.join(pwd, "data/secMoveList.p")))
 tertMoveList = pickle.load(open(os.path.join(pwd, "data/tertMoveList.p")))
@@ -113,7 +72,6 @@ class MirTests(unittest.TestCase):
         """Using a list of mirror log data from the 3.5m, check
         that the M2 and M3 conversions produced by our models are sane.
         """
-        # mountDiffs = []
         # just take a fraction of moveList
         numpy.random.shuffle(moveList)
         nAxes = len(mirror.actuatorList)
@@ -125,12 +83,7 @@ class MirTests(unittest.TestCase):
             encMountNew = numpy.asarray([mount/(2*act.maxMount) for mount, act in itertools.izip(encMount, mirror.actuatorList[:nAxes])])
             encMountNew = encMountNew[:nAxes]
             mountDiff = numpy.abs(actMountLog-encMountNew)
-            #print 'mount diff: ' + ",".join(["%.2f"%x for x in mountDiff])
             self.assertTrue(numpy.all(mountDiff < fract)) # lengths accurate to < 50 microns
-            # mountDiffs.append(mountDiff)
-        # mountDiffs = numpy.asarray(mountDiffs)
-        # plt.hist(mountDiffs.flatten(), 100)
-        # plt.show()
 
     def testSecBallPark(self):
         self._testBallPark(mirrorCtrl.mirrors.mir35mSec, secMoveList, .02)
