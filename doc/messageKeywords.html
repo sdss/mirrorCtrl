@@ -3,8 +3,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta name="description" content="Document created automatically on Fri Oct 31 13:19:20 2014 by rowen@Russells-MacBook-Pro.local using /Users/rowen/SDSS3/code/ops/actorkeys-newtcc/doc/describe.py">
-  <title>mirrorCtrl Message Keyword Dictionary</title>
+  <meta name="description" content="Document created automatically on Thu Feb  5 11:27:54 2015 by csayres@d-128-208-13-157.dhcp4.washington.edu using ./describe.py">
+  <title>mirror</title>
   <link rel="stylesheet" type="text/css" href="describe.css">
 </head>
 <div class="actor">
@@ -13,9 +13,9 @@
     <div class="keyname">actMount</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">Actuator lengths determined from encMount and the mirror model. This may not match cmdMount, even if the actuators move as commanded, due to systematic errors in the mirror model. For an actuator without an encoder, the commanded actuator mount is used. </span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
       <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
@@ -25,9 +25,9 @@
     <div class="keyname">axisHomed</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">Axes that are homed</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Bool (int,int2)</span></div>
       <div class="type descriptor"><span class="label">False</span><span class="value">0</span></div>
       <div class="type descriptor"><span class="label">True</span><span class="value">1</span></div>
@@ -57,9 +57,9 @@
     <div class="keyname">cmdMount</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">Commanded actuator lengths</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
       <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
@@ -69,9 +69,9 @@
     <div class="keyname">desEncMount</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">Desired encoder lengths, in actuator microsteps, based on desOrient and the mirror model. There is one entry per actuator, rather than one per encoder: for an actuator without an encoder, the commanded actuator mount is used.</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
       <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
@@ -138,9 +138,9 @@
     <div class="keyname">encMount</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">Reported encoder lengths, in actuator microsteps. There is one entry per actuator, rather than one per encoder: for an actuator without an encoder, the commanded actuator mount is used.</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
       <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
@@ -150,9 +150,9 @@
     <div class="keyname">galilACC</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">Maximum acceleration and deceleration of each axis</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps/sec^2</span></div>
     </div>
@@ -190,9 +190,9 @@
     <div class="keyname">galilENCRES</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">Resolution of encremental auxiliary encoder; 0 if no encoder</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">ticks/microstep</span></div>
     </div>
@@ -211,9 +211,9 @@
     <div class="keyname">galilHalfRNG</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">Half the range of motion</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
     </div>
@@ -222,9 +222,9 @@
     <div class="keyname">galilHMSPD</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">Max speed for finding home switch</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps/sec</span></div>
     </div>
@@ -233,9 +233,9 @@
     <div class="keyname">galilINDSEP</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">If this axis has an index pulse encoder and it is used for homing, then set to the separation between index pulses</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
     </div>
@@ -254,9 +254,9 @@
     <div class="keyname">galilMARG</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">Margin between the hard and soft reverse limits</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
     </div>
@@ -265,9 +265,9 @@
     <div class="keyname">galilMAXCORR</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">The max error that will be corrected at the end of a move. Set to 0 if no encoder or no correction is desired</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
     </div>
@@ -276,9 +276,9 @@
     <div class="keyname">galilMINCORR</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">The mininimum error that will be corrected, 0 means correct any error</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
     </div>
@@ -323,9 +323,9 @@
     <div class="keyname">galilSPD</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">Max speed</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps/sec</span></div>
     </div>
@@ -334,9 +334,9 @@
     <div class="keyname">galilST_FS</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">Step resolution; 1 for a servo motor</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps/full step</span></div>
     </div>
@@ -355,9 +355,9 @@
     <div class="keyname">homing</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">Axes that are currently homing</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Bool (int,int2)</span></div>
       <div class="type descriptor"><span class="label">False</span><span class="value">0</span></div>
       <div class="type descriptor"><span class="label">True</span><span class="value">1</span></div>
@@ -377,9 +377,9 @@
     <div class="keyname">modelMount</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">Actuator lengths determined from desOrient and the mirror model</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
       <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
@@ -389,9 +389,9 @@
     <div class="keyname">mountErr</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">Error in length for a given iteration. Apply this delta to cmdMount each iteration.</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
       <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
@@ -413,9 +413,9 @@
     <div class="keyname">netMountOffset</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">Offset applied to a model mount at the beginning of a move, to prevent motion for a null move and speed up convergence for a small move. It primarily  compensates for systematic error in the mirror model.</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
       <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
       <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
@@ -468,6 +468,67 @@
     </div>
   </div>
   <div class="key">
+    <div class="keyname">piezoCorr</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">piezo Corrections (microsteps)</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3 times</span></div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">piezoMaxPos</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Max piezo postion (microsteps)</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">piezoMinPos</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">Min piezo postion (microsteps)</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Float (float,flt4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">piezoNSteps</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">number of steps of piezo position</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">piezoResolution</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">resolution (microsteps/piezo ctrl bit)</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+      <div class="type descriptor"><span class="label">Units</span><span class="value">microsteps/piezo ctrl bit</span></div>
+    </div>
+  </div>
+  <div class="key">
+    <div class="keyname">piezoStatus</div>
+    <div class="keydesc">
+      <div class="key descriptor"><span class="label">Description</span><span class="value">1: piezo correction task halted. 2: piezo correction pause requested. 3: piezo corrections disabled</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">1</span></div>
+      <div class="separator">&nbsp;</div>
+      <div class="type descriptor"><span class="label">Type</span><span class="value">Int (int,int4)</span></div>
+      <div class="type descriptor"><span class="label">Invalid</span><span class="value">nan</span></div>
+    </div>
+  </div>
+  <div class="key">
     <div class="keyname">refCount</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">The reference count for an object</span></div>
@@ -510,9 +571,9 @@
     <div class="keyname">status</div>
     <div class="keydesc">
       <div class="key descriptor"><span class="label">Description</span><span class="value">see http://www.apo.nmsu.edu/Telescopes/HardwareControllers/GalilMirrorControllers.html#StatusWord</span></div>
-      <div class="key descriptor"><span class="label">Values</span><span class="value">3-5</span></div>
+      <div class="key descriptor"><span class="label">Values</span><span class="value">3-6</span></div>
       <div class="separator">&nbsp;</div>
-      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-5 times</span></div>
+      <div class="type descriptor"><span class="label">Repeated</span><span class="value">3-6 times</span></div>
       <div class="type descriptor"><span class="label">Type</span><span class="value">Bits (long,int4)</span></div>
       <div class="type descriptor"><span class="label">Field-0</span><span class="value">00000000000000000000000011111111 stopcode</span></div>
       <div class="type descriptor"><span class="label">Field-1</span><span class="value">11111111111111111111111100000000 statusword</span></div>
