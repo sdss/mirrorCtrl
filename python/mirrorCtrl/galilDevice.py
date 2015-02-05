@@ -1218,7 +1218,7 @@ class GalilDevice25Sec(GalilDevice):
         # update timeout
         if not self.currDevCmd.isDone:
             # note still getting timeout
-            newTimeLim = 2
+            newTimeLim = 4
             log.info("New time limit %0.2f sec for currDevCmd %r for piezo move" % (newTimeLim, self.currDevCmd))
             self.currDevCmd.setTimeLimit(newTimeLim)
 
