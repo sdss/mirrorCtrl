@@ -181,6 +181,8 @@ class MirrorCtrl(Actor):
         @param[in] cmd  new local user command (twistedActor.UserCmd)
         """
         # split on , and strip leading and trailing whitespace to make a list of single axis letters
+        if not cmd or not cmd.cmdArgs:
+            raise CommandError("No actuators specified")
         axisList = [arg.strip() for arg in cmd.cmdArgs.split(",") if arg.strip()]
         for arg in axisList:
             if len(arg) != 1:
