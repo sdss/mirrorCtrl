@@ -14,7 +14,7 @@
         <li><a href="#cmd_disconnDev">disconnDev</a>
         <li><a href="#cmd_exit">exit</a>
         <li><a href="#cmd_galil">galil <i>Galil command</i></a>
-        <li><a href="#cmd_home">home <i>[actuatorList]</i></a>
+        <li><a href="#cmd_home">home <i>actuatorList</i></a>
         <li><a href="#cmd_move">move <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a>
         <li><a href="#cmd_offset">offset <i>[piston [,tiltX [,tiltY [,transX [,transY]]]]]</i></a>
         <li><a href="#cmd_showparams">showparams</a>
@@ -69,9 +69,9 @@
 
 <p>Note: this command attempts to be clever about making sure it sees a terminating <code>OK</code> from the Galil. If your command includes an <code>XQ#...</code> command, or if your command ends with <code>MG "OK"</code> then it passes the command along "as is"; otherwise it appends <code>; MG "OK"</code> to your command.
 
-<h3><a name="cmd_home">home <i>[actuatorList]</i></a></h3>
+<h3><a name="cmd_home">home <i>actuatorList</i></a></h3>
 
-<p>Home the desired actuators, where actuator list is a comma-separated list of actuator letters A through F (but some mirrors have fewer than 6 actuators). If no axes are specified, all axes are homed:
+<p>Home the desired actuators, where actuator list is a comma-separated list of actuator letters A through F (but some mirrors have fewer than 6 actuators).
 <ul>
     <li>2.5m M1 valid actuators: A-F
     <li>2.5m M2 valid actuators: A-E

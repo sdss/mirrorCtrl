@@ -162,6 +162,29 @@ class GenericTests(TestCase):
         self.dispatcher.executeCmd(cmdVar)
         return d
 
+    def testBadHomeNoArgs(self):
+        """Sets isHomed to false then tests home command with no actuators specified.
+        checks:
+        1. command fails
+        2. all axes are set to homed on the model.
+        """
+        self.fakeGalil.isHomed = self.fakeGalil.isHomed*0.
+        d = Deferred()
+        cmdStr = 'home'
+        cmdVar = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr,
+                callFunc = CmdCallback(d),
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertTrue(cmdVar.didFail)
+
+        d.addCallback(checkResults)
+        self.dispatcher.executeCmd(cmdVar)
+        return d
+
     def testStatus(self):
         """tests the status command.  Set is homed to false first to verify that most recent values
         are being reported.
