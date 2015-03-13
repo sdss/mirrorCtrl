@@ -15,10 +15,9 @@ testUtils.init(__file__)
 
 import RO.Comm.Generic
 RO.Comm.Generic.setFramework("twisted")
-from RO.Comm.TwistedTimer import Timer
 from opscore.actor import CmdVar
 
-from mirrorCtrl.mirrors import mir35mTert, mir25mSec, mir25mPrim
+from mirrorCtrl.mirrors import mir25mSec
 from mirrorCtrl import MirrorDispatcherWrapper
 
 ## speed up fake galil responses
