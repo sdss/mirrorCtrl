@@ -329,7 +329,7 @@ class GenericTests(TestCase):
         def checkResults(cb):
             """Check results after cmdVar is done
             """
-            self.assertTrue(cmdMove1.didFail)
+            self.assertFalse(cmdMove1.didFail)
             self.assertFalse(cmdStatus.didFail)
             self.assertFalse(cmdMove2.didFail)
 
