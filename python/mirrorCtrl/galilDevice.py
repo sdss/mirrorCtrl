@@ -1123,6 +1123,7 @@ class GalilDevice25Sec(GalilDevice):
         mirror,
         host,
         port,
+        maxIter=5,
         callFunc=None,
     ):
         """Construct a GalilDevice25Sec
@@ -1130,6 +1131,7 @@ class GalilDevice25Sec(GalilDevice):
         @param[in] mirror  an instance of mirrorCtrl.MirrorBase
         @param[in] host  host address of Galil controller
         @param[in] port  port of Galil controller
+        @param[in] maxIter  the maximum number of iterations to refine the mirror position
         @param[in] callFunc  function to call when state of device changes;
             it receives one argument: this device.
             Note that callFunc is NOT called when the connection state changes;
@@ -1140,6 +1142,7 @@ class GalilDevice25Sec(GalilDevice):
             mirror = mirror,
             host = host,
             port = port,
+            maxIter = maxIter,
             callFunc = callFunc,
         )
         ## this mirror has extra status entries
