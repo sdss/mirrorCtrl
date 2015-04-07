@@ -1016,9 +1016,8 @@ class GalilDevice(TCPDevice):
         self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
         # error too large to correct?
         # mirror may not have maxCorrList (sdss primary)
-        if True: # force this
-        # if hasattr(self.mirror, "maxCorrList") and numpy.any(numpy.abs(actErr) > self.mirror.maxCorrList):
-            errMsg = "Mirror error too large to correct: devCmd=%r, userCmd=%r"%(self.currDevCmd, self.userCmdOrNone)
+        if hasattr(self.mirror, "maxCorrList") and numpy.any(numpy.abs(actErr) > self.mirror.maxCorrList):
+            errMsg = "%s error too large to correct: devCmd=%r, userCmd=%r"%(self.mirror.name, self.currDevCmd, self.userCmdOrNone)
             self.writeToUsers("w", "Text=\""+errMsg+"\"", cmd=self.userCmd)
             log.error(errMsg)
             # self.currDevCmd.setState(self.currDevCmd.Failed, "Error too large to correct")
