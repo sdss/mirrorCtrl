@@ -1016,12 +1016,19 @@ class GalilDevice(TCPDevice):
         self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
         # error too large to correct?
         # mirror may not have maxCorrList (sdss primary)
-        if hasattr(self.mirror, "maxCorrList") and numpy.any(numpy.abs(actErr) > self.mirror.maxCorrList):
-            self.currDevCmd.setState(self.currDevCmd.Failed, "Error too large to correct")
-            return
+        if True: # force this
+        # if hasattr(self.mirror, "maxCorrList") and numpy.any(numpy.abs(actErr) > self.mirror.maxCorrList):
+            errMsg = "Mirror error too large to correct: devCmd=%r, userCmd=%r"%(self.currDevCmd, self.userCmdOrNone)
+            self.writeToUsers("w", "Text=\""+errMsg+"\"", cmd=self.userCmd)
+            log.error(errMsg)
+            # self.currDevCmd.setState(self.currDevCmd.Failed, "Error too large to correct")
+            self.userCmd.setState(self.userCmd.Failed, "Error too large to correct") # will cleanup device commands
+
+            # allow move to end
+            # return
 
         # perform another iteration?
-        if (self.status.iter < self.status.maxIter) and numpy.any(numpy.abs(actErr) > self.mirror.minCorrList):
+        elif (self.status.iter < self.status.maxIter) and numpy.any(numpy.abs(actErr) > self.mirror.minCorrList):
             newCmdActPos = [err*self.CorrectionStrength + prevMount for err, prevMount in itertools.izip(actErr, self.status.cmdMount)]
             self.status.cmdMount = newCmdActPos
             # record the current offset which is total descrepancy between first commanded (naive) mount position
