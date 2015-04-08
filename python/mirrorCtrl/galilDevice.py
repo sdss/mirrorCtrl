@@ -1015,16 +1015,13 @@ class GalilDevice(TCPDevice):
         statusStr = self.status._getKeyValStr(["mountErr"])
         self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
         # error too large to correct?
-        # mirror may not have maxCorrList (sdss primary)
+        # mirror may not h
         if hasattr(self.mirror, "maxCorrList") and numpy.any(numpy.abs(actErr) > self.mirror.maxCorrList):
             errMsg = "%s error too large to correct: devCmd=%r, userCmd=%r"%(self.mirror.name, self.currDevCmd, self.userCmdOrNone)
-            self.writeToUsers("w", "Text=\""+errMsg+"\"", cmd=self.userCmd)
+            # self.writeToUsers("w", "Text=\""+errMsg+"\"", cmd=self.userCmd)
             log.error(errMsg)
-            # self.currDevCmd.setState(self.currDevCmd.Failed, "Error too large to correct")
-            self.userCmd.setState(self.userCmd.Failed, "Error too large to correct") # will cleanup device commands
-
-            # allow move to end
-            # return
+            self.userCmd.setState(self.userCmd.Failed, errMsg)
+            # allow move to end, so correct state info is shown after this event
 
         # perform another iteration?
         elif (self.status.iter < self.status.maxIter) and numpy.any(numpy.abs(actErr) > self.mirror.minCorrList):
@@ -1050,8 +1047,6 @@ class GalilDevice(TCPDevice):
             # self.writeToUsers("i", self.status.currentStatus(), cmd=self.userCmdOrNone)
             self.replaceDevCmd(cmdMoveStr, nextDevCmdCall=self._moveIter)
             return
-        # done
-        #self.status.netMountOffset = [cmdLast - cmdFirst for cmdFirst, cmdLast in itertools.izip(self.status.modelMount[0:self.nAct], self.status.cmdMount[0:self.nAct])]
         self._moveEnd()
 
     def _moveEnd(self, *args):
