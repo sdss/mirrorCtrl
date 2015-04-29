@@ -166,7 +166,7 @@ def _makeMirror():
     # minCorrList = [4.0e-5]*3 # min correction (mm); 50 actuator microsteps
     # maxCorrList = [0.79]*3   # max correction (mm); 1000000 actuator microsteps
 
-    minCorrList = [50]*3 # min correction actuator microsteps
+    minCorrList = [75]*3 # min correction actuator microsteps
     maxCorrList = [1000000]*3   # max correction actuator microsteps
 
     return mirrorCtrl.DirectMirror(

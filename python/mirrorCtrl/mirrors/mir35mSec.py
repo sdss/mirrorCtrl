@@ -161,7 +161,7 @@ def _makeMirror():
     # minCorrList = [4.0e-5]*3 + [0.0016]*2 # min correction (mm); 50 actuator microsteps for all actuators
     # maxCorrList = [0.79]*3   + [0.16]*2 # max correction (mm); 1000000 actuator microsteps for A-C; 5000 for D-E
 
-    minCorrList = [50]*5 # min correction (microsteps)
+    minCorrList = [75]*5 # min correction (microsteps)
     maxCorrList = [1000000]*3   + [5000]*2 # max correction (microsteps)
 
 

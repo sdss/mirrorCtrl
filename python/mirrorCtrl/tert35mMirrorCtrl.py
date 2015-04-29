@@ -22,6 +22,7 @@ class Tert35mMirrorCtrl(MirrorCtrl):
                 mirror = mir35mTert,
                 host = GalilHost,
                 port = GalilPort,
+                maxIter = 3,
             ),
             userPort = self.UserPort,
             name = self.Name,
