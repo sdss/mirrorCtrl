@@ -64,10 +64,11 @@ def _makeMirror():
     # and the corresponding PrimMountOffset in this file (values to physically center
     # the primary mirror in its cell) were:
     # PrimMountOffset  9700       800       5650      -1650      -6900      -6900
-    ActMountOffset = numpy.array([10850., -450., 5750., -1650., -6900., -6900])
+    # ActMountOffset = numpy.array([10850., -450., 5750., -1650., -6900., -6900])
     # True mechanical collimation offsets from Kaike's email: March 3, 2015 Re: Primary Mirror Numbers
     # Note: March 2015 testing, found no stars reverted to earlier mirror numbers
-    # ActMountOffset = numpy.array([9700., 800., 5650., -1650., -6900., -6900])
+    # Note: May 2015 testing, adjusted orientation values in inst/default.dat
+    ActMountOffset = numpy.array([9700., 800., 5650., -1650., -6900., -6900])
     # do we want a higher resolution scale?
     ActMountScale = numpy.array([15.696, 15.696, 15.696, 15.696,  33.22, 32.53])
 
