@@ -1265,6 +1265,17 @@ class GalilDevice25Prim(GalilDevice):
     # specify to round commanded moves to nearest integer amount
     RoundMount = 50
 
+    def isPistonOnly(self, orient):
+        """!Determine whether or not the orietation describes a piston only move
+
+        @param[in] orient  an orientation, numpy array.
+        @return bool
+        """
+        orientChanged = numpy.abs(numpy.asarray(orient[:5])-numpy.asarray(self.status.desOrient[:5])) > 1e-7
+        orientChanged[numpy.nonzero(self.status.desOrient[:5]==numpy.nan)] = True
+        return orientChanged[0]==True and numpy.all(orientChanged[1:]==False)
+
+
     def cmdMove(self, userCmd, orient):
         """!Accepts an orientation then commands the move.
 
@@ -1286,13 +1297,10 @@ class GalilDevice25Prim(GalilDevice):
         question: how to handled desired encoder mount here?  It will always be discrepant. No iteration right? just the
         commanded offset.
         """
-
         # note orientations are adjusted by the base class cmdMove routine
         # however the sdss primary has 6 degrees of freedom so adjusted
-        # should always be equal to commanded, unit test this?
-        orientChanged = numpy.abs(numpy.asarray(orient[:5])-numpy.asarray(self.status.desOrient[:5])) > 1e-7
-        pistonOnly = orientChanged[0]==True and numpy.all(orientChanged[1:]==False)
-        if pistonOnly:
+        # should always be equal to commanded
+        if self.isPistonOnly(orient):
             # command A,B,C actuators equally, find the closest multiple of microstep/step
             # note adjusted orient should be equal to input orient, because we have 6 degrees of freedome here.
             mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient = True, adjustOrient = True)
@@ -1306,7 +1314,7 @@ class GalilDevice25Prim(GalilDevice):
             mountAvgDiffABC = numpy.mean(mount[:3] - self.status.modelMount[:3])
             # round to nearest 50
             pistonOffset = numpy.round(mountAvgDiffABC/self.RoundMount)*self.RoundMount
-            log.info("(%r) Pure pistion offset: %i steps, offsetting A,B,C equally"%(self, pistonOffset))
+            log.info("Pure pistion offset: %i steps, offsetting A,B,C equally"%(pistonOffset))
             cmdOffsetStr = self.formatGalilCommand(valueList=[pistonOffset]*3, cmd="XQ #MOVEREL", nAxes=3)
 
             # check limits here?  for offset?
@@ -1331,6 +1339,7 @@ class GalilDevice25Prim(GalilDevice):
             userCmd.addCallback(whenRunning)
             self.runCommand(userCmd, galilCmdStr=cmdOffsetStr, nextDevCmdCall=self._moveEnd)
         else:
+            log.info("Not Pure piston offset: Previous orient: %s, Commanded Orient: %s"%(self.status.desOrient, orient))
             GalilDevice.cmdMove(self, userCmd, orient)
 
 
