@@ -103,6 +103,7 @@ class Test25mPrimTilt(TestCase):
 
     def cmdMove(self, galilDevice, orientation):
         cmd = UserCmd()
+        cmd.cmdVerb = "move"
         galilDevice.cmdMove(cmd, orientation)
         return cmd
 
