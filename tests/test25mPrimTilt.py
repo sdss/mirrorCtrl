@@ -199,6 +199,20 @@ class Test25mPrimTilt(TestCase):
             # print("")
             self.assertTrue(numpy.all(numpy.abs(numpy.subtract(mount1, mount2))<50))
 
+    def testMayEngOrients(self):
+        orientation1 = [0.00,-17.47*RadPerArcSec,11.84*RadPerArcSec,635.90*MMPerMicron,916.80*MMPerMicron,0.00]
+        orientation2 = [0.00,0.00,0.00,651.00*MMPerMicron,937.40*MMPerMicron,0.00]
+        mount1, adjOrient1 = self.galilDeviceNoTilt.mirror.actuatorMountFromOrient(orientation1, return_adjOrient = True, adjustOrient = True)
+        mount2, adjOrient2 = self.galilDeviceTilt.mirror.actuatorMountFromOrient(orientation2, return_adjOrient = True, adjustOrient = True)
+        # print("cmdMount1 ", mount1)
+        # print("adjOrient1 ", adjOrient1)
+        # print("cmdMount2 ", mount2)
+        # print("adjOrient2 ", adjOrient2)
+        # print("")
+        # print("mount Err: %s"%", ".join([str(x) for x in numpy.subtract(mount1, mount2)]))
+        # print("")
+        # print("")
+        self.assertTrue(numpy.all(numpy.abs(numpy.subtract(mount1, mount2))<50))
 
 if __name__ == '__main__':
     from unittest import main
