@@ -1266,15 +1266,18 @@ class GalilDevice25Prim(GalilDevice):
     RoundMount = 50
 
     def isPistonOnly(self, orient):
-        """!Determine whether or not the orietation describes a piston only move
+        """!Return True if the move only requests a change in piston (if that)
+
+        When a move does not change tilt or translation then all axial actuators must be moved
+        by the same amount (rounded to the nearest full step) to avoid introducing unwanted tilts
+        in the primary axis.
 
         @param[in] orient  an orientation, numpy array.
         @return bool
         """
-        orientChanged = numpy.abs(numpy.asarray(orient[:5])-numpy.asarray(self.status.desOrient[:5])) > 1e-7
-        orientChanged[numpy.nonzero(self.status.desOrient[:5]==numpy.nan)] = True
-        return orientChanged[0]==True and numpy.all(orientChanged[1:]==False)
-
+        # note: desOrient[i] being Nan (as happens at startup) results in orientUnchanged[i] False, as desired
+        orientUnchanged = numpy.abs(numpy.asarray(orient[1:5]) - numpy.asarray(self.status.desOrient[1:5])) < 1e-7
+        return numpy.all(orientUnchanged)
 
     def cmdMove(self, userCmd, orient):
         """!Accepts an orientation then commands the move.
@@ -1314,7 +1317,7 @@ class GalilDevice25Prim(GalilDevice):
             mountAvgDiffABC = numpy.mean(mount[:3] - self.status.modelMount[:3])
             # round to nearest 50
             pistonOffset = numpy.round(mountAvgDiffABC/self.RoundMount)*self.RoundMount
-            log.info("Pure pistion offset: %i steps, offsetting A,B,C equally"%(pistonOffset))
+            log.info("Pure piston offset: %i steps, offsetting A,B,C equally" % (pistonOffset,))
             cmdOffsetStr = self.formatGalilCommand(valueList=[pistonOffset]*3, cmd="XQ #MOVEREL", nAxes=3)
 
             # check limits here?  for offset?
@@ -1339,7 +1342,8 @@ class GalilDevice25Prim(GalilDevice):
             userCmd.addCallback(whenRunning)
             self.runCommand(userCmd, galilCmdStr=cmdOffsetStr, nextDevCmdCall=self._moveEnd)
         else:
-            log.info("Not Pure piston offset: Previous orient: %s, Commanded Orient: %s"%(self.status.desOrient, orient))
+            log.info("Multi-axis offset: Previous orient: %s, Commanded Orient: %s" %
+                (self.status.desOrient, orient))
             GalilDevice.cmdMove(self, userCmd, orient)
 
 
