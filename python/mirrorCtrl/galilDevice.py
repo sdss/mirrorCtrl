@@ -19,6 +19,7 @@ All mirrors w/ encoders, disable subsequent moves, we handle them here now
 import time
 import itertools
 import re
+import copy
 
 import numpy
 from RO.StringUtil import quoteStr, strFromException
@@ -901,8 +902,8 @@ class GalilDevice(TCPDevice):
         def whenRunning(cmd):
             if cmd.state == cmd.Running:
                 self.status.moving = 1.
-                self.status.modelMount = mount[:] # this will not change upon iteration
-                self.status.cmdMount = mount[:] + numpy.asarray(self.status.netMountOffset, dtype=float) # this will change upon iteration
+                self.status.modelMount = copy.deepcopy(mount) # this will not change upon iteration
+                self.status.cmdMount = copy.deepcopy(mount) + numpy.asarray(self.status.netMountOffset, dtype=float) # this will change upon iteration
                 self.status.desOrient = adjOrient[:] # initial guess for fitter
                 self.status.desEncMount = desEncMount
                 self.status.iter = 1
@@ -1265,16 +1266,40 @@ class GalilDevice25Prim(GalilDevice):
     # specify to round commanded moves to nearest integer amount
     RoundMount = 50
 
+    def _orientChanged(self, orient):
+        """!Determine if the orientation in any axis has changed
+        @param[in] orient  an orientation, numpy array.
+        @return 5 element array of booleans, representing if orient has changed in any axis
+        """
+        orientChanged = []
+        for ind in range(5):
+            # don't compare rotation value
+            newValue = orient[ind]
+            oldValue = self.status.desOrient[ind]
+            if oldValue != oldValue:
+                orientChanged.append(True)
+            else:
+                orientChanged.append(abs(oldValue-newValue)>1e-7)
+        return numpy.asarray(orientChanged)
+
     def isPistonOnly(self, orient):
-        """!Determine whether or not the orietation describes a piston only move
+        """!Determine whether or not the orietation describes a piston only move. Pistion must change for this
+        to return true (might wanna check for eg isSameOrientation first)
 
         @param[in] orient  an orientation, numpy array.
         @return bool
         """
-        orientChanged = numpy.abs(numpy.asarray(orient[:5])-numpy.asarray(self.status.desOrient[:5])) > 1e-7
-        orientChanged[numpy.nonzero(self.status.desOrient[:5]==numpy.nan)] = True
+        orientChanged = self._orientChanged(orient)
         return orientChanged[0]==True and numpy.all(orientChanged[1:]==False)
 
+    def isSameOrientation(self, orient):
+        """!Determine whether or not the orientation is identical to the current orientation
+
+        @param[in] orient
+        @return bool
+        """
+        orientChanged = self._orientChanged(orient)
+        return numpy.all(orientChanged==False)
 
     def cmdMove(self, userCmd, orient):
         """!Accepts an orientation then commands the move.
@@ -1300,7 +1325,11 @@ class GalilDevice25Prim(GalilDevice):
         # note orientations are adjusted by the base class cmdMove routine
         # however the sdss primary has 6 degrees of freedom so adjusted
         # should always be equal to commanded
-        if self.isPistonOnly(orient):
+        if self.isSameOrientation(orient):
+            # do nothing, set command done, we're already here
+            log.info("Received same orientation, doing nothing!: Previous orient: %s, Commanded Orient: %s"%(self.status.desOrient, orient))
+            userCmd.setState(userCmd.Done, textMsg="no change in orientation, setting done without commanding motion")
+        elif self.isPistonOnly(orient):
             # command A,B,C actuators equally, find the closest multiple of microstep/step
             # note adjusted orient should be equal to input orient, because we have 6 degrees of freedome here.
             mount, adjOrient = self.mirror.actuatorMountFromOrient(orient, return_adjOrient = True, adjustOrient = True)
@@ -1326,7 +1355,7 @@ class GalilDevice25Prim(GalilDevice):
                     for ii in range(3):
                         self.status.modelMount[ii] += pistonOffset
                     # how to deal with commanded mounts when offsetting?, like this?
-                    self.status.cmdMount = self.status.modelMount[:] + numpy.asarray(self.status.netMountOffset, dtype=float) # this will change upon iteration
+                    self.status.cmdMount = copy.deepcopy(self.status.modelMount) + numpy.asarray(self.status.netMountOffset, dtype=float) # this will change upon iteration
                     self.status.desOrient = adjOrient[:] # initial guess for fitter
                     self.status.desEncMount = desEncMount
                     self.status.iter = 1
