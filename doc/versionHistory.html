@@ -6,33 +6,55 @@
 <body>
 <h1><a href="index.html">Mirror Controller</a> Version History</h1>
 
+<h3>1.0.13b1 2015-08-25</h3>
+
+<ul>
+    <li>Bug fix: the SDSS primary might be tilted if two identical (or nearly identical) moves were commanded.
+    <li>Changed two log messages to make it easier to differentiate between them and to correct a spelling error:
+    <ul>
+        <li>"Pure Pistion offset" -> "Pure piston offset"
+        <li>"Not Pure piston offset" -> "Multi-axis offset"
+    </ul>
+    <li>Minor cleanups in galilDevice.py:
+    <ul>
+        <li>Changed % (foo) to % (foo,) in string formatting operations, since the string expects a tuple and (foo) is not.
+        <li>Added carriage returns to shorten some lines.
+    </ul>
+</ul>
+
+<h3>1.0.12 2015-07-23</h3>
+
+<ul>
+    <li>Updated primary mirror offsets (ActMountOffset) for post-shutdown mechanical collimation.
+</ul>
+
 <h3>1.0.11 2015-05-07</h3>
 <ul>
-    <li> 3.5m reduced M2 M3 max iter to 3, and increased min correction to 75
-    <li> 2.5m removed hidden tilts from 2.5m M1 (added tilts to inst/default.dat)
+    <li>3.5m reduced M2 M3 max iter to 3, and increased min correction to 75
+    <li>2.5m removed hidden tilts from 2.5m M1 (added tilts to inst/default.dat)
 </ul>
 
 <h3>1.0.10 2015-04-14</h3>
 <ul>
-    <li> Bug fix: large actuator errors will no longer produce RuntimeError.
+    <li>Bug fix: large actuator errors will no longer produce RuntimeError.
 </ul>
 
 <h3>1.0.8 2015-02-25</h3>
 
 <ul>
-    <li> Actuators must be specifed for home command (previously defaulted to all).
+    <li>Actuators must be specifed for home command (previously defaulted to all).
 </ul>
 
 <h3>1.0.7 2015-02-05</h3>
 
 <ul>
-    <li> Fixed unit test failure caused by excessively stringent comparison of floats after a fitting routine.
+    <li>Fixed unit test failure caused by excessively stringent comparison of floats after a fitting routine.
 </ul>
 
 <h3>1.0.6 2015-01-23</h3>
 
 <ul>
-    <li> Fixed unit test failure caused by excessively stringent comparison of floats after a fitting routine.
+    <li>Fixed unit test failure caused by excessively stringent comparison of floats after a fitting routine.
 </ul>
 
 <h3>Documentation update 2015-01-13</h3>
