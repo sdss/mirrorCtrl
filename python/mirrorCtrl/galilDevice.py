@@ -21,6 +21,7 @@ import itertools
 import re
 
 import numpy
+
 from RO.StringUtil import quoteStr, strFromException
 from RO.SeqUtil import asSequence
 from RO.Comm.TwistedTimer import Timer
@@ -136,7 +137,7 @@ class GalilTimer(object):
 
         Return nan if startTimer not called since construction or last reset.
         """
-        return "%.2f"%(self._getTime())
+        return "%.2f" % (self._getTime(),)
 
     def _getTime(self):
         return time.time() - self.initTime
@@ -300,8 +301,8 @@ class GalilDevice(TCPDevice):
     MoveExtraTime = 5.0
     # scale the determined move offset correction by this much, eg go only 90%
     CorrectionStrength = 0.9
-    # specify to round commanded moves to nearest integer amount
-    RoundMount = None
+    # specify an integer value to round commanded moves to the nearest full step
+    MicrostepsPerStep = None
     def __init__(self, mirror, host, port, maxIter=5, callFunc=None):
         """Construct a GalilDevice
 
@@ -522,7 +523,7 @@ class GalilDevice(TCPDevice):
             self.writeToUsers("i", msgStr, cmd=self.userCmdOrNone)
             return
 
-        elif TimeEstRegEx.match(key) and not "away" in key:# and ("full step" not in key): # ignore sec to find full step, cuts the timeout short!
+        elif TimeEstRegEx.match(key) and not "away" in key: # and ("full step" not in key): # ignore sec to find full step, cuts the timeout short!
             # contains information about estimated execution time
             dataList = numpy.asarray(dataList, dtype=float)
             maxTime = numpy.max(dataList) # get time for longest move
@@ -625,7 +626,8 @@ class GalilDevice(TCPDevice):
             # if cmd is failed instantly, the device could attribute the
             # following 'OK' as a reply for a different command.
             self.currDevCmd.setState(self.currDevCmd.Failing, textMsg=replyStr)
-            self.writeToUsers("w", "Text=\"Device Command %s Failing: %s\"" % (self.currDevCmd.cmdStr, replyStr,), cmd = self.currDevCmd)
+            self.writeToUsers("w", "Text=\"Device Command %s Failing: %s\"" % (self.currDevCmd.cmdStr, replyStr),
+                cmd = self.currDevCmd)
             return
         if OKLineRegEx.match(replyStr):
             # command finished
@@ -636,7 +638,8 @@ class GalilDevice(TCPDevice):
             else:
                 self.currDevCmd.setState(self.currDevCmd.Done)
             return
-        if CmdEchoRegEx.search(replyStr) or AxisEchoRegEx.search(replyStr) or GalCancelCmd.search(replyStr) or GalResetCmd.search(replyStr):
+        if CmdEchoRegEx.search(replyStr) or AxisEchoRegEx.search(replyStr) or GalCancelCmd.search(replyStr) \
+            or GalResetCmd.search(replyStr):
             # this is just the command echo (including possibly ST or RS) ignore it
             return
         if not StartsWithNumRegEx.match(replyStr):
@@ -666,13 +669,15 @@ class GalilDevice(TCPDevice):
         """Begin executing a device command (or series of device commands) in reponse to a userCmd.
 
         @param[in] userCmd  a user command, passed from the mirrorCtrl
-        @param[in] nextDevCmdCall  None, or callable.  Callable to be executed upon the sucessfull completion of the device command
+        @param[in] nextDevCmdCall  None, or callable.  Callable to be executed upon the sucessful completion
+                    of the device command
         @param[in] forceKill  bool. Should this command kill any currently executing command
         @param[in] showReplies  show all replies as plain text?
 
         @throw RuntimeError if a userCommand is currently executing and a forceKill is is not requested.
         """
-        log.info("%s.runCommand(userCmd=%r, galilCmdStr=%r, nextDevCmdCall=%r, forceKill=%r)" % (self, userCmd, galilCmdStr, nextDevCmdCall, forceKill))
+        log.info("%s.runCommand(userCmd=%r, galilCmdStr=%r, nextDevCmdCall=%r, forceKill=%r)" %
+            (self, userCmd, galilCmdStr, nextDevCmdCall, forceKill))
 
         def queueFunc(userCmd):
             if not self.userCmd.isDone:
@@ -680,7 +685,8 @@ class GalilDevice(TCPDevice):
                     log.info("New userCmd %s killing active userCmd %s" % (userCmd, self.userCmd))
                     self.clearAll() # need dev command to finish before rest of code here is executed
                 else:
-                    raise RuntimeError("User command collision! %s blocked by currently running %s!"%(userCmd, self.userCmd))
+                    raise RuntimeError("User command collision! %s blocked by currently running %s!" %
+                        (userCmd, self.userCmd))
             if userCmd is None:
                 userCmd = getNullUserCmd(UserCmd.Running)
             elif userCmd.state == userCmd.Ready:
@@ -689,7 +695,8 @@ class GalilDevice(TCPDevice):
             self.userCmd.addCallback(self._userCmdCallback)
             self.startDevCmd(galilCmdStr, nextDevCmdCall, showReplies=showReplies)
         self.userCmdQueue.addCmd(userCmd, queueFunc)
-        log.info("%s.runCommand(userCmd=%r, galilCmdStr=%r, cmdQueue: %r"%(self, userCmd, galilCmdStr, self.userCmdQueue))
+        log.info("%s.runCommand(userCmd=%r, galilCmdStr=%r, cmdQueue: %r" %
+            (self, userCmd, galilCmdStr, self.userCmdQueue))
 
     def startDevCmd(self, galilCmdStr, nextDevCmdCall=None, showReplies=False):
         """
@@ -702,7 +709,8 @@ class GalilDevice(TCPDevice):
         if not self.currDevCmd.isDone:
             raise RuntimeError("Device command collision: userCmd=%r, currDevCmd=%r, desired galilCmdStr=%r" % \
                 (self.userCmd, self.currDevCmd, galilCmdStr))
-        self.currDevCmd = self.cmdClass(galilCmdStr, timeLim = self.DevCmdTimeout, callFunc=self._devCmdCallback, dev=self, showReplies=showReplies)
+        self.currDevCmd = self.cmdClass(galilCmdStr, timeLim = self.DevCmdTimeout, callFunc=self._devCmdCallback,
+            dev=self, showReplies=showReplies)
         self.nextDevCmdCall = nextDevCmdCall
         self.parsedKeyList = []
         try:
@@ -880,9 +888,10 @@ class GalilDevice(TCPDevice):
         desEncMount = self.mirror.encoderMountFromOrient(adjOrient, adjustOrient = False)
         adjOrient = numpy.asarray(adjOrient, dtype=float)
         mount = numpy.asarray(mount, dtype=float)
-        if self.RoundMount is not None:
-            roundedMount = numpy.round(mount/self.RoundMount)*self.RoundMount
-            log.info("Rounding mount units to nearest %i.  %s --> %s"%(self.RoundMount, str(mount), str(roundedMount)))
+        if self.MicrostepsPerStep is not None:
+            roundedMount = numpy.round(mount/self.MicrostepsPerStep)*self.MicrostepsPerStep
+            log.info("Rounding mount units to nearest %i.  %s --> %s" % 
+                (self.MicrostepsPerStep, str(mount), str(roundedMount)))
             mount = roundedMount
         # check limits of travel
         for mt, link in itertools.izip(mount, self.mirror.actuatorList):
@@ -1017,7 +1026,8 @@ class GalilDevice(TCPDevice):
         # error too large to correct?
         # mirror may not h
         if hasattr(self.mirror, "maxCorrList") and numpy.any(numpy.abs(actErr) > self.mirror.maxCorrList):
-            errMsg = "%s error too large to correct: devCmd=%r, userCmd=%r"%(self.mirror.name, self.currDevCmd, self.userCmdOrNone)
+            errMsg = "%s error too large to correct: devCmd=%r, userCmd=%r" % \
+                (self.mirror.name, self.currDevCmd, self.userCmdOrNone)
             # self.writeToUsers("w", "Text=\""+errMsg+"\"", cmd=self.userCmd)
             log.error(errMsg)
             self.userCmd.setState(self.userCmd.Failed, errMsg)
@@ -1025,11 +1035,13 @@ class GalilDevice(TCPDevice):
 
         # perform another iteration?
         elif (self.status.iter < self.status.maxIter) and numpy.any(numpy.abs(actErr) > self.mirror.minCorrList):
-            newCmdActPos = [err*self.CorrectionStrength + prevMount for err, prevMount in itertools.izip(actErr, self.status.cmdMount)]
+            newCmdActPos = [err*self.CorrectionStrength + prevMount
+                for err, prevMount in itertools.izip(actErr, self.status.cmdMount)]
             self.status.cmdMount = newCmdActPos
             # record the current offset which is total descrepancy between first commanded (naive) mount position
             # and lastly commanded (iterated/converged) mount position
-            self.status.netMountOffset = [cmdLast - cmdFirst for cmdFirst, cmdLast in itertools.izip(self.status.modelMount[0:self.nAct], self.status.cmdMount[0:self.nAct])]
+            self.status.netMountOffset = [cmdLast - cmdFirst for cmdFirst, cmdLast in
+                itertools.izip(self.status.modelMount[0:self.nAct], self.status.cmdMount[0:self.nAct])]
             self.status.mountOrient = numpy.asarray(self.mirror.orientFromActuatorMount(newCmdActPos))
             # clear or update the relevant slots before beginning a new device cmd
             self.parsedKeyList = []
@@ -1262,8 +1274,14 @@ class GalilDevice25Sec(GalilDevice):
             self.writeState(cmd=self.userCmdOrNone)
 
 class GalilDevice25Prim(GalilDevice):
-    # specify to round commanded moves to nearest integer amount
-    RoundMount = 50
+    """!SDSS primary mirror device
+
+    This specialization works around a design issue in the SDSS primary mirror: the axial actuator resolution
+    is too coarse. Thus when commanding a pure piston move (no commanded change in tilt or translation)
+    it is crucial to move the axial actuators by the same amount (in full steps) to avoid introducing
+    an unwanted change in tilt.
+    """
+    MicrostepsPerStep = 50
 
     def isPistonOnly(self, orient):
         """!Return True if the move only requests a change in piston (if that)
@@ -1280,25 +1298,13 @@ class GalilDevice25Prim(GalilDevice):
         return numpy.all(orientUnchanged)
 
     def cmdMove(self, userCmd, orient):
-        """!Accepts an orientation then commands the move.
+        """!Move the mirror to the specified orientation
 
         @param[in] userCmd  a twistedActor UserCmd object associated with this move command
         @param[in] orient  an orientation, numpy array.
 
         Subsequent moves are commanded until an acceptable orientation is reached (within errors).
         Cmd not tied to state of devCmd, because of subsequent moves.
-
-        Special case:
-
-        If a commanded new orientation only differs by piston, then offset A, B and C by the same
-        number of integral WHOLE steps. This avoids unwanted tilts induced by moving small amounts in
-        A, B and C that get rounded differently by the Galil. The # of steps/microstep should be a
-        named parameter or constant that defaults to 50. To implement this feature, it will probably
-        be necessary always command positions that are exact multiples of microsteps/step (usually = 50),
-        and that is something all mirror controllers *could* do (though we might want to be able to disable it when MOFF=0).
-
-        question: how to handled desired encoder mount here?  It will always be discrepant. No iteration right? just the
-        commanded offset.
         """
         # note orientations are adjusted by the base class cmdMove routine
         # however the sdss primary has 6 degrees of freedom so adjusted
@@ -1310,13 +1316,14 @@ class GalilDevice25Prim(GalilDevice):
             desEncMount = self.mirror.encoderMountFromOrient(adjOrient, adjustOrient = False)
             if numpy.any(numpy.abs(adjOrient[:5]-orient[:5])>1e-7):
                 log.warn("(%r) Adjusted and commanded orietations not equal!"%self)
-                log.warn("(%r) Adjusted: [%s]  Commanded: [%s]"%(self, ",".join(["%.2f"%o for o in adjOrient]), ",".join(["%.2f"%o for o in orient])))
+                log.warn("(%r) Adjusted: [%s]  Commanded: [%s]" %
+                    (self, ",".join(["%.2f" % (o,) for o in adjOrient]), ",".join(["%.2f " % (o,) for o in orient])))
             # determine mount offset from current position for A,B,C actuators
             # model mount is used because cmdMount includes a global offset which we dont care about
             # this move will end up being an offset anyways
             mountAvgDiffABC = numpy.mean(mount[:3] - self.status.modelMount[:3])
-            # round to nearest 50
-            pistonOffset = numpy.round(mountAvgDiffABC/self.RoundMount)*self.RoundMount
+            # round to nearest MicrostepsPerStep
+            pistonOffset = numpy.round(mountAvgDiffABC/self.MicrostepsPerStep)*self.MicrostepsPerStep
             log.info("Pure piston offset: %i steps, offsetting A,B,C equally" % (pistonOffset,))
             cmdOffsetStr = self.formatGalilCommand(valueList=[pistonOffset]*3, cmd="XQ #MOVEREL", nAxes=3)
 
@@ -1329,7 +1336,8 @@ class GalilDevice25Prim(GalilDevice):
                     for ii in range(3):
                         self.status.modelMount[ii] += pistonOffset
                     # how to deal with commanded mounts when offsetting?, like this?
-                    self.status.cmdMount = self.status.modelMount[:] + numpy.asarray(self.status.netMountOffset, dtype=float) # this will change upon iteration
+                    self.status.cmdMount = self.status.modelMount[:] + \
+                        numpy.asarray(self.status.netMountOffset, dtype=float) # this will change upon iteration
                     self.status.desOrient = adjOrient[:] # initial guess for fitter
                     self.status.desEncMount = desEncMount
                     self.status.iter = 1
@@ -1337,7 +1345,8 @@ class GalilDevice25Prim(GalilDevice):
                     self.status.maxDuration = 0
                     self.status.duration.startTimer()
                     userCmd.addCallback(self.writeState, callNow=True)
-                    statusStr = self.status._getKeyValStr(["desOrient", "cmdMount", "desOrientAge", "desEncMount", "modelMount", "maxIter"])
+                    statusStr = self.status._getKeyValStr(
+                        ["desOrient", "cmdMount", "desOrientAge", "desEncMount", "modelMount", "maxIter"])
                     self.writeToUsers('i', statusStr, cmd=userCmd)
             userCmd.addCallback(whenRunning)
             self.runCommand(userCmd, galilCmdStr=cmdOffsetStr, nextDevCmdCall=self._moveEnd)
