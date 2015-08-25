@@ -58,8 +58,7 @@ class Test25mM1PurePiston(TestCase):
                 cmdMounts.append(self.galilDevice.status.cmdMount)
                 modelMounts.append(copy.deepcopy(self.galilDevice.status.modelMount))
                 #explicitly check computations
-                self.assertTrue(self.galilDevice.isSameOrientation(orientMMRad))
-                self.assertFalse(self.galilDevice.isPistonOnly(orientMMRad))
+                self.assertTrue(self.galilDevice.isPistonOnly(orientMMRad))
                 #really send the command and check state afterwards
                 self.galilDevice.cmdMove(userCmd2, orientMMRad)
         userCmd1.addCallback(sendOrientAgain)
@@ -98,7 +97,6 @@ class Test25mM1PurePiston(TestCase):
                 cmdMounts.append(self.galilDevice.status.cmdMount)
                 modelMounts.append(copy.deepcopy(self.galilDevice.status.modelMount)) # why the deep copy needed?, trust me it is needed
                 #explicitly check computations
-                self.assertFalse(self.galilDevice.isSameOrientation(pistonOrient))
                 self.assertTrue(self.galilDevice.isPistonOnly(pistonOrient))
                 #really send the command and check state afterwards
                 self.galilDevice.cmdMove(userCmd2, pistonOrient)
@@ -119,7 +117,6 @@ class Test25mM1PurePiston(TestCase):
                 cmdMounts.append(self.galilDevice.status.cmdMount)
                 modelMounts.append(copy.deepcopy(self.galilDevice.status.modelMount)) # why the deep copy needed?, trust me it is needed
                 #explicitly check computations
-                self.assertFalse(self.galilDevice.isSameOrientation(pistonOrient))
                 self.assertTrue(self.galilDevice.isPistonOnly(pistonOrient))
                 #really send the command and check state afterwards
                 self.galilDevice.cmdMove(userCmd2, pistonOrient)
