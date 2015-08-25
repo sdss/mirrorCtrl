@@ -14,8 +14,6 @@ from mpl_toolkits.mplot3d import Axes3D
 
 __all__ = ["MirrorBase", "DirectMirror", "TipTransMirror"]
 
-numpy.seterr(all='raise')
-
 ## Tolerance parameter used in scipy minimization routine
 _FitTol = 1e-8
 ## Maximum iterations to user in scipy minimization routine
