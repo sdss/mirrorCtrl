@@ -863,6 +863,13 @@ class GalilDevice(TCPDevice):
 
         def whenRunning(cmd):
             if cmd.state==cmd.Running:
+                # get rid of desired orientation.
+                # If this isn't NaN'd the SDSS M1 mirror device
+                # will not be able to offset back to the nominal
+                # zero position after a home of the ABC axis.
+                # also i think i just makes sense to get rid of a
+                # desiredOrient in the homing context.
+                self.status.desOrient = numpy.asarray([numpy.nan]*6)
                 self.status.homing = newHoming
                 self.writeToUsers(">", "Text = \"Homing Actuators: %s\"" % (", ".join(str(v) for v in axisList)), cmd=userCmd)
                 updateStr = self.status._getKeyValStr(["homing"])
