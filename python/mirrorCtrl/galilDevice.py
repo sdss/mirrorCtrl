@@ -891,7 +891,7 @@ class GalilDevice(TCPDevice):
         mount = numpy.asarray(mount, dtype=float)
         if self.MicrostepsPerStep is not None:
             roundedMount = numpy.round(mount/self.MicrostepsPerStep)*self.MicrostepsPerStep
-            log.info("Rounding mount units to nearest %i.  %s --> %s" % 
+            log.info("Rounding mount units to nearest %i.  %s --> %s" %
                 (self.MicrostepsPerStep, str(mount), str(roundedMount)))
             mount = roundedMount
         # check limits of travel
@@ -1324,7 +1324,12 @@ class GalilDevice25Prim(GalilDevice):
             # this move will end up being an offset anyways
             mountAvgDiffABC = numpy.mean(mount[:3] - self.status.modelMount[:3])
             # round to nearest MicrostepsPerStep
-            pistonOffset = numpy.round(mountAvgDiffABC/self.MicrostepsPerStep)*self.MicrostepsPerStep
+            pistonOffset = int(numpy.round(mountAvgDiffABC/self.MicrostepsPerStep)*self.MicrostepsPerStep)
+            if pistonOffset == 0:
+                # rather than command a 0 offset set the move command done.
+                log.info("Piston offset = 0, setting command done")
+                userCmd.setState(userCmd.Done, "Zero offset commanded.  Setting move done")
+                return
             log.info("Pure piston offset: %i steps, offsetting A,B,C equally" % (pistonOffset,))
             cmdOffsetStr = self.formatGalilCommand(valueList=[pistonOffset]*3, cmd="XQ #MOVEREL", nAxes=3)
 
