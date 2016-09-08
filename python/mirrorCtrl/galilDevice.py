@@ -961,6 +961,8 @@ class GalilDevice(TCPDevice):
         3. send XQ#STATUS, wait for ok
         4. set userCmd to Done.
         """
+        # zero out the desired position if a stop or init was commanded
+        self.status.desOrient = numpy.asarray([numpy.nan]*6)
         if not hasattr(userCmd, "cmdVerb"):
             userCmd.cmdVerb = "stop" # cmdVerb used by queue
 
