@@ -654,6 +654,26 @@ class GenericTests(TestCase):
         self.dispatcher.executeCmd(cmdVar)
         return d
 
+    def testActPos(self):
+        """Test the actuator pos command
+        """
+        log.info("testActPos")
+        d = Deferred()
+        nActuators = len(self.actor.galil.mirror.actuatorList)
+        cmdStr = "actpos %s"%(",".join(["0"]*nActuators))
+        cmdVar = CmdVar (
+                actor = self.name,
+                cmdStr = cmdStr,
+                callFunc = CmdCallback(d),
+            )
+        def checkResults(cb):
+            """Check results after cmdVar is done
+            """
+            self.assertFalse(cmdVar.didFail)
+        d.addCallback(checkResults)
+        self.dispatcher.executeCmd(cmdVar)
+        return d
+
 class Base25mTests(object):
     """Tests a for 2.5m mirrors
     """

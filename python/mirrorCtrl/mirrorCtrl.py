@@ -104,6 +104,33 @@ class MirrorCtrl(Actor):
         return True
         # cmd.setState(cmd.Done)
 
+    def cmd_actpos(self, cmd):
+        """!Move actuators to a commanded position
+
+        @param[in] cmd new local user command (twistedActor.UserCmd)
+
+        Pass comma separated arguments of lenth equal to number of actuators for this mirror.
+        Units are steps.
+        """
+        if not cmd or not cmd.cmdArgs:
+            raise CommandError("No values specified")
+        try:
+            cmdArgList = numpy.asarray(cmd.cmdArgs.split(","), dtype=float)
+        except Exception:
+            raise CommandError("Could not parse %s as a comma-separated list of floats" % (cmd.cmdArgs,))
+        if (len(cmdArgList) != len(self.galil.mirror.actuatorList)):
+            raise CommandError("Must specify %i values for this mirror; got %s" % (len(self.galil.mirror.actuatorList), len(cmdArgList)))
+        if not self.galil.conn.isConnected:
+            raise CommandError("Device Not Connected")
+        try:
+            self.galil.cmdActMove(cmd, mount=cmdArgList)
+        except Exception as e:
+            traceback.print_exc(file=sys.stderr)
+            raise CommandError(strFromException(e))
+
+        return True
+
+
     def cmd_move(self, cmd):
         """!Move mirror to a commanded orientation, if device isn't busy.
 

@@ -874,12 +874,48 @@ class GalilDevice(TCPDevice):
                 self.writeToUsers(">", "Text = \"Homing Actuators: %s\"" % (", ".join(str(v) for v in axisList)), cmd=userCmd)
                 updateStr = self.status._getKeyValStr(["homing"])
                 self.writeToUsers("i", updateStr, cmd=userCmd)
+                self.writeToUsers("i", "Text = zeroing previous mount offset")
+                self.status.netMountOffset = numpy.asarray([0.]*self.nAct)
                 self.status.maxDuration = 0
                 self.status.duration.startTimer()
                 userCmd.addCallback(self.writeState, callNow=True)
         userCmd.addCallback(whenRunning)
         self.runCommand(userCmd, galilCmdStr=cmdStr)
 
+    def cmdActMove(self, userCmd, mount):
+        """!Move acutators to mountPosition
+
+        @param[in] userCmd  a twistedActor UserCmd object associated with this move command
+        @param[in] mountPosition  positions at which to move the actuators  List of length equal
+             to number of actuator for this mirror.
+        """
+        # check limits of travel
+        for mt, link in itertools.izip(mount, self.mirror.actuatorList):
+            if not (link.minMount <= mt <= link.maxMount):
+                userCmd.setState(userCmd.Failed, "Commanded actuator values %s violate mount limits" % str(mount))
+                return
+        cmdMoveStr = self.formatGalilCommand(valueList=mount, cmd="XQ #MOVE")
+        # determine orientation, etc the mirror will be in based on the provided actuator positions
+        orientation = numpy.asarray(self.mirror.orientFromActuatorMount(mount))
+        encMount = numpy.asarray(self.mirror.encoderMountFromOrient(orientation, adjustOrient = False))
+        def whenRunning(cmd):
+            if cmd.state == cmd.Running:
+                print("act command running")
+                self.status.moving = 1.
+                self.status.modelMount = copy.deepcopy(mount) # this will not change upon iteration
+                self.status.cmdMount = copy.deepcopy(mount)
+                # compute the mirror orientation for this move
+                self.status.desOrient = orientation # initial guess for fitter
+                self.status.desEncMount = encMount
+                self.status.iter = 1
+                self.status.desOrientAge.startTimer()
+                self.status.maxDuration = 0
+                self.status.duration.startTimer()
+                userCmd.addCallback(self.writeState, callNow=True)
+                statusStr = self.status._getKeyValStr(["desOrient", "cmdMount", "desOrientAge", "desEncMount", "modelMount", "maxIter"])
+                self.writeToUsers('i', statusStr, cmd=userCmd)
+        userCmd.addCallback(whenRunning)
+        self.runCommand(userCmd, galilCmdStr=cmdMoveStr, nextDevCmdCall=self._moveEnd)
 
     def cmdMove(self, userCmd, orient):
         """!Accepts an orientation then commands the move.
