@@ -21,7 +21,7 @@ class Sec35mMirrorCtrl(MirrorCtrl):
                 mirror = mir35mSec,
                 host = GalilHost,
                 port = GalilPort,
-                maxIter = 3,
+                maxIter = 5,
             ),
             userPort = self.UserPort,
             name = self.Name,

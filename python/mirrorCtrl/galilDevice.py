@@ -367,11 +367,11 @@ class GalilDevice(TCPDevice):
                 "showparams" : 1,
             }
         )
-        # cmdQueue.addRule(
-        #     action = CommandQueue.KillRunning, # note this will also cancel a queued move
-        #     newCmds = ['move'],
-        #     queuedCmds = ['move'],
-        # )
+        cmdQueue.addRule(
+            action = CommandQueue.CancelQueued, # note this will also cancel a queued move
+            newCmds = ['move'],
+            queuedCmds = ['move'],
+        )
         cmdQueue.addRule(
             action = CommandQueue.CancelNew,
             newCmds = ['move'],
