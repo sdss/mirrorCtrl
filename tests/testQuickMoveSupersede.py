@@ -93,7 +93,7 @@ class TestMoveSupersede(TestCase):
         def checkResults(cb):
             """Check results after cmdVar is done
             """
-            self.assertFalse(cmdMove1.didFail) # move is superseded but doesn't fail
+            self.assertTrue(cmdMove1.didFail) # move is superseded and does fail
             self.assertFalse(cmdMove2.didFail)
         dBoth.addCallback(checkResults)
         # self.dispatcher.executeCmd(cmdMove1)

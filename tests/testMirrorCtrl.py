@@ -337,7 +337,8 @@ class GenericTests(TestCase):
         self.dispatcher.executeCmd(cmdStatus)
         # self.dispatcher.executeCmd(cmdMove1)
         Timer(0.02, self.dispatcher.executeCmd, cmdMove1)
-        Timer(0.04, self.dispatcher.executeCmd, cmdMove2)
+        # Timer(0.04, self.dispatcher.executeCmd, cmdMove2)
+        Timer(1, self.dispatcher.executeCmd, cmdMove2)
         # self.dispatcher.executeCmd(cmdMove2)
         return dAll
 
