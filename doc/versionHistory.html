@@ -6,6 +6,12 @@
 <body>
 <h1><a href="index.html">Mirror Controller</a> Version History</h1>
 
+<h3>1.1.0 2017-06-14</h3>
+<ul>
+    <li>Add actpos command for explicitly commanding actuator lengths
+    <li>No longer queue moves.  New moves will supercede any pending moves, but currently executing moves will run to completion.
+</ul>
+
 <h3>1.0.15 2016-09-08</h3>
 <ul>
     <li>Zero out desired orientation when home, stop, or init is commanded.  This fixes a bug for the SDSS M1 controller in which the mirror will not move back to the previously commanded orientation after a home, because it thinks it is already there!
