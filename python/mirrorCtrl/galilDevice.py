@@ -323,6 +323,7 @@ class GalilDevice(TCPDevice):
         self.mirror = mirror
         self.stTimer = Timer()
         self.statusTimer = Timer()
+        self.statusTimer.start(self.StatusInterval, self.cmdStatus, expandCommand())
         TCPDevice.__init__(self,
             name = "galil",
             host = host,
