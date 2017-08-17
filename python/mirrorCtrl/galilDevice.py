@@ -26,7 +26,7 @@ import numpy
 from RO.StringUtil import quoteStr, strFromException
 from RO.SeqUtil import asSequence
 from RO.Comm.TwistedTimer import Timer
-from twistedActor import TCPDevice, UserCmd, log, CommandQueue
+from twistedActor import TCPDevice, UserCmd, log, CommandQueue, expandCommand
 
 from .const import convOrient2UMArcsec
 
@@ -224,6 +224,7 @@ class GalilStatus(object):
 
     def cleanup(self):
         self.stTimer.cancel()
+        self.statusTimer.cancel()
 
     def _getKeyValStr(self, keywords):
         """Package and return current keyword value info in status cache
@@ -304,6 +305,8 @@ class GalilDevice(TCPDevice):
     CorrectionStrength = 0.9
     # specify an integer value to round commanded moves to the nearest full step
     MicrostepsPerStep = None
+    # query for status at this interval, to keep the port from timing out
+    StatusInterval = 60.
     def __init__(self, mirror, host, port, maxIter=5, callFunc=None):
         """Construct a GalilDevice
 
@@ -319,6 +322,7 @@ class GalilDevice(TCPDevice):
         self.maxIter = maxIter if mirror.hasEncoders else 1
         self.mirror = mirror
         self.stTimer = Timer()
+        self.statusTimer = Timer()
         TCPDevice.__init__(self,
             name = "galil",
             host = host,
@@ -1035,6 +1039,7 @@ class GalilDevice(TCPDevice):
 
         If the Galil is busy then returns cached data.
         """
+        self.statusTimer.cancel()
         if self.userCmdQueue.currExeCmd.cmd.isDone:
             self.runCommand(userCmd, galilCmdStr="XQ#STATUS", nextDevCmdCall=self._statusCallback)
         else:
@@ -1136,6 +1141,7 @@ class GalilDevice(TCPDevice):
         self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
         self.writeState(cmd=self.userCmdOrNone)
         self._devCmdCallback(self.currDevCmd)
+        self.statusTimer.start(self.StatusInterval, self.cmdStatus, expandCommand())
 
     def formatGalilCommand(self, valueList, cmd, axisPrefix="", valFmt="%0.f", nAxes=None):
         """Format a Galil command.
