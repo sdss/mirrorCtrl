@@ -323,7 +323,7 @@ class GalilDevice(TCPDevice):
         self.mirror = mirror
         self.stTimer = Timer()
         self.statusTimer = Timer()
-        self.statusTimer.start(self.StatusInterval, self.cmdStatus, expandCommand())
+        self.statusTimer.start(self.StatusInterval, self.statusLoop)
         TCPDevice.__init__(self,
             name = "galil",
             host = host,
@@ -1033,6 +1033,18 @@ class GalilDevice(TCPDevice):
         self.writeState(cmd=userCmd)
         userCmd.setState(userCmd.Done)
 
+    def statusLoop(self):
+        """This function gets called on a timer
+        to periodically get status from the galil.
+        This is to keep the connection alive
+        """
+        expandedCmd = expandCommand()
+        if self.userCmdQueue.currExeCmd.cmd.isDone:
+            # get status if nothing is running.
+            self.runCommand(expandedCmd, galilCmdStr="XQ#STATUS", nextDevCmdCall=self._statusCallback)
+        self.statusTimer.start(self.StatusInterval, self.statusLoop)
+
+
     def cmdStatus(self, userCmd):
         """Return the Galil status to the user.
 
@@ -1040,7 +1052,6 @@ class GalilDevice(TCPDevice):
 
         If the Galil is busy then returns cached data.
         """
-        self.statusTimer.cancel()
         if self.userCmdQueue.currExeCmd.cmd.isDone:
             self.runCommand(userCmd, galilCmdStr="XQ#STATUS", nextDevCmdCall=self._statusCallback)
         else:
@@ -1142,7 +1153,6 @@ class GalilDevice(TCPDevice):
         self.writeToUsers("i", statusStr, cmd=self.userCmdOrNone)
         self.writeState(cmd=self.userCmdOrNone)
         self._devCmdCallback(self.currDevCmd)
-        self.statusTimer.start(self.StatusInterval, self.cmdStatus, expandCommand())
 
     def formatGalilCommand(self, valueList, cmd, axisPrefix="", valFmt="%0.f", nAxes=None):
         """Format a Galil command.
