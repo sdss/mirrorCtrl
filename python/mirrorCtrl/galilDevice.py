@@ -330,6 +330,7 @@ class GalilDevice(TCPDevice):
             port = port,
             callFunc = callFunc,
             cmdInfo = (),
+            lineTerminator = "\r",
         )
         ## currently executing (or last completed) device command
         self.currDevCmd = self.cmdClass("")
