@@ -52,6 +52,7 @@ class MirrorCtrl(Actor):
         """
         self.galil.userCmdQueue.queueTimer.cancel()
         self.statusTimer.cancel()
+        self.galil.statusTimer.cancel()
 
     def processOrientation(self, orientation):
         """!Convert a user specified orientation in um and arcseconds with possibly < 5
