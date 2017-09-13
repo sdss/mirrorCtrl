@@ -91,6 +91,8 @@ class Test25mPrimTilt(TestCase):
         return gatherResults([self.hiddenTilts.readyDeferred, self.noHiddenTilts.readyDeferred])
 
     def tearDown(self):
+        self.hiddenTilts.device.statusTimer.cancel()
+        self.noHiddenTilts.device.statusTimer.cancel()
         return gatherResults([self.hiddenTilts.close(), self.noHiddenTilts.close()])
 
     @property

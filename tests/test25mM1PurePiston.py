@@ -30,6 +30,7 @@ class Test25mM1PurePiston(TestCase):
         return self.dw.readyDeferred
 
     def tearDown(self):
+        self.dw.device.statusTimer.cancel()
         d = self.dw.close()
         return d
 
