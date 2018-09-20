@@ -162,7 +162,7 @@ def _makeMirror():
     # maxCorrList = [0.79]*3   + [0.16]*2 # max correction (mm); 1000000 actuator microsteps for A-C; 5000 for D-E
 
     minCorrList = [75]*5 # min correction (microsteps)
-    maxCorrList = [1000000]*3   + [5000]*2 # max correction (microsteps)
+    maxCorrList = [1000000]*3   + [15000]*2 # max correction (microsteps)
 
 
     return mirrorCtrl.DirectMirror(
