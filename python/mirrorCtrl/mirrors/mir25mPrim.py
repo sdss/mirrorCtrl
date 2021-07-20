@@ -69,7 +69,9 @@ def _makeMirror():
     # Note: March 2015 testing, found no stars reverted to earlier mirror numbers
     # Note: May 2015 testing, adjusted orientation values in inst/default.dat
     # Note: August 2016 updated to new values. Previous values: 9900., -50., 6300., -1600., 12000., 12000.
-    ActMountOffset = numpy.array([10450., -1100., 6850., 19700., 8500., 8550.])
+    # Note: June 2021 updated to new values
+    #  previous values: [10450., -1100., 6850., 19700., 8500., 8550.]
+    ActMountOffset = numpy.array([8600., -150., 7800., 16050., 8500., 8550.])
     # do we want a higher resolution scale?
     ActMountScale = numpy.array([15.696, 15.696, 15.696, 15.696,  33.22, 32.53])
 
