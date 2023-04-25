@@ -8,7 +8,8 @@ from mirrorCtrl.mirrors import mir25mPrim
 
 __all__ = ["Prim25mMirrorCtrl"]
 
-GalilHost = "t-g-sdss-2"
+#GalilHost = "t-g-sdss-2"
+GalilHost = "10.25.1.11"
 GalilPort = 2900 # terminal server port 9
 # GalilHost = "localhost"
 
