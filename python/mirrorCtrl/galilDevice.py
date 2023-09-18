@@ -946,7 +946,7 @@ class GalilDevice(TCPDevice):
         # check limits of travel
         for mt, link in itertools.izip(mount, self.mirror.actuatorList):
             if not (link.minMount <= mt <= link.maxMount):
-                userCmd.setState(userCmd.Failed, "Commanded orientation %s violates mount limits" % str(orient))
+                userCmd.setState(userCmd.Failed, "Desired orientation: %s violates mount limits with desired actuator positions: %s" % (str(orient), str(mount)))
                 return
 
         # apply the current offset (doing this for small moves avoids unwanted mirror motion
